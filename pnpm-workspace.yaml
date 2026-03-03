@@ -1,0 +1,4 @@
+@"
+packages:
+  - "apps/*"
+"@ | Set-Content pnpm-workspace.yaml

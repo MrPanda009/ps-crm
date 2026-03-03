@@ -1,0 +1,23 @@
+@"
+# Node
+node_modules
+.next
+dist
+out
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Mac
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+"@ | Set-Content .gitignore
