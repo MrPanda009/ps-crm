@@ -8,12 +8,22 @@ export default function LoginPage() {
     <div className="flex flex-col min-h-screen ">
         <main>
       <AnimatedAuth 
-        themeColor="#b58d80" // Changes the primary accent to blue
-        glowColor="rgba(59, 130, 246, 0.4)"
+        themeColor="#b58d80"
+        themeColorDark="#8c6a5d"
+        glowColor="rgba(32, 10, 8, 0.46)"
+        glowColorDark="rgba(16, 5, 4, 0.6)"
         transitionTintColor="#d2b48c"
+        transitionTintColorDark="#2c241b"
         backgroundColor="#d2b48c"
-        backdropClassName="bg-gradient-to-br from-#d2c6be"
+        backgroundColorDark="#2c241b"
+        backdrop="#ad7777"
+        backdropDark="#1f1515"
+        placeholderColor="rgb(0, 0, 0)"
+        placeholderColorDark="rgba(255, 255, 255, 1)"
+        leftPanelSubtitle = 'Lorem ipsum dolor sit amet consectetur adipisicing.'
         leftPanelTitle="STAY CONNECTED!"
+        rightPanelTitle = 'HELLO FRIEND!'
+        rightPanelSubtitle = 'Enter your personal details and start your journey with us.'
         leftPanelImage = 'Image1.jpg'
         rightPanelImage = 'Image2.jpg'
       />

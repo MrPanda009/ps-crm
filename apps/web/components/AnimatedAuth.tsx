@@ -6,16 +6,24 @@ import { useGSAP } from '@gsap/react';
 import { User, Lock, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/src/lib/supabase';
+import { useTheme } from './ThemeProvider';
 
 // Register the hook to ensure proper cleanup in React strict mode
 gsap.registerPlugin(useGSAP);
 
 export interface AnimatedAuthProps {
   themeColor?: string;
+  themeColorDark?: string;
   glowColor?: string;
+  glowColorDark?: string;
   backgroundColor?: string;
-  backdropClassName?: string;
+  backgroundColorDark?: string;
+  backdrop?: string;
+  backdropDark?: string;
+  placeholderColor?: string;
+  placeholderColorDark?: string;
   transitionTintColor?: string;
+  transitionTintColorDark?: string;
   leftPanelTitle?: string;
   leftPanelSubtitle?: string;
   rightPanelTitle?: string;
@@ -31,12 +39,37 @@ type Role = (typeof roles)[number];
 
 export const ANIMATED_AUTH_TRANSITION_TINT_COLOR = '#d2b48c';
 
+export const AUTH_COLORS_LIGHT = {
+  themeColor: '#b58d80',
+  glowColor: 'rgba(59, 130, 246, 0.4)',
+  backgroundColor: '#d2b48c',
+  backdrop: '#ad7777',
+  placeholderColor: '#9ca3af',
+  transitionTintColor: '#d2b48c',
+};
+
+export const AUTH_COLORS_DARK = {
+  themeColor: '#8b5cf6',
+  glowColor: 'rgba(139, 92, 246, 0.5)',
+  backgroundColor: '#0a0a0a',
+  backdrop: '#18181b',
+  placeholderColor: '#9ca3af',
+  transitionTintColor: '#d2b48c',
+};
+
 export default function AnimatedAuth({
-  themeColor = '#8b5cf6', // Default purple (Tailwind violet-500)
-  glowColor = 'rgba(139, 92, 246, 0.5)',
-  backgroundColor = '#0a0a0a',
-  backdropClassName = 'bg-gradient-to-br from-slate-100 via-stone-100 to-amber-50',
-  transitionTintColor = ANIMATED_AUTH_TRANSITION_TINT_COLOR,
+  themeColor = AUTH_COLORS_LIGHT.themeColor,
+  themeColorDark = AUTH_COLORS_DARK.themeColor,
+  glowColor = AUTH_COLORS_LIGHT.glowColor,
+  glowColorDark = AUTH_COLORS_DARK.glowColor,
+  backgroundColor = AUTH_COLORS_LIGHT.backgroundColor,
+  backgroundColorDark = AUTH_COLORS_DARK.backgroundColor,
+  backdrop = AUTH_COLORS_LIGHT.backdrop,
+  backdropDark = AUTH_COLORS_DARK.backdrop,
+  placeholderColor = AUTH_COLORS_LIGHT.placeholderColor,
+  placeholderColorDark = AUTH_COLORS_DARK.placeholderColor,
+  transitionTintColor = AUTH_COLORS_LIGHT.transitionTintColor,
+  transitionTintColorDark = AUTH_COLORS_DARK.transitionTintColor,
   leftPanelTitle = 'WELCOME BACK!',
   leftPanelSubtitle = 'Lorem ipsum dolor sit amet consectetur adipisicing.',
   rightPanelTitle = 'HELLO FRIEND!',
@@ -46,6 +79,7 @@ export default function AnimatedAuth({
   leftPanelImage = '/Authsideimage.jpeg',
   rightPanelImage = '/Authsideimage.jpeg',
 }: AnimatedAuthProps) {
+  const { theme } = useTheme();
   const [isLogin, setIsLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -71,6 +105,14 @@ export default function AnimatedAuth({
   const overlayRightTextRef = useRef<HTMLDivElement>(null);
   const loginFormRef = useRef<HTMLDivElement>(null);
   const signupFormRef = useRef<HTMLDivElement>(null);
+
+  const isDark = theme === 'dark';
+  const activeThemeColor = isDark ? themeColorDark : themeColor;
+  const activeGlowColor = isDark ? glowColorDark : glowColor;
+  const activeBackgroundColor = isDark ? backgroundColorDark : backgroundColor;
+  const activeBackdrop = isDark ? backdropDark : backdrop;
+  const activePlaceholderColor = isDark ? placeholderColorDark : placeholderColor;
+  const activeTransitionTintColor = isDark ? transitionTintColorDark : transitionTintColor;
 
   useGSAP(() => {
     gsap.fromTo(
@@ -137,7 +179,7 @@ export default function AnimatedAuth({
     }
 
     setLoading(false);
-    router.push('/map');
+    router.push('/citizendashboard');
   };
 
   const handleSignup = async () => {
@@ -191,15 +233,19 @@ export default function AnimatedAuth({
   };
 
   return (
-    <div className={`flex items-center justify-center min-h-screen ${backdropClassName} p-4`}>
+    <div
+      className="flex items-center justify-center min-h-screen p-4 bg-cover bg-center"
+      style={{ background: activeBackdrop }}
+    >
       {/* Main Container */}
       <div
         ref={containerRef}
         className="relative w-full max-w-4xl h-[600px] md:h-[500px] rounded-xl overflow-hidden flex"
         style={{
-          backgroundColor,
-          boxShadow: `0 0 20px ${glowColor}, inset 0 0 0 1px ${themeColor}40`,
-        }}
+          backgroundColor: activeBackgroundColor,
+          boxShadow: `0 0 20px ${activeGlowColor}, inset 0 0 0 1px ${activeThemeColor}40`,
+          '--auth-placeholder': activePlaceholderColor,
+        } as React.CSSProperties}
       >
         {(error || message) && (
           <div className="absolute left-1/2 top-4 z-30 -translate-x-1/2 px-4 py-2 text-sm rounded-lg border border-white/20 bg-black/70 text-white">
@@ -220,7 +266,7 @@ export default function AnimatedAuth({
                 placeholder="Email"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-sm placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-sm placeholder-[var(--auth-placeholder)]"
               />
               <span className="absolute right-0 text-gray-400">
                 <Mail size={16} />
@@ -232,7 +278,7 @@ export default function AnimatedAuth({
                 placeholder="Password" 
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-sm placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-sm placeholder-[var(--auth-placeholder)]"
               />
               <button
                 type="button"
@@ -247,13 +293,13 @@ export default function AnimatedAuth({
             onClick={handleLogin}
             disabled={loading}
             className="w-full mt-8 py-3 rounded-full text-white font-semibold transition-transform hover:scale-105"
-            style={{ backgroundColor: themeColor }}
+            style={{ backgroundColor: activeThemeColor }}
           >
             {loading ? 'Please wait...' : loginTitle}
           </button>
           <p className="text-xs text-gray-400 mt-6 text-center">
             Don't have an account?{' '}
-            <button onClick={() => setIsLogin(false)} style={{ color: themeColor }} className="hover:underline">
+            <button onClick={() => setIsLogin(false)} style={{ color: activeThemeColor }} className="hover:underline">
               Sign Up
             </button>
           </p>
@@ -272,7 +318,7 @@ export default function AnimatedAuth({
                 placeholder="Full name"
                 value={signupName}
                 onChange={(e) => setSignupName(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
               />
               <span className="absolute right-0 text-gray-400">
                 <User size={16} />
@@ -284,7 +330,7 @@ export default function AnimatedAuth({
                 placeholder="Email" 
                 value={signupEmail}
                 onChange={(e) => setSignupEmail(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
               />
               <span className="absolute right-0 text-gray-400">
                 <Mail size={16} />
@@ -296,7 +342,7 @@ export default function AnimatedAuth({
                 placeholder="Phone"
                 value={signupPhone}
                 onChange={(e) => setSignupPhone(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
               />
               <span className="absolute right-0 text-gray-400">
                 <User size={16} />
@@ -308,7 +354,7 @@ export default function AnimatedAuth({
                 placeholder="City (required)"
                 value={signupCity}
                 onChange={(e) => setSignupCity(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
               />
               <span className="absolute right-0 text-gray-400">
                 <User size={16} />
@@ -320,7 +366,7 @@ export default function AnimatedAuth({
                 placeholder="Department"
                 value={signupDepartment}
                 onChange={(e) => setSignupDepartment(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
               />
               <span className="absolute right-0 text-gray-400">
                 <User size={16} />
@@ -332,7 +378,7 @@ export default function AnimatedAuth({
                 placeholder="Password" 
                 value={signupPassword}
                 onChange={(e) => setSignupPassword(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-gray-400"
+                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
               />
               <button
                 type="button"
@@ -343,10 +389,10 @@ export default function AnimatedAuth({
               </button>
             </div>
             <div>
-              <p className="text-[11px] text-gray-400 mb-1.5">Role</p>
+              <p className="text-[11px] mb-1.5" style={{ color: activePlaceholderColor }}>Role</p>
               <div className="flex flex-wrap gap-3">
                 {roles.map((role) => (
-                  <label key={role} className="text-[11px] text-gray-200 capitalize flex items-center gap-1.5">
+                  <label key={role} className="text-[11px] capitalize flex items-center gap-1.5" style={{ color: activePlaceholderColor }}>
                     <input
                       type="radio"
                       name="signup-role"
@@ -364,13 +410,13 @@ export default function AnimatedAuth({
             onClick={handleSignup}
             disabled={loading}
             className="w-full mt-4 py-2.5 rounded-full text-white text-sm font-semibold transition-transform hover:scale-105"
-            style={{ backgroundColor: themeColor }}
+            style={{ backgroundColor: activeThemeColor }}
           >
             {loading ? 'Please wait...' : signupTitle}
           </button>
           <p className="text-[11px] text-gray-400 mt-3 text-center">
             Already have an account?{' '}
-            <button onClick={() => setIsLogin(true)} style={{ color: themeColor }} className="hover:underline">
+            <button onClick={() => setIsLogin(true)} style={{ color: activeThemeColor }} className="hover:underline">
               Login
             </button>
           </p>
@@ -399,7 +445,7 @@ export default function AnimatedAuth({
           <div
             ref={overlayTintRef}
             className="absolute inset-0 opacity-0 z-10"
-            style={{ backgroundColor: transitionTintColor }}
+            style={{ backgroundColor: activeTransitionTintColor }}
           />
 
           {/* Overlay Content Left (Visible when overlay is on the left) */}
