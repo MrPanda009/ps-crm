@@ -11,7 +11,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const citizenNavigation: SidebarNavigationItem[] = [
     { id: "dashboard", name: "Dashboard", icon: <LayoutGrid size={20} strokeWidth={2.5} />, href: "#", isActive: true },
     { id: "track", name: "Your Tickets", icon: <Ticket size={20} strokeWidth={2} />, href: "#" },
-    { id: "projects", name: "Heatmap", icon: <Flame size={20} strokeWidth={2} />, href: "#", },
+    { id: "projects", name: "Heatmap", icon: <Flame size={20} strokeWidth={2} />, href: "/citizendashboard/heatmap", },
     { id: "reports", name: "Nearby Tickets", icon: <MapPin size={20} strokeWidth={2} />, href: "#" },
   ];
 
@@ -20,6 +20,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     branding: {
       ...defaultSidebarConfig.branding,
       title: "Citizen",
+    },
+    colors: {
+      ...defaultSidebarConfig.colors,
+      textMain: "text-white dark:text-white",
     },
     navigation: citizenNavigation,
   };
