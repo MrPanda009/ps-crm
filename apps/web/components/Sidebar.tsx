@@ -1,0 +1,281 @@
+"use client";
+
+import React, { useEffect, useRef } from "react";
+import { 
+  Flame, 
+  LayoutGrid, 
+  Target, 
+  FolderKanban, 
+  FileText, 
+  MessageSquare, 
+  Settings,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Sun,
+  Moon
+} from "lucide-react";
+import gsap from "gsap";
+import { useTheme } from "@/components/ThemeProvider";
+
+// 0. Color Interface & Constants
+export interface SidebarThemeColors {
+  background: string;
+  border: string;
+  textMain: string;
+  textMuted: string;
+  textHover: string;
+  bgHover: string;
+  activeText: string;
+  activeBg: string;
+  activeIndicator: string;
+  badgeBg: string;
+  badgeText: string;
+  toggleButtonBg: string;
+}
+
+export const SIDEBAR_LIGHT_COLORS: SidebarThemeColors = {
+  background: "bg-[#4f392e]",
+  border: "border-gray-100",
+  textMain: "text-gray-900",
+  textMuted: "text-gray-400",
+  textHover: "hover:text-gray-700",
+  bgHover: "hover:bg-gray-50",
+  activeText: "text-[#ffffff]",
+  activeBg: "bg-[#b4725a]",
+  activeIndicator: "bg-[#b4725a]",
+  badgeBg: "bg-[#b4725a]",
+  badgeText: "text-white",
+  toggleButtonBg: "bg-white",
+};
+
+export const SIDEBAR_DARK_COLORS: SidebarThemeColors = {
+  background: "dark:bg-gray-950",
+  border: "dark:border-gray-800",
+  textMain: "dark:text-white",
+  textMuted: "dark:text-gray-500",
+  textHover: "dark:hover:text-gray-200",
+  bgHover: "dark:hover:bg-gray-900",
+  activeText: "dark:text-purple-400",
+  activeBg: "dark:bg-purple-900/20",
+  activeIndicator: "dark:bg-purple-500",
+  badgeBg: "dark:bg-purple-500",
+  badgeText: "dark:text-white",
+  toggleButtonBg: "dark:bg-gray-800",
+};
+
+// 1. The Exported Interface for Maximum Customizability
+export interface SidebarConfig {
+  branding: {
+    title: string;
+    icon: React.ReactNode;
+  };
+  colors: SidebarThemeColors;
+  navigation: Array<{
+    id: string;
+    name: string;
+    icon: React.ReactNode;
+    href: string;
+    isActive?: boolean;
+    badge?: number;
+  }>;
+  bottomNavigation: Array<{
+    id: string;
+    name: string;
+    icon: React.ReactNode;
+    href: string;
+  }>;
+  // Mobile drawer controls
+  isOpen: boolean;
+  onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+// 2. Default Configuration (matches your Taskify UI design)
+export const defaultSidebarConfig: Omit<SidebarConfig, "isOpen" | "onClose" | "isCollapsed" | "onToggleCollapse"> = {
+  branding: {
+    title: "Taskify",
+    icon: <Flame size={24} strokeWidth={2.5} className="text-purple-600 dark:text-purple-400" />,
+  },
+  colors: {
+    background: `${SIDEBAR_LIGHT_COLORS.background} ${SIDEBAR_DARK_COLORS.background}`,
+    border: `${SIDEBAR_LIGHT_COLORS.border} ${SIDEBAR_DARK_COLORS.border}`,
+    textMain: `${SIDEBAR_LIGHT_COLORS.textMain} ${SIDEBAR_DARK_COLORS.textMain}`,
+    textMuted: `${SIDEBAR_LIGHT_COLORS.textMuted} ${SIDEBAR_DARK_COLORS.textMuted}`,
+    textHover: `${SIDEBAR_LIGHT_COLORS.textHover} ${SIDEBAR_DARK_COLORS.textHover}`,
+    bgHover: `${SIDEBAR_LIGHT_COLORS.bgHover} ${SIDEBAR_DARK_COLORS.bgHover}`,
+    activeText: `${SIDEBAR_LIGHT_COLORS.activeText} ${SIDEBAR_DARK_COLORS.activeText}`,
+    activeBg: `${SIDEBAR_LIGHT_COLORS.activeBg} ${SIDEBAR_DARK_COLORS.activeBg}`,
+    activeIndicator: `${SIDEBAR_LIGHT_COLORS.activeIndicator} ${SIDEBAR_DARK_COLORS.activeIndicator}`,
+    badgeBg: `${SIDEBAR_LIGHT_COLORS.badgeBg} ${SIDEBAR_DARK_COLORS.badgeBg}`,
+    badgeText: `${SIDEBAR_LIGHT_COLORS.badgeText} ${SIDEBAR_DARK_COLORS.badgeText}`,
+    toggleButtonBg: `${SIDEBAR_LIGHT_COLORS.toggleButtonBg} ${SIDEBAR_DARK_COLORS.toggleButtonBg}`,
+  },
+  navigation: [
+    { id: "dashboard", name: "Dashboard", icon: <LayoutGrid size={20} strokeWidth={2.5} />, href: "#", isActive: true },
+    { id: "track", name: "Track", icon: <Target size={20} strokeWidth={2} />, href: "#" },
+    { id: "projects", name: "Projects", icon: <FolderKanban size={20} strokeWidth={2} />, href: "#", badge: 2 },
+    { id: "reports", name: "Reports", icon: <FileText size={20} strokeWidth={2} />, href: "#" },
+  ],
+  bottomNavigation: [
+    { id: "support", name: "Support", icon: <MessageSquare size={20} strokeWidth={2} />, href: "#" },
+    { id: "settings", name: "Settings", icon: <Settings size={20} strokeWidth={2} />, href: "#" },
+  ],
+};
+
+// 3. The Component
+const Sidebar: React.FC<SidebarConfig> = ({ 
+  branding, 
+  colors, 
+  navigation, 
+  bottomNavigation, 
+  isOpen, 
+  onClose,
+  isCollapsed = false,
+  onToggleCollapse
+}) => {
+  const sidebarRef = useRef<HTMLElement>(null);
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+
+  useEffect(() => {
+    // GSAP stagger animation - only runs when the sidebar is rendered/opened
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        ".menu-item",
+        { y: 15, autoAlpha: 0 },
+        {
+          y: 0,
+          autoAlpha: 1,
+          duration: 0.3,
+          stagger: 0.04, // Faster stagger for a snappier feel
+          ease: "power2.out",
+          clearProps: "opacity,visibility,transform",
+        }
+      );
+    }, sidebarRef);
+
+    return () => ctx.revert();
+  }, [isOpen]); // Re-run animation if mobile menu toggles
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-gray-900/50 dark:bg-black/60 z-40 lg:hidden transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar Drawer / Static Sidebar */}
+      <aside 
+        ref={sidebarRef} 
+        className={`
+          fixed top-0 left-0 z-50 h-screen flex flex-col py-8 overflow-x-visible font-sans transition-all duration-300 ease-in-out
+          ${colors.background} ${colors.border} lg:border-r lg:relative lg:translate-x-0
+          ${isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
+          ${isCollapsed ? "w-20" : "w-64"}
+        `}
+      >
+        {/* Desktop Collapse Toggle */}
+        <button
+          onClick={onToggleCollapse}
+          className={`absolute -right-3 top-10 z-50 hidden lg:flex h-6 w-6 items-center justify-center rounded-full border text-gray-500 shadow-md hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:text-white transition-colors ${colors.toggleButtonBg}`}
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
+
+        {/* make top part scrollable so bottom nav stays visible */}
+        <div className="flex min-h-0 flex-col flex-1 overflow-y-auto">
+          {/* Logo & Mobile Close Button */}
+          <div className={`flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-8"} mb-10 menu-item transition-all duration-300`}>
+            <div className={`flex items-center ${isCollapsed ? "justify-center gap-0" : "gap-3"} transition-all duration-300`}>
+              <div className="bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-lg shrink-0">
+                {branding.icon}
+              </div>
+              <span className={`text-2xl font-bold ${colors.textMain} whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"}`}>
+                {branding.title}
+              </span>
+            </div>
+            {/* Close button only visible on mobile */}
+            <button onClick={onClose} className={`lg:hidden text-gray-500 hover:text-gray-900 dark:hover:text-white ${isCollapsed ? "hidden" : "block"}`}>
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Main Navigation */}
+          <nav className={`space-y-2 ${isCollapsed ? "px-2" : "px-4"} transition-all duration-300`}>
+            {navigation.map((item) => (
+              <div key={item.id} className="relative menu-item">
+                {item.isActive && (
+                  <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-r-md ${colors.activeIndicator}`} />
+                )}
+                <a 
+                  href={item.href} 
+                  className={`
+                    flex items-center ${isCollapsed ? "justify-center px-2" : "justify-start px-4"} py-3 ml-2 rounded-xl font-medium transition-all duration-300
+                    ${item.isActive 
+                      ? `${colors.activeBg} ${colors.activeText} font-semibold` 
+                      : `${colors.textMuted} ${colors.textHover} ${colors.bgHover}`
+                    }
+                  `}
+                  title={isCollapsed ? item.name : undefined}
+                >
+                  <div className={`flex items-center ${isCollapsed ? "gap-0" : "gap-4"} transition-all duration-300`}>
+                    <div className="shrink-0">{item.icon}</div>
+                    <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"}`}>
+                      {item.name}
+                    </span>
+                  </div>
+                  {item.badge && (
+                    <>
+                      <span className={`ml-auto text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${colors.badgeBg} ${colors.badgeText} transition-all duration-300 ${isCollapsed ? "w-0 opacity-0 overflow-hidden scale-0" : "w-5 opacity-100 scale-100"}`}>
+                        {item.badge}
+                      </span>
+                      <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${colors.badgeBg} transition-all duration-300 ${isCollapsed ? "opacity-100 scale-100" : "opacity-0 scale-0"}`} />
+                    </>
+                  )}
+                </a>
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className={`shrink-0 space-y-2 ${isCollapsed ? "px-2" : "px-4"} transition-all duration-300`}>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className={`menu-item flex w-full items-center ${isCollapsed ? "justify-center px-2 gap-0" : "justify-start px-4 gap-4"} py-3 ml-2 rounded-xl font-medium transition-all duration-300 ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
+            title={isCollapsed ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
+          >
+            <div className="shrink-0">
+              {isDark ? <Sun size={20} strokeWidth={2} /> : <Moon size={20} strokeWidth={2} />}
+            </div>
+            <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"}`}>
+              {isDark ? "Light Mode" : "Dark Mode"}
+            </span>
+          </button>
+
+          {bottomNavigation.map((item) => (
+            <a 
+              key={item.id}
+              href={item.href} 
+              className={`menu-item flex items-center ${isCollapsed ? "justify-center px-2 gap-0" : "justify-start px-4 gap-4"} py-3 ml-2 rounded-xl font-medium transition-all duration-300 ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
+              title={isCollapsed ? item.name : undefined}
+            >
+              <div className="shrink-0">{item.icon}</div>
+              <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"}`}>
+                {item.name}
+              </span>
+            </a>
+          ))}
+        </div>
+      </aside>
+    </>
+  );
+};
+
+export default Sidebar;

@@ -4,6 +4,9 @@
 /* existing styles below */
 @import "tailwindcss";
 
+/* Use the `dark` class on <html> as the source of truth for theme switching. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @keyframes floatBubble {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-8px); }
