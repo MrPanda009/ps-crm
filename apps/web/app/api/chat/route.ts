@@ -5,6 +5,8 @@ import { SYSTEM_PROMPT } from "@/lib/gemini";
 import type { ChatMessage, GeminiResponse, ExtractedComplaint } from "@/lib/gemini";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL ?? "gemini-2.5-flash";
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.0-flash";
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:3000",
   "http://localhost:3001",
@@ -23,7 +25,7 @@ interface GeminiCandidate {
 
 interface GeminiApiResponse {
   candidates?: GeminiCandidate[];
-  error?: { message: string };
+  error?: { message: string; status?: string; code?: number };
 }
 
 function getCorsHeaders(origin: string | null): HeadersInit {
@@ -116,22 +118,62 @@ export async function POST(req: NextRequest): Promise<NextResponse<GeminiRespons
   ];
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents,
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
-        }),
-      },
+    const models = [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL].filter(
+      (v, i, arr) => Boolean(v) && arr.indexOf(v) === i,
     );
 
-    const data = (await geminiRes.json()) as GeminiApiResponse;
+    let data: GeminiApiResponse | null = null;
+    let quotaFailure = false;
 
-    if (data.error) {
+    for (const model of models) {
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents,
+            generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+          }),
+        },
+      );
+
+      data = (await geminiRes.json()) as GeminiApiResponse;
+
+      if (!data.error) {
+        quotaFailure = false;
+        break;
+      }
+
+      const isQuota =
+        data.error.code === 429 ||
+        data.error.status === "RESOURCE_EXHAUSTED" ||
+        /quota|resource_exhausted/i.test(data.error.message);
+
+      const isNotFound =
+        data.error.code === 404 ||
+        data.error.status === "NOT_FOUND" ||
+        /not found|unsupported/i.test(data.error.message);
+
+      if (isQuota) {
+        quotaFailure = true;
+        continue;
+      }
+
+      if (isNotFound) {
+        // Model ID may be unavailable for this API version/project; try next model.
+        continue;
+      }
+
       return NextResponse.json({ error: data.error.message }, withCors(req, { status: 502 }));
+    }
+
+    if (!data || data.error) {
+      const status = quotaFailure ? 429 : 502;
+      const message = quotaFailure
+        ? "Gemini quota exhausted. Please retry shortly or switch to a billed Gemini project."
+        : (data?.error?.message ?? "Gemini request failed");
+      return NextResponse.json({ error: message }, withCors(req, { status }));
     }
 
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";

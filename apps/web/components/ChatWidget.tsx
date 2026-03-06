@@ -38,10 +38,25 @@ interface ImageTicketPreview {
   status: string;
   ward_name: string;
   pincode: string;
+  digipin: string;
+  locality: string;
+  city: string;
+  district: string;
+  state: string;
+  formatted_address: string;
   latitude: number;
   longitude: number;
+  accuracy: number;
+  timestamp: string;
   user_text: string;
   confirm_prompt: string;
+}
+
+interface DeviceLocation {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: string;
 }
 
 const ISSUE_TYPE_CATEGORY_MAP: Array<{ keywords: string[]; categoryId: number }> = [
@@ -106,16 +121,23 @@ export default function ChatWidget() {
     });
   }, []);
 
-  /** Get browser geolocation (returns Delhi fallback on failure) */
-  const getLocation = (): Promise<{ lat: number; lng: number }> =>
+  /** Get browser geolocation and keep strict location metadata with fallback. */
+  const getLocation = (): Promise<DeviceLocation> =>
     new Promise((resolve) => {
+      const now = new Date().toISOString();
       if (!navigator.geolocation) {
-        resolve({ lat: 28.6139, lng: 77.209 });
+        resolve({ lat: 28.6139, lng: 77.209, accuracy: 10000, timestamp: now });
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve({ lat: 28.6139, lng: 77.209 }),
+        (pos) =>
+          resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : 9999,
+            timestamp: new Date(pos.timestamp).toISOString(),
+          }),
+        () => resolve({ lat: 28.6139, lng: 77.209, accuracy: 10000, timestamp: now }),
         { timeout: 8000 },
       );
     });
@@ -214,7 +236,7 @@ export default function ChatWidget() {
             return;
           }
 
-          const { lat, lng } = await getLocation();
+          const { lat, lng, accuracy, timestamp } = await getLocation();
 
           // Build FormData for FastAPI /analyze
           const formData = new FormData();
@@ -222,6 +244,8 @@ export default function ChatWidget() {
           formData.append("user_text", input.trim() || "Please analyze this civic issue");
           formData.append("latitude", lat.toString());
           formData.append("longitude", lng.toString());
+          formData.append("accuracy", accuracy.toString());
+          formData.append("timestamp", timestamp);
 
           const res = await fetch(`${API_URL}/analyze`, {
             method: "POST",
@@ -320,12 +344,12 @@ export default function ChatWidget() {
       formData.append("user_text", "Confirmed by user");
       formData.append("latitude", pendingImagePreview.latitude.toString());
       formData.append("longitude", pendingImagePreview.longitude.toString());
+      formData.append("accuracy", pendingImagePreview.accuracy.toString());
+      formData.append("timestamp", pendingImagePreview.timestamp);
       formData.append("child_id", pendingImagePreview.child_id.toString());
       formData.append("title", pendingImagePreview.title);
       formData.append("description", pendingImagePreview.description);
       formData.append("severity_db", pendingImagePreview.severity_db);
-      formData.append("ward_name", pendingImagePreview.ward_name);
-      formData.append("pincode", pendingImagePreview.pincode);
 
       const res = await fetch(`${API_URL}/confirm`, {
         method: "POST",
@@ -370,7 +394,7 @@ export default function ChatWidget() {
         return;
       }
 
-      const { lat, lng } = await getLocation();
+      const { lat, lng, accuracy, timestamp } = await getLocation();
       const categoryId = categoryFromIssueType(pendingComplaint.issue_type);
       const severityLevel = severityToLevel(pendingComplaint.severity);
 
@@ -385,6 +409,8 @@ export default function ChatWidget() {
           severity: severityLevel,
           latitude: lat,
           longitude: lng,
+          accuracy,
+          timestamp,
           city: "Delhi",
         }),
       });
@@ -531,6 +557,7 @@ export default function ChatWidget() {
                             ["Severity", `${msg.imagePreview.severity} (${msg.imagePreview.severity_db})`],
                             ["Ward", msg.imagePreview.ward_name],
                             ["Pincode", msg.imagePreview.pincode],
+                            ["DIGIPIN", msg.imagePreview.digipin],
                             ["Authority", msg.imagePreview.authority],
                           ].map(([label, value]) => (
                             <tr key={label} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
