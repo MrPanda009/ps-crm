@@ -22,7 +22,21 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   title: "JanSamadhan",
-  description: "JanSamadhan – your civic complaint CRM",
+  description:
+    "JanSamadhan is a public grievance platform to report civic issues, track complaint status, and connect citizens with the right local authorities.",
+  openGraph: {
+    title: "JanSamadhan",
+    description:
+      "Report civic issues, track complaint progress, and get connected to the correct department with JanSamadhan.",
+    siteName: "JanSamadhan",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "JanSamadhan",
+    description:
+      "A civic issue reporting and complaint-tracking platform for citizens and authorities.",
+  },
 };
 
 export default function RootLayout({
