@@ -15,6 +15,7 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 interface ComplaintPayload {
   citizen_id: string;
   category_id: number;
+  issue_type?: string;
   title: string;
   description: string;
   severity: "L1" | "L2" | "L3" | "L4";
@@ -28,6 +29,25 @@ interface ComplaintPayload {
   address_text?: string;
   assigned_department?: string;
   city?: string;
+}
+
+interface CanonicalComplaintRecord {
+  id: string;
+  user_id: string;
+  issue_type: string;
+  severity: string;
+  description: string;
+  image_url: string;
+  lat: number;
+  lng: number;
+  address: string;
+  pincode: string;
+  city: string;
+  district: string;
+  authority: string;
+  status: string;
+  created_at: string;
+  digipin: string;
 }
 
 interface ReverseGeo {
@@ -140,6 +160,42 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<Reve
   return location;
 }
 
+function buildCanonicalComplaintRecord(input: {
+  userId: string;
+  issueType: string;
+  severity: string;
+  description: string;
+  imageUrl: string;
+  lat: number;
+  lng: number;
+  address: string;
+  pincode: string;
+  city: string;
+  district: string;
+  authority: string;
+  status: string;
+  digipin: string;
+}): CanonicalComplaintRecord {
+  return {
+    id: "",
+    user_id: input.userId,
+    issue_type: input.issueType,
+    severity: input.severity,
+    description: input.description,
+    image_url: input.imageUrl,
+    lat: input.lat,
+    lng: input.lng,
+    address: input.address,
+    pincode: input.pincode,
+    city: input.city,
+    district: input.district,
+    authority: input.authority,
+    status: input.status,
+    created_at: "",
+    digipin: input.digipin,
+  };
+}
+
 /**
  * POST /api/complaints
  * Creates a new complaint in Supabase.
@@ -154,6 +210,7 @@ export async function POST(req: NextRequest) {
   const {
     citizen_id,
     category_id,
+    issue_type,
     title,
     description,
     severity,
@@ -193,6 +250,22 @@ export async function POST(req: NextRequest) {
   const resolvedWard = (ward_name?.trim() || resolved.locality || "Unknown locality").trim();
   const resolvedCity = (city?.trim() || resolved.city || "Delhi").trim();
   const addressWithMeta = `${resolvedAddress} | gps_accuracy_m=${accuracy.toFixed(1)} | gps_timestamp=${timestamp}`;
+  const canonicalComplaint = buildCanonicalComplaintRecord({
+    userId: citizen_id,
+    issueType: (issue_type?.trim() || title.trim()),
+    severity: severity,
+    description,
+    imageUrl: "",
+    lat: latitude,
+    lng: longitude,
+    address: resolvedAddress,
+    pincode: resolvedPincode,
+    city: resolvedCity,
+    district: resolved.district,
+    authority: assigned_department?.trim() || "UNASSIGNED",
+    status: "submitted",
+    digipin: resolvedDigipin,
+  });
 
   // Build PostGIS WKT POINT string
   const locationWKT = `SRID=4326;POINT(${longitude} ${latitude})`;
@@ -200,19 +273,19 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from("complaints")
     .insert({
-      citizen_id,
+      citizen_id: canonicalComplaint.user_id,
       category_id,
       title,
-      description,
-      severity: severity ?? "L2",
+      description: canonicalComplaint.description,
+      severity: canonicalComplaint.severity as "L1" | "L2" | "L3" | "L4",
       status: "submitted",
       location: locationWKT,
       ward_name: resolvedWard,
-      pincode: resolvedPincode,
-      digipin: resolvedDigipin,
+      pincode: canonicalComplaint.pincode,
+      digipin: canonicalComplaint.digipin,
       address_text: addressWithMeta,
       assigned_department: assigned_department ?? null,
-      city: resolvedCity,
+      city: canonicalComplaint.city,
     })
     .select("id, ticket_id, title, status, created_at")
     .single();
