@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Flame, LayoutGrid, MapPin, Menu, Ticket } from "lucide-react";
 import Sidebar, { defaultSidebarConfig, SidebarNavigationItem } from "@/components/Sidebar";
 import { usePathname } from "next/navigation";
+import ChatWidget from "@/components/ChatWidget";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -52,6 +53,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
         {children}
       </main>
+
+      {/* AI Chat Widget */}
+      <ChatWidget />
     </div>
   );
 }
