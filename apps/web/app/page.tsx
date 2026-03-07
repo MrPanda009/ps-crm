@@ -6,10 +6,14 @@ import AnimatedText from "@/components/Animatedtext";
 import DecorativeLine from "@/components/Decorativeline";
 import MapVisual from "@/components/Mapvisual";
 import { MegaFooter } from "@/components/MegaFooter";
+import { useTheme } from "@/components/ThemeProvider";
 
 export default function HomePage() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   return (
-    <main className="flex min-h-screen flex-col bg-[#ddd1c0]">
+    <main className={`flex min-h-screen flex-col transition-colors duration-500 ${isDark ? "bg-[#2a221c]" : "bg-[#ddd1c0]"}`}>
       <Animatedheader />
 
       <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
@@ -36,11 +40,11 @@ export default function HomePage() {
           </div>
 
           <div className="order-1 flex w-full items-center justify-center lg:order-2 lg:w-1/2">
-            <div className="relative w-full max-w-2xl lg:max-w-3xl">
-              <div className="absolute -bottom-5 -left-5 hidden h-full w-full rounded-2xl bg-[#5b4238]/40 lg:block" />
+            <div className="relative w-full max-w-2xl lg:max-w-lg">
+              <div className="absolute -bottom-3 -left-3 h-full w-full rounded-2xl bg-[#5b4238]/40 lg:-bottom-5 lg:-left-5" />
               <MapVisual
                 imageSrc="/Image1.jpg"
-                className="relative z-10 w-full !max-w-none rounded-2xl"
+                className="relative z-10 w-full rounded-2xl"
               />
             </div>
           </div>

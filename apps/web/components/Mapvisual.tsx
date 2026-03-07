@@ -83,7 +83,12 @@ export default function MapVisual({
   return (
     <div
       ref={containerRef}
-      className={`relative w-full max-w-lg aspect-square lg:aspect-[4/3] rounded-xl shadow-2xl overflow-visible transition-colors duration-500 ${className}`}
+      // make the map container fluid on small screens and only constrain it on
+      // larger viewports. the previous `max-w-lg` caused the graphic to hang
+      // at a fixed size on mobile, breaking the layout. `w-full` ensures it
+      // always fills its parent and `max-w-full` removes any hard cap. the
+      // `lg:max-w-lg` restores the original desktop constraint.
+      className={`relative w-full max-w-full lg:max-w-lg aspect-square lg:aspect-[4/3] rounded-xl shadow-2xl overflow-visible transition-colors duration-500 ${className}`}
       style={{ backgroundColor: currentTheme.panelBg }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

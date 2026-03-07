@@ -92,35 +92,31 @@ export default function Header({
   useGSAP(() => {
     if (!headerRef.current) return;
 
-    // Set initial colors
-    gsap.set(headerRef.current, {
-      backgroundColor: currentTheme.bgInitial,
-      color: currentTheme.textInitial,
-    });
-
-    // Create scroll trigger to animate to scrolled colors
-    const st = ScrollTrigger.create({
-      start: "top -50",
-      end: 99999,
-      onEnter: () => {
-        gsap.to(headerRef.current, {
-          backgroundColor: currentTheme.bgScrolled,
-          color: currentTheme.textScrolled,
-          duration: 0.2,
-          ease: "power2.out",
-        });
+    const anim = gsap.fromTo(
+      headerRef.current,
+      {
+        backgroundColor: currentTheme.bgInitial,
+        color: currentTheme.textInitial,
       },
-      onLeaveBack: () => {
-        gsap.to(headerRef.current, {
-          backgroundColor: currentTheme.bgInitial,
-          color: currentTheme.textInitial,
-          duration: 0.2,
-          ease: "power2.out",
-        });
-      },
-    });
+      {
+        backgroundColor: currentTheme.bgScrolled,
+        color: currentTheme.textScrolled,
+        duration: 0.1,
+        ease: "power2.out",
+        paused: true,
+        overwrite: "auto",
+      }
+    );
 
-    return () => st.kill();
+    if (window.scrollY > 50) {
+      anim.progress(1);
+    }
+
+    ScrollTrigger.create({
+      start: 50,
+      onEnter: () => anim.play(),
+      onLeaveBack: () => anim.reverse(),
+    });
   }, [currentTheme]);
 
   return (
