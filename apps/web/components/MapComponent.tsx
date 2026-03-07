@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   MapContainer,
   TileLayer,
@@ -8,7 +9,10 @@ import {
   useMap,
 } from "react-leaflet";
 import dynamic from "next/dynamic";
-const MarkerClusterGroup = dynamic(() => import("react-leaflet-markercluster"), { ssr: false });
+const MarkerClusterGroup = dynamic(
+  () => import("react-leaflet-markercluster").then((mod) => mod.default ?? mod),
+  { ssr: false }
+) as React.ComponentType<{ children: React.ReactNode }>;
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
