@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sun,
-  Moon
+  Moon,
+  LogOut
 } from "lucide-react";
 import gsap from "gsap";
 import { useTheme } from "@/components/ThemeProvider";
@@ -95,6 +96,7 @@ export interface SidebarConfig {
   onClose: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  onLogout?: () => void;
 }
 
 // 2. Default Configuration (matches your Taskify UI design)
@@ -138,7 +140,8 @@ const Sidebar: React.FC<SidebarConfig> = ({
   isOpen, 
   onClose,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  onLogout
 }) => {
   const sidebarRef = useRef<HTMLElement>(null);
   const { theme, toggleTheme } = useTheme();
@@ -264,6 +267,22 @@ const Sidebar: React.FC<SidebarConfig> = ({
               {isDark ? "Light Mode" : "Dark Mode"}
             </span>
           </button>
+
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+             className={`menu-item flex w-full items-center ${isCollapsed ? "justify-center px-2 gap-0" : "justify-start px-4 gap-4"} py-3 ml-2 rounded-xl font-medium transition-all duration-300 ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
+             title={isCollapsed ? "Logout" : undefined}
+          >
+            <div className="shrink-0">
+              <LogOut size={20} strokeWidth={2} />
+            </div>
+           <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"}`}>
+               Logout
+           </span>
+          </button>
+        )}
 
           {bottomNavigation.map((item) => (
             <Link 

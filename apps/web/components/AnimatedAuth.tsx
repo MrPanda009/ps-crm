@@ -7,6 +7,7 @@ import { User, Lock, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/src/lib/supabase';
 import { useTheme } from './ThemeProvider';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 // Register the hook to ensure proper cleanup in React strict mode
 gsap.registerPlugin(useGSAP);
@@ -111,6 +112,7 @@ export default function AnimatedAuth({
   const overlayRightTextRef = useRef<HTMLDivElement>(null);
   const loginFormRef = useRef<HTMLDivElement>(null);
   const signupFormRef = useRef<HTMLDivElement>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const isDark = theme === 'dark';
   const activeThemeColor = isDark ? themeColorDark : themeColor;
@@ -169,56 +171,75 @@ export default function AnimatedAuth({
   }, { dependencies: [isLogin], scope: containerRef });
 
   const handleLogin = async () => {
-    setError('');
-    setMessage('');
-    setLoading(true);
+  setError('');
+  setMessage('');
 
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email: loginEmail.trim(),
-      password: loginPassword,
-    });
+  const token = recaptchaRef.current?.getValue();
+  if (!token) {
+    setError('Please complete the reCAPTCHA.');
+    return;
+  }
 
-    if (loginError) {
-      setError(loginError.message);
-      setLoading(false);
-      return;
-    }
+  const verifyRes = await fetch('/api/verify-recaptcha', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  const verifyData = await verifyRes.json();
+  if (!verifyData.success) {
+    setError('reCAPTCHA verification failed. Please try again.');
+    recaptchaRef.current?.reset();
+    return;
+  }
 
-    const userId = data.user?.id;
-    if (!userId) {
-      setError('Login failed. Please try again.');
-      setLoading(false);
-      return;
-    }
+  setLoading(true);
 
-    // Verify selected role matches the role stored in the database
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single();
+  const { data, error: loginError } = await supabase.auth.signInWithPassword({
+    email: loginEmail.trim(),
+    password: loginPassword,
+  });
 
-    if (profileError || !profile) {
-      setError('Could not verify role. Please try again.');
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
-    if (profile.role !== loginRole) {
-      setError('Wrong credentials');
-      //timeout for 3 sec
-      setTimeout(() => {
-        setError(null);
-      }, 1000);
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
+  if (loginError) {
+    setError(loginError.message);
     setLoading(false);
-    router.push(`/${loginRole}`);
-  };
+    recaptchaRef.current?.reset();
+    return;
+  }
+
+  const userId = data.user?.id;
+  if (!userId) {
+    setError('Login failed. Please try again.');
+    setLoading(false);
+    recaptchaRef.current?.reset();
+    return;
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    setError('Could not verify role. Please try again.');
+    await supabase.auth.signOut();
+    setLoading(false);
+    recaptchaRef.current?.reset();
+    return;
+  }
+
+  if (profile.role !== loginRole) {
+    setError('Wrong credentials');
+    setTimeout(() => setError(null), 1000);
+    await supabase.auth.signOut();
+    setLoading(false);
+    recaptchaRef.current?.reset();
+    return;
+  }
+
+  setLoading(false);
+  router.push(`/${loginRole}`);
+};
 
   const handleSignup = async () => {
     if (!signupEmail || !signupPassword) {
@@ -360,6 +381,13 @@ export default function AnimatedAuth({
               ))}
             </div>
           </div>
+          <ReCAPTCHA
+             ref={recaptchaRef}
+             sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+             theme={isDark ? 'dark' : 'light'}
+             size="normal"
+            className="mt-4"
+          />
           <button 
             onClick={handleLogin}
             disabled={loading}
