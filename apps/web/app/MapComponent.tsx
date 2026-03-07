@@ -6,6 +6,11 @@ const MapComponent = dynamic(() => import("@/components/MapComponent"), {
   ssr: false,
 });
 
-export default function MapPage() {
-  return <MapComponent />;
+export default function MapPage({
+  selectedComplaintId,
+}: {
+  selectedComplaintId?: string | null;
+}) {
+  return <MapComponent selectedComplaintId={selectedComplaintId} />;
 }
+

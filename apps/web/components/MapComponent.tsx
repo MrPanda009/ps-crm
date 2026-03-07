@@ -152,7 +152,11 @@ function parseLocationToLatLng(location: unknown): { lat: number; lng: number } 
   return null;
 }
 
-export default function MapComponent() {
+export default function MapComponent({
+  selectedComplaintId,
+}: {
+  selectedComplaintId?: string | null;
+}) {
   const [complaints, setComplaints] = useState<MapComplaint[]>([]);
   const [mounted, setMounted] = useState(false);
   const [leaflet, setLeaflet] = useState<any>(null);
@@ -287,7 +291,10 @@ export default function MapComponent() {
           attribution="© OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-
+<ZoomToComplaint
+  complaints={complaints}
+  selectedComplaintId={selectedComplaintId}
+/>
         {!showHeatmap && (
           <MarkerClusterGroup>
             {complaints.map((c) => (
@@ -431,7 +438,31 @@ function getIntensity(severity: string) {
       return 0.3;
   }
 }
+function ZoomToComplaint({
+  complaints,
+  selectedComplaintId,
+}: {
+  complaints: MapComplaint[];
+  selectedComplaintId?: string | null;
+}) {
+  const map = useMap();
 
+  useEffect(() => {
+    if (!selectedComplaintId) return;
+
+    const complaint = complaints.find(
+      (c) => c.id === selectedComplaintId
+    );
+
+    if (complaint) {
+      map.setView([complaint.lat, complaint.lng], 15, {
+        animate: true,
+      });
+    }
+  }, [selectedComplaintId, complaints, map]);
+
+  return null;
+}
 function LegendDot({ color, label }: any) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
