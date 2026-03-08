@@ -113,6 +113,8 @@ const authorityExamples = [
   "Water Supply Department",
   "Road Maintenance Authority",
   "Police Department",
+  "DMRC",
+  "NHAI",
 ]
 
 export default function TicketsPage() {
