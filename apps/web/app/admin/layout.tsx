@@ -6,18 +6,27 @@ import {
   FileBarChart2,
   FolderTree,
   LayoutGrid,
+  LogOut,
   Menu,
+  MessageSquare,
   Settings,
   Shield,
   Users,
 } from "lucide-react";
 import Sidebar, { defaultSidebarConfig, SidebarNavigationItem } from "@/components/Sidebar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/src/lib/supabase";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace("/login");
+  }
 
   const adminNavigation: SidebarNavigationItem[] = [
     { id: "dashboard", name: "Dashboard", icon: <LayoutGrid size={20} strokeWidth={2.5} />, href: "/admin", isActive: pathname === "/admin" },
@@ -40,6 +49,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       textMain: "text-white dark:text-white",
     },
     navigation: adminNavigation,
+    bottomNavigation: [
+      {
+        id: "support",
+        name: "Support",
+        icon: <MessageSquare size={20} strokeWidth={2} />,
+        href: "#",
+      },
+      {
+        id: "logout",
+        name: "Logout",
+        icon: <LogOut size={20} strokeWidth={2} />,
+        onClick: handleLogout,
+      },
+    ],
   };
 
   return (
