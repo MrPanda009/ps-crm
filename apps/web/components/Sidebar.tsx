@@ -119,16 +119,30 @@ export const defaultSidebarConfig: Omit<SidebarConfig, "isOpen" | "onClose" | "i
     badgeText: `${SIDEBAR_LIGHT_COLORS.badgeText} ${SIDEBAR_DARK_COLORS.badgeText}`,
     toggleButtonBg: `${SIDEBAR_LIGHT_COLORS.toggleButtonBg} ${SIDEBAR_DARK_COLORS.toggleButtonBg}`,
   },
-  navigation: [
-    { id: "dashboard", name: "Dashboard", icon: <LayoutGrid size={20} strokeWidth={2.5} />, href: "#", isActive: true },
-    { id: "track", name: "Track", icon: <Target size={20} strokeWidth={2} />, href: "#" },
-    { id: "projects", name: "Projects", icon: <FolderKanban size={20} strokeWidth={2} />, href: "#", badge: 2 },
-    { id: "reports", name: "Reports", icon: <FileText size={20} strokeWidth={2} />, href: "#" },
-  ],
-  bottomNavigation: [
-    { id: "support", name: "Support", icon: <MessageSquare size={20} strokeWidth={2} />, href: "#" },
-    { id: "settings", name: "Settings", icon: <Settings size={20} strokeWidth={2} />, href: "#" },
-  ],
+navigation: [
+  {
+    id: "dashboard",
+    name: "Dashboard",
+    icon: <LayoutGrid size={20} strokeWidth={2.5} />,
+    href: "/authority"
+  },
+  {
+    id: "track",
+    name: "Track",
+    icon: <Target size={20} strokeWidth={2} />,
+    href: "/authority/track"
+  },
+  {
+    id: "reports",
+    name: "Reports",
+    icon: <FileText size={20} strokeWidth={2} />,
+    href: "/authority/reports"
+  }
+],
+bottomNavigation: [
+  { id: "support", name: "Support", icon: <MessageSquare size={20} strokeWidth={2} />, href: "#" },
+  { id: "settings", name: "Settings", icon: <Settings size={20} strokeWidth={2} />, href: "#" },
+],
 };
 
 
