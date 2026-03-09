@@ -51,6 +51,50 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* second full screen page with Empower */}
+      <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
+          <div className="relative order-1 w-full lg:w-1/2">
+            <FadedText text="Empower" className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
+            <div className="relative z-10 pt-10 lg:pt-16">
+              <AnimatedText
+                as="h2"
+                text="Empower Communities"
+                className="text-4xl font-bold tracking-tight md:text-5xl"
+              />
+              <AnimatedText
+                as="p"
+                text="Give citizens and administrators the tools they need to create lasting impact."
+                className="mt-6 max-w-md text-xl leading-relaxed"
+                animationDelay={0.2}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* third full screen page with Connect */}
+      <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
+          <div className="relative order-1 w-full lg:w-1/2">
+            <FadedText text="Connect" className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
+            <div className="relative z-10 pt-10 lg:pt-16">
+              <AnimatedText
+                as="h2"
+                text="Connect People"
+                className="text-4xl font-bold tracking-tight md:text-5xl"
+              />
+              <AnimatedText
+                as="p"
+                text="Bridge the gap between citizens and services through real-time communication and data."
+                className="mt-6 max-w-md text-xl leading-relaxed"
+                animationDelay={0.2}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       <MegaFooter
         brandColor="#000000"
         brandColorDark="#ffffff"
