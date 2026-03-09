@@ -357,7 +357,7 @@ export default function AnimatedAuth({
     const { error: googleError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/citizen`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 

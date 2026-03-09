@@ -43,7 +43,7 @@ function LiveFollow({
     }
 
     if (forceRecenter || !prev) {
-      map.flyTo([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15), { duration: 0.8 });
+      map.flyTo([userLocation.lat, userLocation.lng], 18, { duration: 0.8 });
     } else {
       map.panTo([userLocation.lat, userLocation.lng], { animate: true, duration: 0.8 });
     }
@@ -190,6 +190,7 @@ export default function NearbyTicketsMap({
   const [collapsed, setCollapsed] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [recenterSignal, setRecenterSignal] = useState(0);
+  const [mapSessionKey, setMapSessionKey] = useState(0);
 
   useEffect(() => {
     import("leaflet").then((leaflet) => {
@@ -223,21 +224,61 @@ export default function NearbyTicketsMap({
     setRecenterSignal((prev) => prev + 1);
   }
 
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      // Force a fresh Leaflet instance after re-opening to avoid container reuse issues.
+      if (!next) {
+        setMapSessionKey((k) => k + 1);
+      }
+      return next;
+    });
+  }
+
   return (
     <>
       <div className="relative overflow-hidden transition-all duration-300" style={{ height: collapsed ? 0 : expandedMapHeight }}>
         {!collapsed && L && (
-          <MapContainer center={[28.6139, 77.209]} zoom={12} style={{ height: "100%", width: "100%" }} zoomControl={false}>
+          <MapContainer
+            key={mapSessionKey}
+            center={[28.6139, 77.209]}
+            zoom={12}
+            style={{ height: "100%", width: "100%" }}
+            zoomControl={false}
+          >
             <TileLayer attribution="© OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <FlyToTarget target={flyTarget} />
             <LiveFollow userLocation={userLocation} recenterSignal={recenterSignal} />
 
             {userLocation && (
-              <Circle
-                center={[userLocation.lat, userLocation.lng]}
-                radius={radiusMeters}
-                pathOptions={{ color: "#7c3aed", fillColor: "#7c3aed", fillOpacity: 0.12, weight: 2 }}
-              />
+              <>
+                <Circle
+                  center={[userLocation.lat, userLocation.lng]}
+                  radius={radiusMeters}
+                  pathOptions={{ color: "#7c3aed", fillColor: "#7c3aed", fillOpacity: 0.12, weight: 2 }}
+                />
+                {/* User location marker - blue target with white center, distinct from complaint markers */}
+                <CircleMarker
+                  center={[userLocation.lat, userLocation.lng]}
+                  radius={12}
+                  pathOptions={{
+                    color: "#3b82f6",
+                    fillColor: "#3b82f6",
+                    fillOpacity: 0.25,
+                    weight: 3,
+                  }}
+                />
+                <CircleMarker
+                  center={[userLocation.lat, userLocation.lng]}
+                  radius={5}
+                  pathOptions={{
+                    color: "#ffffff",
+                    fillColor: "#3b82f6",
+                    fillOpacity: 1,
+                    weight: 2,
+                  }}
+                />
+              </>
             )}
 
             {showHeatmap && <HeatmapLayer complaints={complaints} />}
@@ -308,7 +349,7 @@ export default function NearbyTicketsMap({
 
       <div className="group relative flex h-7 shrink-0 select-none items-center justify-center border-y border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-900">
         <button
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={toggleCollapsed}
           className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-[10px] font-semibold text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
         >
           {collapsed ? (

@@ -50,13 +50,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const bootstrapCitizen = async () => {
-      const { data: userData, error } = await supabase.auth.getUser();
-      if (error || !userData.user?.id) {
+      // getSession() reads the cached session from localStorage — no network
+      // request and no race condition with OAuth hash/code tokens.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         setCitizenId(null);
         setNotificationLoading(false);
         return;
       }
-      setCitizenId(userData.user.id);
+      setCitizenId(session.user.id);
     };
 
     void bootstrapCitizen();
@@ -238,10 +240,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </button>
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">
-                  JanSamadhan AI Assistant
+                  {pathname === '/citizen/tickets' ? 'Your Tickets' : pathname === '/citizen/nearby' ? 'Nearby Tickets' : 'JanSamadhan AI Assistant'}
                 </h1>
                 <p className="mt-0.5 text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
-                  Report an issue quickly, then track what happened next.
+                  {pathname === '/citizen/tickets' ? 'Track all complaints you have reported in one list.' : pathname === '/citizen/nearby' ? 'See complaints reported near your location.' : 'Report an issue quickly, then track what happened next.'}
                 </p>
               </div>
             </div>
@@ -256,9 +258,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   aria-haspopup="menu"
                   aria-expanded={isNotificationOpen}
                   onClick={toggleNotifications}
-                  className="relative h-10 w-10 rounded-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-600"
+                  className="relative h-10 w-10 rounded-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center justify-center"
                 >
-                  <Bell size={18} className="mx-auto" />
+                  <Bell size={18} />
                   {hasUnreadUpdates && (
                     <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
                   )}

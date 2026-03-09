@@ -124,11 +124,10 @@ export default function RecentTickets() {
   // Fetch current user's citizen ID
   useEffect(() => {
     const getCitizenId = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        setCitizenId(user.id);
+      // getSession() reads from localStorage — no network call, no race condition.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCitizenId(session.user.id);
       } else {
         setError("User not authenticated");
         setLoading(false);

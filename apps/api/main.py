@@ -858,6 +858,7 @@ async def confirm(
             "title":               title,
             "description":         complaint_record["description"],
             "severity":            complaint_record["severity"],
+            "effective_severity":  complaint_record["severity"],
             "status":              complaint_record["status"],
             "location":            location_wkt,
             "ward_name":           derived_ward_name,

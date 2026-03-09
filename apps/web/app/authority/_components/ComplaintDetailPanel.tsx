@@ -119,11 +119,14 @@ export function ComplaintDetailPanel({
   workers,
   onClose,
   onAssigned,
+  inline = false,
 }: {
   complaint: AuthorityComplaintRow
   workers?: WorkerOption[]
   onClose: () => void
   onAssigned?: () => void
+  /** When true, renders as an inline card instead of a fixed side panel */
+  inline?: boolean
 }) {
   const sev = SEVERITY_META[complaint.effective_severity]
   const st  = STATUS_META[complaint.status]
@@ -133,147 +136,160 @@ export function ComplaintDetailPanel({
     !complaint.assigned_worker_id &&
     (complaint.status === "submitted" || complaint.status === "under_review")
 
+  // ── Shared inner content ──────────────────────────────────────────────────
+  const header = (
+    <div className={`flex items-start justify-between border-b border-gray-100 px-6 py-5 dark:border-gray-800`}>
+      <div className="flex-1 pr-4">
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${sev.badge}`}>
+            {sev.label}
+          </span>
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.badge}`}>
+            {st.label}
+          </span>
+          {complaint.sla_breached && (
+            <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase text-red-600 dark:bg-red-900/30 dark:text-red-400">
+              SLA Breached
+            </span>
+          )}
+          {complaint.status === "escalated" && (
+            <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+              Escalated
+            </span>
+          )}
+        </div>
+        <h2 className="text-base font-semibold leading-snug text-gray-900 dark:text-white">
+          {complaint.title}
+        </h2>
+      </div>
+      <button
+        onClick={onClose}
+        className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 transition-colors"
+      >
+        <X size={18} />
+      </button>
+    </div>
+  )
+
+  const body = (
+    <div className={`${inline ? "" : "flex-1 overflow-y-auto"} px-6 py-5 space-y-5`}>
+      <Field label="Ticket ID">
+        <span className="font-mono text-sm text-gray-700 dark:text-gray-300">
+          {complaint.ticket_id}
+        </span>
+      </Field>
+
+      <Field label="Category">
+        <span className="text-sm text-gray-800 dark:text-gray-200">
+          {complaint.categories?.name ?? "—"}
+        </span>
+      </Field>
+
+      {complaint.address_text && (
+        <Field label="Location">
+          <span className="flex items-start gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+            <MapPin size={13} className="mt-0.5 flex-shrink-0 text-[#b4725a]" />
+            {complaint.address_text}
+          </span>
+        </Field>
+      )}
+
+      <Field label="Reported">
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          {new Date(complaint.created_at).toLocaleDateString("en-IN", {
+            day: "numeric", month: "long", year: "numeric",
+          })}
+          <span className="ml-1.5 text-xs text-gray-400">
+            ({timeAgo(complaint.created_at)})
+          </span>
+        </span>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-5">
+        <Field label="Upvotes">
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            {complaint.upvote_count}
+          </span>
+        </Field>
+        <Field label="Escalation">
+          {complaint.escalation_level > 0 ? (
+            <span className="inline-flex rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+              Level {complaint.escalation_level}
+            </span>
+          ) : (
+            <span className="text-sm text-gray-400">None</span>
+          )}
+        </Field>
+      </div>
+
+      <Field label="Assigned Worker">
+        {complaint.assigned_worker_id ? (
+          <span className="text-sm font-medium text-green-600 dark:text-green-400">
+            Assigned ✓
+          </span>
+        ) : (
+          <span className="text-sm text-orange-500">Unassigned</span>
+        )}
+      </Field>
+
+      {complaint.sla_deadline && (
+        <Field label="SLA Deadline">
+          <span className={`text-sm ${
+            complaint.sla_breached
+              ? "font-semibold text-red-600 dark:text-red-400"
+              : "text-gray-700 dark:text-gray-300"
+          }`}>
+            {new Date(complaint.sla_deadline).toLocaleDateString("en-IN", {
+              day: "numeric", month: "long", year: "numeric",
+            })}
+          </span>
+        </Field>
+      )}
+    </div>
+  )
+
+  const footer = (
+    <div className="border-t border-gray-100 px-6 py-4 dark:border-gray-800 space-y-3">
+      {canAssign && workers && onAssigned && (
+        <>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+            Assign a Worker
+          </p>
+          <AssignDropdown
+            complaintId={complaint.id}
+            workers={workers}
+            onAssigned={() => { onAssigned(); onClose(); }}
+          />
+        </>
+      )}
+      <a
+        href="/authority/track"
+        className="flex w-full items-center justify-center rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-900"
+      >
+        Open in Track Complaints →
+      </a>
+    </div>
+  )
+
+  // ── Inline card (used in track page) ─────────────────────────────────────
+  if (inline) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
+        {header}
+        {body}
+        {footer}
+      </div>
+    )
+  }
+
+  // ── Fixed side panel (original behaviour for other pages) ─────────────────
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/40"
-        onClick={onClose}
-      />
-
-      {/* Panel — slides in from right via CSS transform */}
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
       <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-gray-100 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
-
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5 dark:border-gray-800">
-          <div className="flex-1 pr-4">
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${sev.badge}`}>
-                {sev.label}
-              </span>
-              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.badge}`}>
-                {st.label}
-              </span>
-              {complaint.sla_breached && (
-                <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                  SLA Breached
-                </span>
-              )}
-              {complaint.status === "escalated" && (
-                <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                  Escalated
-                </span>
-              )}
-            </div>
-            <h2 className="text-base font-semibold leading-snug text-gray-900 dark:text-white">
-              {complaint.title}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <Field label="Ticket ID">
-            <span className="font-mono text-sm text-gray-700 dark:text-gray-300">
-              {complaint.ticket_id}
-            </span>
-          </Field>
-
-          <Field label="Category">
-            <span className="text-sm text-gray-800 dark:text-gray-200">
-              {complaint.categories?.name ?? "—"}
-            </span>
-          </Field>
-
-          {complaint.address_text && (
-            <Field label="Location">
-              <span className="flex items-start gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-                <MapPin size={13} className="mt-0.5 flex-shrink-0 text-[#b4725a]" />
-                {complaint.address_text}
-              </span>
-            </Field>
-          )}
-
-          <Field label="Reported">
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              {new Date(complaint.created_at).toLocaleDateString("en-IN", {
-                day: "numeric", month: "long", year: "numeric",
-              })}
-              <span className="ml-1.5 text-xs text-gray-400">
-                ({timeAgo(complaint.created_at)})
-              </span>
-            </span>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Upvotes">
-              <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                {complaint.upvote_count}
-              </span>
-            </Field>
-            <Field label="Escalation">
-              {complaint.escalation_level > 0 ? (
-                <span className="inline-flex rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                  Level {complaint.escalation_level}
-                </span>
-              ) : (
-                <span className="text-sm text-gray-400">None</span>
-              )}
-            </Field>
-          </div>
-
-          <Field label="Assigned Worker">
-            {complaint.assigned_worker_id ? (
-              <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                Assigned ✓
-              </span>
-            ) : (
-              <span className="text-sm text-orange-500">Unassigned</span>
-            )}
-          </Field>
-
-          {complaint.sla_deadline && (
-            <Field label="SLA Deadline">
-              <span className={`text-sm ${
-                complaint.sla_breached
-                  ? "font-semibold text-red-600 dark:text-red-400"
-                  : "text-gray-700 dark:text-gray-300"
-              }`}>
-                {new Date(complaint.sla_deadline).toLocaleDateString("en-IN", {
-                  day: "numeric", month: "long", year: "numeric",
-                })}
-              </span>
-            </Field>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-gray-100 px-6 py-4 dark:border-gray-800 space-y-3">
-          {canAssign && workers && onAssigned && (
-            <>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                Assign a Worker
-              </p>
-              <AssignDropdown
-                complaintId={complaint.id}
-                workers={workers}
-                onAssigned={() => { onAssigned(); onClose(); }}
-              />
-            </>
-          )}
-          <a
-            href="/authority/track"
-            className="flex w-full items-center justify-center rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-900"
-          >
-            Open in Track Complaints →
-          </a>
-        </div>
+        {header}
+        {body}
+        {footer}
       </div>
     </>
   )

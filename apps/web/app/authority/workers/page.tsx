@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/src/lib/supabase"
-import { CheckCircle2, Circle, XCircle, RefreshCw } from "lucide-react"
+import { CheckCircle2, Circle, XCircle } from "lucide-react"
 
 type Availability = "available" | "busy" | "inactive"
 
@@ -41,8 +41,6 @@ export default function WorkersPage() {
     const department = profile?.department ?? ""
     setDept(department)
 
-    // If no department, still try to fetch all workers in worker_profiles
-    // so the page isn't blank. Filter by dept only when we have one.
     let query = supabase
       .from("worker_profiles")
       .select("worker_id,availability,department,profiles(full_name,email)")
@@ -72,7 +70,6 @@ export default function WorkersPage() {
 
     setWorkers(
       wRows.map((w: any) => {
-        // profiles can be a single object or an array depending on the join
         const prof = Array.isArray(w.profiles) ? w.profiles[0] : w.profiles
         return {
           worker_id:    w.worker_id,
@@ -90,7 +87,6 @@ export default function WorkersPage() {
 
   useEffect(() => { void fetchWorkers() }, [])
 
-  // Realtime: re-fetch when worker_profiles or complaints change
   useEffect(() => {
     const ch = supabase.channel("workers-realtime")
       .on("postgres_changes", { event:"*", schema:"public", table:"worker_profiles" }, () => void fetchWorkers())
@@ -115,18 +111,12 @@ export default function WorkersPage() {
   return (
     <div className="space-y-5">
 
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Workers</h1>
-          <p className="text-sm text-gray-400">
-            {dept ? `${dept} department · ` : ""}{workers.length} total
-          </p>
-        </div>
-        <button onClick={() => void fetchWorkers()}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-          <RefreshCw size={13}/> Refresh
-        </button>
+      {/* Header — refresh button removed */}
+      <div>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Workers</h1>
+        <p className="text-sm text-gray-400">
+          {dept ? `${dept} department · ` : ""}{workers.length} total
+        </p>
       </div>
 
       {/* Summary pills */}

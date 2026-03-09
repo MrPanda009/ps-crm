@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/src/lib/supabase";
 import type { Tables } from "@/src/types/database.types";
 import { calculateDistanceMeters, type GeoPoint } from "./distance";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,13 @@ export const SEVERITY_CONFIG: Record<SeverityLevel, { label: string; color: stri
 
 export function getSeverityConfig(sev: string) {
   return SEVERITY_CONFIG[sev as SeverityLevel] ?? SEVERITY_CONFIG.L1;
+}
+
+function normalizeSeverity(value: unknown, fallback: SeverityLevel = "L1"): SeverityLevel {
+  if (value === "L1" || value === "L2" || value === "L3" || value === "L4") {
+    return value;
+  }
+  return fallback;
 }
 
 // ─── Location Parser ──────────────────────────────────────────────────────────
@@ -113,6 +121,9 @@ export function useNearbyTickets() {
 
   const lastCenterRef = useRef<GeoPoint | null>(null);
   const lastRadiusRef = useRef<number>(1000);
+  const userIdRef = useRef<string | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   async function fetchComplaints() {
     setLoading(true);
@@ -152,13 +163,15 @@ export function useNearbyTickets() {
       .map((c) => {
         const pos = parseLocation(c.location);
         if (!pos) return null;
+        const normalizedSeverity = normalizeSeverity(c.severity);
         return {
           id: c.id,
           ticket_id: c.ticket_id,
           title: c.title,
           description: c.description,
-          severity: c.severity as SeverityLevel,
-          effective_severity: (c.effective_severity || c.severity) as SeverityLevel,
+          // Citizen nearby should mirror generated ticket severity unless backend performs explicit override.
+          severity: normalizedSeverity,
+          effective_severity: normalizedSeverity,
           lat: pos.lat,
           lng: pos.lng,
           photo_urls: c.photo_urls,
@@ -187,13 +200,143 @@ export function useNearbyTickets() {
 
   useEffect(() => {
     fetchComplaints();
+    setupRealtimeSubscription();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      stopPolling();
+      unsubscribeFromRealtime();
+    };
   }, []);
+
+  function startPolling() {
+    if (pollingIntervalRef.current) return;
+    pollingIntervalRef.current = setInterval(() => {
+      fetchComplaints();
+    }, 20000); // 20 seconds
+  }
+
+  function stopPolling() {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }
+
+  function setupRealtimeSubscription() {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user?.id) return;
+      userIdRef.current = session.user.id;
+
+      const channel = supabase
+        .channel("public:complaints", {
+          config: { broadcast: { self: true } },
+        })
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "complaints",
+          },
+          (payload: RealtimePostgresChangesPayload<Tables<"complaints">>) => {
+            handleRealtimeEvent(payload);
+          }
+        )
+        .subscribe((status) => {
+          if (status === "CHANNEL_ERROR") {
+            console.log("Realtime channel error, falling back to polling");
+            startPolling();
+          }
+        });
+
+      channelRef.current = channel;
+    });
+  }
+
+  function unsubscribeFromRealtime() {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }
+
+  function handleRealtimeEvent(payload: RealtimePostgresChangesPayload<Tables<"complaints">>) {
+    const eventType = payload.eventType;
+
+    if (eventType === "INSERT" || eventType === "UPDATE") {
+      const newData = payload.new as Tables<"complaints">;
+
+      // Skip own tickets
+      if (newData.citizen_id === userIdRef.current) {
+        // Remove own ticket if it exists
+        if (eventType === "INSERT") {
+          setAllComplaints((prev) => prev.filter((c) => c.id !== newData.id));
+        }
+        return;
+      }
+
+      const pos = parseLocation(newData.location);
+      if (!pos) return;
+
+      const normalizedSeverity = normalizeSeverity(newData.severity);
+      const mapped: MappedComplaint = {
+        id: newData.id,
+        ticket_id: newData.ticket_id,
+        title: newData.title,
+        description: newData.description,
+        // Keep realtime updates aligned with generated severity by default.
+        severity: normalizedSeverity,
+        effective_severity: normalizedSeverity,
+        lat: pos.lat,
+        lng: pos.lng,
+        photo_urls: newData.photo_urls,
+        upvote_count: newData.upvote_count,
+        status: newData.status,
+        created_at: newData.created_at,
+        address_text: newData.address_text,
+        ward_name: newData.ward_name,
+        category_id: newData.category_id,
+        assigned_department: newData.assigned_department,
+      };
+
+      setAllComplaints((prev) => {
+        const existingIndex = prev.findIndex((c) => c.id === mapped.id);
+        const updated = existingIndex >= 0
+          ? [...prev.slice(0, existingIndex), mapped, ...prev.slice(existingIndex + 1)]
+          : [...prev, mapped];
+        // Re-apply filter after update
+        setVisibleComplaints(applyFilter(updated, lastCenterRef.current, lastRadiusRef.current));
+        return updated;
+      });
+    } else if (eventType === "DELETE") {
+      const oldData = payload.old as Tables<"complaints">;
+      setAllComplaints((prev) => {
+        const updated = prev.filter((c) => c.id !== oldData.id);
+        // Re-apply filter after delete
+        setVisibleComplaints(applyFilter(updated, lastCenterRef.current, lastRadiusRef.current));
+        return updated;
+      });
+    }
+  }
 
   const updateRadius = useCallback(
     (center: GeoPoint, radiusMeters: number) => {
+      // Clamp radius to max 2km
+      const clampedRadius = Math.min(radiusMeters, 2000);
       lastCenterRef.current = center;
-      lastRadiusRef.current = radiusMeters;
-      setVisibleComplaints(applyFilter(allComplaints, center, radiusMeters));
+      lastRadiusRef.current = clampedRadius;
+      setVisibleComplaints(applyFilter(allComplaints, center, clampedRadius));
     },
     [allComplaints]
   );

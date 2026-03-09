@@ -458,6 +458,7 @@ export async function POST(req: NextRequest) {
       title,
       description: canonicalComplaint.description,
       severity: canonicalComplaint.severity as "L1" | "L2" | "L3" | "L4",
+      effective_severity: canonicalComplaint.severity as "L1" | "L2" | "L3" | "L4",
       status: "submitted",
       location: locationWKT,
       ward_name: resolvedWard,

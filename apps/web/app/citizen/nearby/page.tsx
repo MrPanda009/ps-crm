@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowUp, ChevronDown, LocateFixed, X } from "lucide-react";
+import { AlertTriangle, ArrowUp, ChevronDown, X } from "lucide-react";
 
 import { useNearbyTickets } from "./_components/useNearbyTickets";
 import { getSeverityConfig } from "./_components/useNearbyTickets";
@@ -186,9 +186,6 @@ export default function NearbyTicketsPage() {
   }
 
   const locationReady = Boolean(location);
-  const locationBlockingMessage = geolocationState === "loading"
-    ? "Detecting your current location..."
-    : "Nearby tickets cannot be viewed without allowing location access.";
   const secondsSinceLastLocation = lastUpdatedAt
     ? Math.max(0, Math.floor((nowTs - lastUpdatedAt) / 1000))
     : null;
@@ -200,44 +197,20 @@ export default function NearbyTicketsPage() {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
-      {!locationReady ? (
-        <div className="flex flex-1 items-center justify-center p-4">
-          <section className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-              <LocateFixed size={22} />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Location Access Required</h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{locationBlockingMessage}</p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              We use live GPS tracking to keep map pins and ticket list synced as you move.
-            </p>
-            {geolocationError && (
-              <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">{geolocationError}</p>
-            )}
-            <button
-              onClick={requestLocation}
-              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-500"
-            >
-              <LocateFixed size={15} /> Allow Location Access
-            </button>
-          </section>
-        </div>
-      ) : (
-        <>
-          <div className="shrink-0 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-            <NearbyTicketsMap
-              complaints={filteredComplaints}
-              selectedId={selectedComplaintId}
-              flyTarget={flyTarget}
-              userLocation={location}
-              radiusMeters={radiusMeters}
-              onRadiusChange={setRadiusMeters}
-              onMarkerClick={handleSelectComplaint}
-            />
-          </div>
+      <div className="shrink-0 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <NearbyTicketsMap
+          complaints={filteredComplaints}
+          selectedId={selectedComplaintId}
+          flyTarget={flyTarget}
+          userLocation={location}
+          radiusMeters={radiusMeters}
+          onRadiusChange={setRadiusMeters}
+          onMarkerClick={handleSelectComplaint}
+        />
+      </div>
 
-          <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden p-3">
-            <section className="flex h-full min-h-[280px] min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden p-3">
+        <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-14rem)] lg:max-h-[calc(100vh-12rem)]">
           {(gpsSignalStale || lowAccuracy) && (
             <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/50 dark:text-amber-200">
               {gpsSignalStale ? "Searching for GPS signal... live updates are temporarily delayed." : ""}
@@ -393,8 +366,8 @@ export default function NearbyTicketsPage() {
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="flex min-h-0 min-w-[940px] flex-col">
+          <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
+            <div className="min-w-[940px] flex flex-col flex-1 min-h-0">
               <div className="sticky top-0 z-10 grid grid-cols-[150px_2.2fr_1.2fr_1fr_1fr_100px_120px] gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <span>Ticket ID</span>
                 <span>Issue Title</span>
@@ -405,7 +378,7 @@ export default function NearbyTicketsPage() {
                 <span>Severity</span>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {loading && (
                   <div className="px-4 py-8 text-sm text-gray-500">Loading nearby tickets...</div>
                 )}
@@ -494,8 +467,6 @@ export default function NearbyTicketsPage() {
           </div>
         </section>
       </div>
-        </>
-      )}
     </div>
   );
 }

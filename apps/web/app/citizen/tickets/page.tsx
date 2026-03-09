@@ -288,13 +288,8 @@ export default function CitizenTicketsPage() {
   const hasActiveFilters = searchQuery || statusFilter || departmentFilter || sortBy !== "latest";
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-6">
-      <header className="mb-4">
-        <h1 className="text-lg md:text-xl font-semibold text-gray-900">Your Tickets</h1>
-        <p className="mt-1 text-sm text-gray-600">Track all complaints you have reported in one list.</p>
-      </header>
-
-      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-13rem)] lg:max-h-[calc(100vh-11rem)]">
+    <div className="w-full flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-4">
+      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-8rem)]">
         {/* Search and Filter Controls */}
         <div className="flex flex-col gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4">
           {/* Search Bar */}
