@@ -49,6 +49,8 @@ export default function TrackPage() {
   const [isStatOpen, setIsStatOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<Complaint | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const detailRef = useRef<HTMLDivElement>(null)
 
   async function fetchData() {
     const { data: auth } = await supabase.auth.getUser()
@@ -176,9 +178,9 @@ export default function TrackPage() {
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50/80 px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
           <div className="flex gap-5 text-sm font-medium text-gray-600">
-            {([["bg-green-500","Low"],["bg-amber-400","Medium"],["bg-orange-500","High"],["bg-red-500","Critical"]] as [string,string][]).map(([c,l])=>(
+            {([["bg-green-500", "Low"], ["bg-amber-400", "Medium"], ["bg-orange-500", "High"], ["bg-red-500", "Critical"]] as [string, string][]).map(([c, l]) => (
               <span key={l} className="flex items-center gap-1.5">
-                <span className={`h-2.5 w-2.5 rounded-full ${c}`}/>{l}
+                <span className={`h-2.5 w-2.5 rounded-full ${c}`} />{l}
               </span>
             ))}
           </div>
@@ -304,12 +306,12 @@ export default function TrackPage() {
                       <td className="p-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-3">
                           <button
-                            onClick={() => setExpandedId(prev => prev===c.id ? null : c.id)}
+                            onClick={() => setExpandedId(prev => prev === c.id ? null : c.id)}
                             className="text-xs font-semibold text-blue-600 hover:underline"
                           >
                             {isExpanded ? "Close" : "View"}
                           </button>
-                          {canAssign && <AssignDropdown complaintId={c.id} workers={workers} onAssigned={fetchData}/>}
+                          {canAssign && <AssignDropdown complaintId={c.id} workers={workers} onAssigned={fetchData} />}
                           <button onClick={() => setDetail(c)} className="text-xs font-semibold text-blue-600 hover:underline">View</button>
                           {canAssign && <AssignDropdown complaintId={c.id} workers={workers} onAssigned={fetchData} />}
                         </div>
