@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/client';
-
-// Re-exported singleton so every existing `import { supabase } from '@/src/lib/supabase'`
-// automatically gets the SSR-aware browser client (PKCE verifier stored in cookies).
-export const supabase = createClient();
+import { createBrowserClient } from "@supabase/ssr"
+import type { Database } from "../types/database.types"
+export const supabase = createBrowserClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
