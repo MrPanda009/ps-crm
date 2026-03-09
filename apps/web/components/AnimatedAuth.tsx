@@ -23,12 +23,23 @@ export interface AnimatedAuthProps {
   backdropDark?: string;
   placeholderColor?: string;
   placeholderColorDark?: string;
+  textColor?: string;
+  textColorDark?: string;
+  secondaryTextColor?: string;
+  secondaryTextColorDark?: string;
+  borderColor?: string;
+  borderColorDark?: string;
   transitionTintColor?: string;
   transitionTintColorDark?: string;
   leftPanelTitle?: string;
   leftPanelSubtitle?: string;
   rightPanelTitle?: string;
   rightPanelSubtitle?: string;
+  // new props for panel text colors
+  leftPanelTitleColor?: string;
+  leftPanelSubtitleColor?: string;
+  rightPanelTitleColor?: string;
+  rightPanelSubtitleColor?: string;
   loginTitle?: string;
   signupTitle?: string;
   leftPanelImage?: string;
@@ -41,21 +52,47 @@ type Role = (typeof roles)[number];
 export const ANIMATED_AUTH_TRANSITION_TINT_COLOR = '#d2b48c';
 
 export const AUTH_COLORS_LIGHT = {
-  themeColor: '#b58d80',
-  glowColor: 'rgba(59, 130, 246, 0.4)',
-  backgroundColor: '#d2b48c',
-  backdrop: '#ad7777',
-  placeholderColor: '#9ca3af',
+  themeColor: '#cbae86',
+  glowColor: 'rgba(32, 10, 8, 0.46)',
+  backgroundColor: '#e4e3e1',
+  backdrop: '#f4f0d9',
+  placeholderColor: 'rgb(0, 0, 0)',
+  textColor: '#000000',
+  secondaryTextColor: '#6b7280',
+  borderColor: '#d1d5db',
   transitionTintColor: '#d2b48c',
+  /* dark-mode fallbacks included for convenience */
+  themeColorDark: '#8c6a5d',
+  glowColorDark: 'rgba(16, 5, 4, 0.6)',
+  backgroundColorDark: '#2c241b',
+  backdropDark: '#1f1515',
+  placeholderColorDark: 'rgba(255, 255, 255, 1)',
+  textColorDark: '#ffffff',
+  secondaryTextColorDark: '#9ca3af',
+  borderColorDark: '#4b5563',
+  transitionTintColorDark: '#2c241b',
 };
 
 export const AUTH_COLORS_DARK = {
-  themeColor: '#8b5cf6',
-  glowColor: 'rgba(139, 92, 246, 0.5)',
-  backgroundColor: '#0a0a0a',
-  backdrop: '#18181b',
-  placeholderColor: '#9ca3af',
-  transitionTintColor: '#d2b48c',
+  themeColor: '#8c6a5d',
+  glowColor: 'rgba(16, 5, 4, 0.6)',
+  backgroundColor: '#2c241b',
+  backdrop: '#1f1515',
+  placeholderColor: 'rgba(255, 255, 255, 1)',
+  textColor: '#ffffff',
+  secondaryTextColor: '#9ca3af',
+  borderColor: '#4b5563',
+  transitionTintColor: '#2c241b',
+  /* include original light fallbacks where sensible */
+  themeColorDark: '#8c6a5d',
+  glowColorDark: 'rgba(16, 5, 4, 0.6)',
+  backgroundColorDark: '#2c241b',
+  backdropDark: '#1f1515',
+  placeholderColorDark: 'rgba(255, 255, 255, 1)',
+  textColorDark: '#ffffff',
+  secondaryTextColorDark: '#9ca3af',
+  borderColorDark: '#4b5563',
+  transitionTintColorDark: '#2c241b',
 };
 
 export default function AnimatedAuth({
@@ -69,12 +106,23 @@ export default function AnimatedAuth({
   backdropDark = AUTH_COLORS_DARK.backdrop,
   placeholderColor = AUTH_COLORS_LIGHT.placeholderColor,
   placeholderColorDark = AUTH_COLORS_DARK.placeholderColor,
+  textColor = AUTH_COLORS_LIGHT.textColor,
+  textColorDark = AUTH_COLORS_DARK.textColor,
+  secondaryTextColor = AUTH_COLORS_LIGHT.secondaryTextColor,
+  secondaryTextColorDark = AUTH_COLORS_DARK.secondaryTextColor,
+  borderColor = AUTH_COLORS_LIGHT.borderColor,
+  borderColorDark = AUTH_COLORS_DARK.borderColor,
   transitionTintColor = AUTH_COLORS_LIGHT.transitionTintColor,
   transitionTintColorDark = AUTH_COLORS_DARK.transitionTintColor,
   leftPanelTitle = 'WELCOME BACK!',
   leftPanelSubtitle = 'Lorem ipsum dolor sit amet consectetur adipisicing.',
   rightPanelTitle = 'HELLO FRIEND!',
   rightPanelSubtitle = 'Enter your personal details and start your journey with us.',
+  // default text colors
+  leftPanelTitleColor = '#ffffff',
+  leftPanelSubtitleColor = 'rgb(209 213 219)',
+  rightPanelTitleColor = '#ffffff',
+  rightPanelSubtitleColor = 'rgb(209 213 219)',
   loginTitle = 'Login',
   signupTitle = 'Sign Up',
   leftPanelImage = '/Authsideimage.jpeg',
@@ -121,6 +169,9 @@ export default function AnimatedAuth({
   const activeBackgroundColor = isDark ? backgroundColorDark : backgroundColor;
   const activeBackdrop = isDark ? backdropDark : backdrop;
   const activePlaceholderColor = isDark ? placeholderColorDark : placeholderColor;
+  const activeTextColor = isDark ? textColorDark : textColor;
+  const activeSecondaryTextColor = isDark ? secondaryTextColorDark : secondaryTextColor;
+  const activeBorderColor = isDark ? borderColorDark : borderColor;
   const activeTransitionTintColor = isDark ? transitionTintColorDark : transitionTintColor;
 
   useGSAP(() => {
@@ -329,6 +380,9 @@ export default function AnimatedAuth({
           backgroundColor: activeBackgroundColor,
           boxShadow: `0 0 20px ${activeGlowColor}, inset 0 0 0 1px ${activeThemeColor}40`,
           '--auth-placeholder': activePlaceholderColor,
+          '--auth-text': activeTextColor,
+          '--auth-text-secondary': activeSecondaryTextColor,
+          '--auth-border': activeBorderColor,
         } as React.CSSProperties}
       >
         {(error || message) && (
@@ -342,32 +396,32 @@ export default function AnimatedAuth({
           ref={loginFormRef}
           className="absolute left-0 top-0 w-full md:w-1/2 h-full flex flex-col justify-center px-8 md:px-12 opacity-0 -translate-x-12 pointer-events-auto z-10"
         >
-          <h2 className="text-3xl font-bold text-white mb-8">{loginTitle}</h2>
+          <h2 className="text-3xl font-bold text-[var(--auth-text)] mb-8">{loginTitle}</h2>
           <div className="space-y-4">
-            <div className="relative border-b border-gray-600 pb-2">
+            <div className="relative border-b border-[var(--auth-border)] pb-2">
               <input 
                 type="email" 
                 placeholder="Email"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-sm placeholder-[var(--auth-placeholder)]"
+                className="w-full bg-transparent outline-none text-[var(--auth-text)] text-sm placeholder-[var(--auth-placeholder)]"
               />
-              <span className="absolute right-0 text-gray-400">
+              <span className="absolute right-0 text-[var(--auth-text-secondary)]">
                 <Mail size={16} />
               </span>
             </div>
-            <div className="relative border-b border-gray-600 pb-2">
+            <div className="relative border-b border-[var(--auth-border)] pb-2">
               <input 
                 type={showLoginPassword ? 'text' : 'password'}
                 placeholder="Password" 
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-sm placeholder-[var(--auth-placeholder)]"
+                className="w-full bg-transparent outline-none text-[var(--auth-text)] text-sm placeholder-[var(--auth-placeholder)]"
               />
               <button
                 type="button"
                 onClick={() => setShowLoginPassword((prev) => !prev)}
-                className="absolute right-0 text-xs text-gray-300 hover:text-white"
+                className="absolute right-0 text-xs text-[var(--auth-text-secondary)] hover:text-[var(--auth-text)]"
               >
                 {showLoginPassword ? 'Hide' : 'Show'}
               </button>
@@ -407,11 +461,23 @@ export default function AnimatedAuth({
             type="button"
             onClick={handleGoogleAuth}
             disabled={loading}
-            className="w-full mt-3 py-3 rounded-full text-white text-sm font-semibold border border-white/30 bg-transparent transition-colors hover:bg-white/10"
+            className="w-full mt-3 py-3 rounded-full text-[var(--auth-text)] text-sm font-semibold border bg-transparent transition-transform transition-colors hover:scale-105 hover:bg-white/10 flex items-center justify-center space-x-2"
+            style={{ borderColor: activeThemeColor }}
           >
-            {loading ? 'Please wait...' : 'Login via Google'}
+            {loading ? (
+              'Please wait...'
+            ) : (
+              <>
+                <img
+                  src="/Googe_icon.svg"
+                  alt="Google logo"
+                  className="h-5 w-5"
+                />
+                <span>Login via Google</span>
+              </>
+            )}
           </button>
-          <p className="text-xs text-gray-400 mt-4 text-center">
+          <p className="text-xs text-[var(--auth-text-secondary)] mt-4 text-center">
             Don&apos;t have an account?{' '}
             <button onClick={() => setIsLogin(false)} style={{ color: activeThemeColor }} className="hover:underline">
               Sign Up
@@ -424,56 +490,56 @@ export default function AnimatedAuth({
           ref={signupFormRef}
           className="absolute right-0 top-0 w-full md:w-1/2 h-full flex flex-col justify-start px-8 md:px-12 pointer-events-auto z-10 overflow-y-auto md:overflow-hidden pt-6"
         >
-          <h2 className="text-2xl font-bold text-white mb-4">{signupTitle}</h2>
+          <h2 className="text-2xl font-bold text-[var(--auth-text)] mb-4">{signupTitle}</h2>
           <div className="space-y-2.5">
-            <div className="relative border-b border-gray-600 pb-2">
+            <div className="relative border-b border-[var(--auth-border)] pb-2">
               <input 
                 type="text" 
                 placeholder="Full name"
                 value={signupName}
                 onChange={(e) => setSignupName(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
+                className="w-full bg-transparent outline-none text-[var(--auth-text)] text-xs placeholder-[var(--auth-placeholder)]"
               />
-              <span className="absolute right-0 text-gray-400">
+              <span className="absolute right-0 text-[var(--auth-text-secondary)]">
                 <User size={16} />
               </span>
             </div>
-            <div className="relative border-b border-gray-600 pb-2">
+            <div className="relative border-b border-[var(--auth-border)] pb-2">
               <input 
                 type="email" 
                 placeholder="Email" 
                 value={signupEmail}
                 onChange={(e) => setSignupEmail(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
+                className="w-full bg-transparent outline-none text-[var(--auth-text)] text-xs placeholder-[var(--auth-placeholder)]"
               />
-              <span className="absolute right-0 text-gray-400">
+              <span className="absolute right-0 text-[var(--auth-text-secondary)]">
                 <Mail size={16} />
               </span>
             </div>
-            <div className="relative border-b border-gray-600 pb-2">
+            <div className="relative border-b border-[var(--auth-border)] pb-2">
               <input 
                 type="text" 
                 placeholder="Phone"
                 value={signupPhone}
                 onChange={(e) => setSignupPhone(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
+                className="w-full bg-transparent outline-none text-[var(--auth-text)] text-xs placeholder-[var(--auth-placeholder)]"
               />
-              <span className="absolute right-0 text-gray-400">
+              <span className="absolute right-0 text-[var(--auth-text-secondary)]">
                 <User size={16} />
               </span>
             </div>
-            <div className="relative border-b border-gray-600 pb-2">
+            <div className="relative border-b border-[var(--auth-border)] pb-2">
               <input 
                 type={showSignupPassword ? 'text' : 'password'}
                 placeholder="Password" 
                 value={signupPassword}
                 onChange={(e) => setSignupPassword(e.target.value)}
-                className="w-full bg-transparent outline-none text-white text-xs placeholder-[var(--auth-placeholder)]"
+                className="w-full bg-transparent outline-none text-[var(--auth-text)] text-xs placeholder-[var(--auth-placeholder)]"
               />
               <button
                 type="button"
                 onClick={() => setShowSignupPassword((prev) => !prev)}
-                className="absolute right-0 text-xs text-gray-300 hover:text-white"
+                className="absolute right-0 text-xs text-[var(--auth-text-secondary)] hover:text-[var(--auth-text)]"
               >
                 {showSignupPassword ? 'Hide' : 'Show'}
               </button>
@@ -508,11 +574,23 @@ export default function AnimatedAuth({
             type="button"
             onClick={handleGoogleAuth}
             disabled={loading}
-            className="w-full mt-3 py-2.5 rounded-full text-white text-sm font-semibold border border-white/30 bg-transparent transition-colors hover:bg-white/10"
+            className="w-full mt-3 py-2.5 rounded-full text-[var(--auth-text)] text-sm font-semibold border bg-transparent transition-transform transition-colors hover:scale-105 hover:bg-white/10 flex items-center justify-center space-x-2"
+            style={{ borderColor: activeThemeColor }}
           >
-            {loading ? 'Please wait...' : 'Signup via Google'}
+            {loading ? (
+              'Please wait...'
+            ) : (
+              <>
+                <img
+                  src="/Googe_icon.svg"
+                  alt="Google logo"
+                  className="h-4 w-4"
+                />
+                <span>Signup via Google</span>
+              </>
+            )}
           </button>
-          <p className="text-[11px] text-gray-400 mt-3 text-center">
+          <p className="text-[11px] text-[var(--auth-text-secondary)] mt-3 text-center">
             Already have an account?{' '}
             <button onClick={() => setIsLogin(true)} style={{ color: activeThemeColor }} className="hover:underline">
               Login
@@ -551,12 +629,18 @@ export default function AnimatedAuth({
             ref={overlayLeftTextRef}
             className="absolute inset-0 z-20 flex flex-col justify-center items-start px-12 w-[calc(100%/0.55*0.5)]"
           >
-            <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
+            <h1
+              className="text-4xl font-bold mb-4 leading-tight"
+              style={{ color: leftPanelTitleColor }}
+            >
               {leftPanelTitle.split(' ').map((word, i) => (
                 <React.Fragment key={i}>{word}<br/></React.Fragment>
               ))}
             </h1>
-            <p className="text-sm text-gray-300 max-w-[200px] leading-relaxed">
+            <p
+              className="text-sm max-w-[200px] leading-relaxed"
+              style={{ color: leftPanelSubtitleColor }}
+            >
               {leftPanelSubtitle}
             </p>
           </div>
@@ -566,12 +650,18 @@ export default function AnimatedAuth({
             ref={overlayRightTextRef}
             className="absolute right-0 inset-y-0 z-20 flex flex-col justify-center items-end px-12 w-[calc(100%/0.55*0.5)] text-right opacity-0"
           >
-            <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
+            <h1
+              className="text-4xl font-bold mb-4 leading-tight"
+              style={{ color: rightPanelTitleColor }}
+            >
               {rightPanelTitle.split(' ').map((word, i) => (
                 <React.Fragment key={i}>{word}<br/></React.Fragment>
               ))}
             </h1>
-            <p className="text-sm text-gray-300 max-w-[200px] leading-relaxed">
+            <p
+              className="text-sm max-w-[200px] leading-relaxed"
+              style={{ color: rightPanelSubtitleColor }}
+            >
               {rightPanelSubtitle}
             </p>
           </div>
