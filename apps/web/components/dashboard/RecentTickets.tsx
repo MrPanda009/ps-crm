@@ -72,13 +72,13 @@ interface TicketCardProps {
 
 function TicketCard({ ticket }: TicketCardProps) {
   return (
-    <article className="flex flex-col p-5 rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-gray-300 transition-all duration-200 ease-out cursor-pointer">
+    <article className="flex flex-col p-5 rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-gray-300 transition-all duration-200 ease-out cursor-pointer dark:bg-[#1e1e1e] dark:border-[#2a2a2a] dark:hover:border-[#3a3a3a] dark:shadow-none">
       <div className="space-y-2">
         {/* Header: Ticket ID with Severity Dot and Status Badge */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${getSeverityDotColor(ticket.severity || "L1")}`} />
-            <span className="text-xs font-medium text-gray-500">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
               {ticket.ticket_id || "N/A"}
             </span>
           </div>
@@ -88,25 +88,25 @@ function TicketCard({ ticket }: TicketCardProps) {
         </div>
 
         {/* Issue Title - Primary Focus */}
-        <h3 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-snug line-clamp-2">
           {ticket.title}
         </h3>
 
         {/* Locality - Secondary with Icon */}
-        <div className="flex items-center gap-1.5 text-sm text-gray-500">
+        <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
           <MapPin size={14} className="flex-shrink-0" />
           <span className="line-clamp-1">{ticket.address_text || "Location not available"}</span>
         </div>
 
         {/* Assigned Department - Secondary with Icon */}
-        <div className="flex items-center gap-1.5 text-sm text-gray-500">
+        <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
           <Building2 size={14} className="flex-shrink-0" />
           <span>{ticket.assigned_department || "Unassigned"}</span>
         </div>
 
         {/* Timestamp - Bottom */}
-        <div className="pt-1 mt-2 border-t border-gray-100">
-          <span className="text-xs text-gray-400">
+        <div className="pt-1 mt-2 border-t border-gray-100 dark:border-[#2a2a2a]">
+          <span className="text-xs text-gray-400 dark:text-gray-500">
             {formatTimestamp(ticket.created_at)}
           </span>
         </div>
@@ -208,7 +208,7 @@ export default function RecentTickets() {
 
   if (error) {
     return (
-      <div className="p-6 rounded-lg border border-red-200 bg-red-50 text-red-700 shadow-sm text-center">
+      <div className="p-6 rounded-lg border border-red-200 bg-red-50 text-red-700 shadow-sm text-center dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
         <p className="text-sm font-medium">{error}</p>
       </div>
     );
@@ -220,12 +220,12 @@ export default function RecentTickets() {
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="h-40 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            className="h-40 rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
             <div className="space-y-3 animate-pulse">
-              <div className="h-3 bg-gray-200 rounded w-1/3" />
-              <div className="h-4 bg-gray-200 rounded w-full" />
-              <div className="h-3 bg-gray-200 rounded w-2/3" />
-              <div className="h-3 bg-gray-200 rounded w-1/2" />
+              <div className="h-3 bg-gray-200 dark:bg-[#2a2a2a] rounded w-1/3" />
+              <div className="h-4 bg-gray-200 dark:bg-[#2a2a2a] rounded w-full" />
+              <div className="h-3 bg-gray-200 dark:bg-[#2a2a2a] rounded w-2/3" />
+              <div className="h-3 bg-gray-200 dark:bg-[#2a2a2a] rounded w-1/2" />
             </div>
           </div>
         ))}
@@ -235,8 +235,8 @@ export default function RecentTickets() {
 
   if (tickets.length === 0) {
     return (
-      <div className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm text-center">
-        <p className="text-sm text-gray-600">No tickets submitted yet. Create one using the chat panel.</p>
+      <div className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm text-center dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+        <p className="text-sm text-gray-600 dark:text-gray-400">No tickets submitted yet. Create one using the chat panel.</p>
       </div>
     );
   }

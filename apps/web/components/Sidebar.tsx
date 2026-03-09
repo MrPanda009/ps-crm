@@ -54,38 +54,38 @@ export interface SidebarBottomNavigationItem {
 
 export const SIDEBAR_LIGHT_COLORS: SidebarThemeColors = {
   background: "bg-[#4f392e]",
-  border: "border-gray-100",
+  border: "border-[#C9A84C]/30",
   textMain: "text-gray-900",
   textMuted: "text-gray-400",
   textHover: "hover:text-gray-700",
   bgHover: "hover:bg-gray-50",
   activeText: "text-[#ffffff]",
-  activeBg: "bg-[#b4725a]",
-  activeIndicator: "bg-[#b4725a]",
-  badgeBg: "bg-[#b4725a]",
+  activeBg: "bg-[#C9A84C]",
+  activeIndicator: "bg-[#C9A84C]",
+  badgeBg: "bg-[#C9A84C]",
   badgeText: "text-white",
   toggleButtonBg: "bg-white",
 };
 
 export const SIDEBAR_DARK_COLORS: SidebarThemeColors = {
-  background: "dark:bg-gray-950",
-  border: "dark:border-gray-800",
+  background: "dark:bg-[#111111]",
+  border: "dark:border-[#C9A84C]/20",
   textMain: "dark:text-white",
-  textMuted: "dark:text-gray-500",
-  textHover: "dark:hover:text-gray-200",
-  bgHover: "dark:hover:bg-gray-900",
-  activeText: "dark:text-purple-400",
-  activeBg: "dark:bg-purple-900/20",
-  activeIndicator: "dark:bg-purple-500",
-  badgeBg: "dark:bg-purple-500",
+  textMuted: "dark:text-gray-400",
+  textHover: "dark:hover:text-white",
+  bgHover: "dark:hover:bg-[#2a2a2a]",
+  activeText: "dark:text-[#C9A84C]",
+  activeBg: "dark:bg-[#C9A84C]/10",
+  activeIndicator: "dark:bg-[#C9A84C]",
+  badgeBg: "dark:bg-[#C9A84C]/20",
   badgeText: "dark:text-white",
-  toggleButtonBg: "dark:bg-gray-800",
+  toggleButtonBg: "dark:bg-[#1e1e1e]",
 };
 
 // 1. The Exported Interface for Maximum Customizability
 export interface SidebarConfig {
   branding: {
-    title: string;
+    title: React.ReactNode;
     icon: React.ReactNode;
   };
   colors: SidebarThemeColors;
@@ -103,7 +103,11 @@ export interface SidebarConfig {
 export const defaultSidebarConfig: Omit<SidebarConfig, "isOpen" | "onClose" | "isCollapsed" | "onToggleCollapse"> = {
   branding: {
     title: "Taskify",
-    icon: <Flame size={24} strokeWidth={2.5} className="text-purple-600 dark:text-purple-400" />,
+    icon: (
+      <div className="bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-lg shrink-0">
+        <Flame size={24} strokeWidth={2.5} className="text-purple-600 dark:text-purple-400" />
+      </div>
+    ),
   },
   colors: {
     background: `${SIDEBAR_LIGHT_COLORS.background} ${SIDEBAR_DARK_COLORS.background}`,
@@ -191,7 +195,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-gray-900/50 dark:bg-black/60 z-40 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-gray-900/50 dark:bg-black/60 z-[3000] lg:hidden transition-opacity"
           onClick={onClose}
         />
       )}
@@ -200,7 +204,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
       <aside
         ref={sidebarRef}
         className={`
-          fixed lg:relative top-0 left-0 z-[1002] min-h-screen flex flex-col py-8 overflow-x-visible font-sans transition-all duration-300 ease-in-out
+          fixed lg:relative top-0 left-0 z-[3001] min-h-screen flex flex-col py-8 overflow-x-visible font-sans transition-all duration-300 ease-in-out
           ${colors.background} ${colors.border} lg:border-r lg:relative lg:translate-x-0
           ${isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
           ${isCollapsed ? "w-20" : "w-64"}
@@ -209,7 +213,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
         {/* Desktop Collapse Toggle */}
         <button
           onClick={onToggleCollapse}
-          className={`absolute -right-3 top-10 z-[1002] hidden lg:flex h-6 w-6 items-center justify-center rounded-full border text-gray-500 shadow-md hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:text-white transition-all duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-[#b4725a] dark:focus:ring-purple-500 focus:outline-none ${colors.toggleButtonBg}`}
+          className={`absolute -right-3 top-10 z-[3002] hidden lg:flex h-6 w-6 items-center justify-center rounded-full border text-gray-500 shadow-md hover:text-gray-900 dark:border-[#C9A84C]/40 dark:text-gray-400 dark:hover:text-[#C9A84C] transition-all duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-[#C9A84C] dark:focus:ring-[#C9A84C] focus:outline-none ${colors.toggleButtonBg}`}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
@@ -219,15 +223,17 @@ const Sidebar: React.FC<SidebarConfig> = ({
           {/* Logo & Mobile Close Button */}
           <div className={`flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-8"} mb-10 menu-item transition-all duration-300`}>
             <div className={`flex items-center ${isCollapsed ? "justify-center gap-0" : "gap-3"} transition-all duration-300`}>
-              <div className="bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-lg shrink-0">
+              <div className="shrink-0 flex items-center justify-center">
                 {branding.icon}
               </div>
-              <span className={`text-2xl font-bold ${colors.textMain} whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"}`}>
-                {branding.title}
-              </span>
+              <div className={`whitespace-nowrap overflow-hidden transition-all duration-300 ${isCollapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"}`}>
+                <div className={`text-[21px] font-medium leading-tight ${colors.textMain}`}>
+                  {branding.title}
+                </div>
+              </div>
             </div>
             {/* Close button only visible on mobile */}
-            <button onClick={onClose} className={`lg:hidden text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#b4725a] dark:focus:ring-purple-500 rounded-md ${isCollapsed ? "hidden" : "block"}`}>
+            <button onClick={onClose} className={`lg:hidden text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#C9A84C] dark:focus:ring-[#C9A84C] rounded-md ${isCollapsed ? "hidden" : "block"}`}>
               <X size={24} />
             </button>
           </div>
@@ -243,7 +249,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
                   href={item.href}
                   className={`
                     flex items-center ${isCollapsed ? "justify-center px-2" : "justify-start px-4"} py-3 ml-2 rounded-xl font-medium transition-all duration-200
-                    focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#b4725a] dark:focus:ring-purple-500
+                    focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#C9A84C] dark:focus:ring-[#C9A84C]
                     ${item.isActive
                       ? `${colors.activeBg} ${colors.activeText} font-semibold`
                       : `${colors.textMuted} ${colors.textHover} ${colors.bgHover}`
@@ -277,7 +283,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
           <button
             type="button"
             onClick={toggleTheme}
-            className={`menu-item flex w-full items-center ${isCollapsed ? "justify-center px-2 gap-0" : "justify-start px-4 gap-4"} py-3 ml-2 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#b4725a] dark:focus:ring-purple-500 ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
+            className={`menu-item flex w-full items-center ${isCollapsed ? "justify-center px-2 gap-0" : "justify-start px-4 gap-4"} py-3 ml-2 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#C9A84C] dark:focus:ring-[#C9A84C] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
             title={isCollapsed ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
           >
             <div className="shrink-0">

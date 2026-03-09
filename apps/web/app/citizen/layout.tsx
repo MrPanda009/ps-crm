@@ -22,7 +22,7 @@ function statusClasses(status: string): string {
   const normalized = status.trim().toLowerCase();
   if (normalized === "submitted") return "bg-amber-100 text-amber-700";
   if (normalized === "assigned") return "bg-blue-100 text-blue-700";
-  if (normalized === "in_progress" || normalized === "under_review") return "bg-purple-100 text-purple-700";
+  if (normalized === "in_progress" || normalized === "under_review") return "bg-amber-100 text-[#C9A84C]";
   if (normalized === "resolved") return "bg-green-100 text-green-700";
   if (normalized === "rejected") return "bg-red-100 text-red-700";
   return "bg-gray-100 text-gray-600";
@@ -205,6 +205,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     branding: {
       ...defaultSidebarConfig.branding,
       title: "Citizen",
+      icon: (
+        <div
+          className="w-10 h-10 lg:w-[42px] lg:h-[42px] bg-[#C9A84C]"
+          style={{
+            WebkitMaskImage: 'url(/Emblem.svg)',
+            WebkitMaskSize: 'contain',
+            WebkitMaskRepeat: 'no-repeat',
+            WebkitMaskPosition: 'center',
+            maskImage: 'url(/Emblem.svg)',
+            maskSize: 'contain',
+            maskRepeat: 'no-repeat',
+            maskPosition: 'center',
+          }}
+        />
+      ),
     },
     colors: {
       ...defaultSidebarConfig.colors,
@@ -214,7 +229,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-[#161616]">
       <Sidebar
         {...sidebarConfig}
         isOpen={isSidebarOpen}
@@ -227,13 +242,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main content area - flex-1 fills remaining space naturally */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full overflow-x-hidden">
         {/* Fixed Header - edge to edge */}
-        <header className="sticky top-0 z-[2100] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <header className="sticky top-0 z-[2100] bg-white dark:bg-[#1a1a1a] border-b border-gray-200 dark:border-[#2a2a2a] shadow-sm">
           <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 min-w-0 max-w-full">
             {/* Left side - Hamburger and Title */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <button 
+              <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex-shrink-0"
+                className="lg:hidden p-2 bg-[#C9A84C] text-white rounded-md hover:bg-[#B39340] transition-colors flex-shrink-0"
                 aria-label="Open menu"
               >
                 <Menu size={20} />
@@ -258,7 +273,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   aria-haspopup="menu"
                   aria-expanded={isNotificationOpen}
                   onClick={toggleNotifications}
-                  className="relative h-10 w-10 rounded-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center justify-center"
+                  className="relative h-10 w-10 rounded-full border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-600 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-[#2a2a2a] flex items-center justify-center"
                 >
                   <Bell size={18} />
                   {hasUnreadUpdates && (
@@ -270,7 +285,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <div
                     role="menu"
                     aria-label="Notifications"
-                    className="absolute right-0 z-[2000] mt-2 w-80 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 shadow-lg"
+                    className="absolute right-0 z-[2000] mt-2 w-80 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] p-2 shadow-lg"
                   >
                     <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Latest Updates
@@ -288,7 +303,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           <div
                             key={notification.id}
                             role="menuitem"
-                            className="rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            className="rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors"
                           >
                             <p className="line-clamp-1 text-sm font-medium text-gray-900 dark:text-gray-100">
                               {notification.title || "Untitled issue"}
@@ -313,7 +328,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   aria-haspopup="menu"
                   aria-expanded={isProfileMenuOpen}
                   onClick={toggleProfileMenu}
-                  className="h-10 rounded-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 text-gray-700 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-600 inline-flex items-center gap-2"
+                  className="h-10 rounded-full border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 text-gray-700 dark:text-gray-300 shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-[#2a2a2a] inline-flex items-center gap-2"
                 >
                   <UserCircle2 size={18} />
                   <ChevronDown
@@ -326,13 +341,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <div
                     role="menu"
                     aria-label="Profile menu"
-                    className="absolute right-0 z-[2000] mt-2 w-48 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 shadow-lg"
+                    className="absolute right-0 z-[2000] mt-2 w-48 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] py-1 shadow-lg"
                   >
                     <button
                       type="button"
                       role="menuitem"
                       onClick={handleLogout}
-                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors"
                     >
                       <LogOut size={16} />
                       <span>Logout</span>

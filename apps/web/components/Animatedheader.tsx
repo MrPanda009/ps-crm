@@ -57,7 +57,7 @@ export default function Header({
   avatarSrc = "/avatar-placeholder.jpg", // Replace with your actual path
   navLinks = [
     { label: "HOME", href: "/" },
-    { label: "EVENTS", href: "/events" },
+    { label: "CONTACT", href: "/contact" },
     { label: "BLOGS", href: "/blogs" },
     { label: "ABOUT", href: "/about" },
   ],

@@ -11,7 +11,7 @@ import dynamic from "next/dynamic";
 const LocationPinPicker = dynamic(() => import("@/components/LocationPinPicker"), {
   ssr: false,
   loading: () => (
-    <div className="h-40 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs text-gray-400">
+    <div className="h-40 w-full rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-gray-100 dark:bg-[#1e1e1e] flex items-center justify-center text-xs text-gray-400">
       Loading map…
     </div>
   ),
@@ -623,7 +623,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   return (
     <div
       ref={panelRef}
-      className="flex flex-col h-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+      className="flex flex-col h-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-[#2a2a2a] dark:bg-[#161616]"
     >
       {/* -- Messages -- */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
@@ -633,8 +633,8 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === "user"
-                  ? "rounded-br-sm bg-[#b4725a] text-white dark:bg-purple-600"
-                  : "rounded-bl-sm bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+                  ? "rounded-br-sm bg-[#b4725a] text-white dark:bg-[#C9A84C] dark:text-black"
+                  : "rounded-bl-sm bg-gray-100 text-gray-800 dark:bg-[#252525] dark:text-gray-100"
               }`}
             >
               {/* User-uploaded image thumbnail */}
@@ -650,7 +650,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
 
               {/* Text-based extracted complaint summary table */}
               {msg.extracted && (
-                <div className="mt-3 rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-gray-600 dark:bg-gray-900">
+                <div className="mt-3 rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">📋 Confirm Your Complaint</p>
                   <table className="w-full text-left">
                     <tbody>
@@ -664,7 +664,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
                           ["DIGIPIN", msg.geoDetails?.digipin || "Detecting\u2026"],
                         ] as [string, string][]
                       ).map(([label, value]) => (
-                        <tr key={label} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
+                        <tr key={label} className="border-b border-gray-100 last:border-0 dark:border-[#2a2a2a]">
                           <td className="py-1 pr-2 font-medium text-gray-500 dark:text-gray-400">{label}</td>
                           <td className="py-1 text-gray-800 dark:text-gray-200">{value}</td>
                         </tr>
@@ -679,11 +679,11 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
 
               {/* Image-based ticket preview from FastAPI /analyze */}
               {msg.imagePreview && (
-                <div className="mt-3 w-full max-w-[34rem] rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-gray-600 dark:bg-gray-900">
+                <div className="mt-3 w-full max-w-[34rem] rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">Confirm Your Complaint</p>
                   <div className={`grid gap-3 ${pendingImageDataUrl ? "grid-cols-[96px_minmax(0,1fr)]" : "grid-cols-1"}`}>
                     {pendingImageDataUrl && (
-                      <div className="h-24 w-24 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+                      <div className="h-24 w-24 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#252525]">
                         <img
                           src={pendingImageDataUrl}
                           alt="Issue photo"
@@ -720,7 +720,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
                       <button
                         type="button"
                         onClick={() => toggleImagePreviewDetails(msg.id)}
-                        className="mt-2 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                        className="mt-2 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors dark:text-gray-400 dark:hover:bg-[#2a2a2a] dark:hover:text-gray-100"
                       >
                         {expandedImagePreview[msg.id] ? (
                           <>
@@ -747,7 +747,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         {/* Typing indicator */}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 dark:bg-gray-800">
+            <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 dark:bg-[#252525]">
               <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
               <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
               <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
@@ -758,7 +758,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         {/* Submitting state */}
         {submitting && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-600 dark:bg-[#252525] dark:text-gray-300">
               <Loader2 size={16} className="animate-spin" /> Submitting your complaint…
             </div>
           </div>
@@ -767,9 +767,9 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       </div>
 
       {/* -- Input bar -- */}
-      <div className="border-t border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900">
+      <div className="border-t border-gray-200 bg-white px-3 py-2 dark:border-[#2a2a2a] dark:bg-[#161616]">
         {hasPending && pendingLocation && (
-          <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
             <div className="mb-2">
               <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">Detected location</p>
             </div>
@@ -802,7 +802,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
                 <button
                   type="button"
                   onClick={() => setLocationConfirmed(true)}
-                  className="rounded-md bg-[#4f392e] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#b4725a] transition-all duration-200 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-purple-600 dark:hover:bg-purple-500 dark:focus:ring-purple-500 dark:focus:ring-offset-gray-900"
+                  className="rounded-md bg-[#4f392e] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#b4725a] transition-all duration-200 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-[#C9A84C] dark:text-black dark:hover:bg-[#d4b45c] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
                 >
                   Confirm location
                 </button>
@@ -813,7 +813,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
                     setPendingLocation(loc);
                     setLocationConfirmed(false);
                   }}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-600 dark:focus:ring-offset-gray-900"
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 dark:border-[#2a2a2a] dark:text-gray-200 dark:hover:bg-[#2a2a2a] dark:focus:ring-[#2a2a2a] dark:focus:ring-offset-[#161616]"
                 >
                   Move pin to GPS
                 </button>
@@ -825,7 +825,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
               <button
                 type="button"
                 onClick={() => setIsMapExpanded(!isMapExpanded)}
-                className="flex shrink-0 items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700"
+                className="flex shrink-0 items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-[#2a2a2a]"
               >
                 {isMapExpanded ? (
                   <>
@@ -847,7 +847,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || submitting}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-purple-600 dark:hover:text-white dark:hover:border-purple-600 dark:focus:ring-purple-500 dark:focus:ring-offset-gray-900"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
             aria-label="Upload photo"
             title="Upload a photo of the issue"
           >
@@ -871,12 +871,12 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
             onKeyDown={handleKeyDown}
             placeholder={duplicateContext ? "Type UPVOTE or YES AGAIN..." : hasPending ? "Confirm location, then type YES to submit..." : "Describe your issue..."}
             disabled={submitting}
-            className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition-all duration-200 placeholder:text-gray-400 focus:border-[#b4725a] focus:ring-2 focus:ring-[#b4725a]/20 focus:bg-white dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:focus:bg-gray-700"
+            className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition-all duration-200 placeholder:text-gray-400 focus:border-[#b4725a] focus:ring-2 focus:ring-[#b4725a]/20 focus:bg-white dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-[#C9A84C] dark:focus:ring-[#C9A84C]/20 dark:focus:bg-[#252525]"
           />
           <button
             onClick={handleSend}
             disabled={isLoading || submitting || !input.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f392e] text-white transition-all duration-200 hover:bg-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-purple-600 dark:hover:bg-purple-500 dark:focus:ring-purple-500 dark:focus:ring-offset-gray-900"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f392e] text-white transition-all duration-200 hover:bg-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-[#C9A84C] dark:text-black dark:hover:bg-[#d4b45c] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
             aria-label="Send message"
           >
             <Send size={16} />
