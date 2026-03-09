@@ -6,7 +6,6 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 // lucide icons for social links and theme toggle
-import { X, Linkedin, Github } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import ThemeToggle from "./Themetogglebutton";
 import LoginButton3D from "./Loginbutton";
@@ -35,7 +34,6 @@ export interface HeaderProps {
   logoText?: string;
   avatarSrc?: string;
   navLinks?: { label: string; href: string }[];
-  socialLinks?: { id: string; icon: React.ReactNode; href: string }[];
   themeColors?: HeaderTheme;
 }
 
@@ -63,35 +61,53 @@ export default function Header({
     { label: "BLOGS", href: "/blogs" },
     { label: "ABOUT", href: "/about" },
   ],
-  socialLinks = [
-    {
-      id: "github",
-      href: "#",
-      icon: <Github className="w-4 h-4" />,
-    },
-    {
-      id: "x",
-      href: "#",
-      icon: <X className="w-4 h-4" />,
-    },
-    {
-      id: "linkedin",
-      href: "#",
-      icon: <Linkedin className="w-4 h-4" />,
-    },
-  ],
   themeColors = defaultTheme,
 }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { theme } = useTheme();
 
-  const isDarkMode = theme === "dark";
+  // Determine the resolved theme directly from the DOM so we never flash the wrong
+  // colour during the SSR→hydration→useEffect cycle.  The inline <head> script has
+  // already set the correct class before any JS runs, so this is always accurate.
+  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">(() => {
+    if (typeof window !== "undefined") {
+      return document.documentElement.classList.contains("dark") ? "dark" : "light";
+    }
+    return "dark";
+  });
+
+  // Keep resolvedTheme in sync whenever ThemeProvider toggles the theme.
+  useEffect(() => {
+    setResolvedTheme(theme);
+  }, [theme]);
+
+  const isDarkMode = resolvedTheme === "dark";
   const currentTheme = isDarkMode ? themeColors.dark : themeColors.light;
+
+  // One-time entrance animation — slides the header in from above on mount.
+  // Starting opacity:0 is set directly on the element (style prop below) to
+  // prevent any flash before this effect runs.
+  useGSAP(() => {
+    if (!headerRef.current) return;
+    gsap.fromTo(
+      headerRef.current,
+      { y: -80, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.8, delay: 0.1, ease: "power3.out" }
+    );
+  }, []);
 
   // 2. GSAP Animation for scroll color change
   useGSAP(() => {
     if (!headerRef.current) return;
+
+    // Immediately apply the correct background for the current theme so there's
+    // no flash of the wrong colour while the animation is being set up.
+    const atTop = window.scrollY <= 50;
+    gsap.set(headerRef.current, {
+      backgroundColor: atTop ? currentTheme.bgInitial : currentTheme.bgScrolled,
+      color: atTop ? currentTheme.textInitial : currentTheme.textScrolled,
+    });
 
     const anim = gsap.fromTo(
       headerRef.current,
@@ -113,17 +129,23 @@ export default function Header({
       anim.progress(1);
     }
 
-    ScrollTrigger.create({
+    const st = ScrollTrigger.create({
       start: 50,
       onEnter: () => anim.play(),
       onLeaveBack: () => anim.reverse(),
     });
+
+    return () => {
+      st.kill();
+      anim.kill();
+    };
   }, [currentTheme]);
 
   return (
     <header
       ref={headerRef}
       className="fixed top-0 left-0 w-full z-50 transition-colors duration-300 shadow-sm"
+      style={{ opacity: 0 }}
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         
@@ -142,18 +164,6 @@ export default function Header({
             <span className="font-bold text-lg tracking-wider hidden sm:block">
               {logoText}
             </span>
-          </div>
-          
-          <div className="hidden sm:flex items-center gap-4 border-l border-current pl-6 opacity-80">
-            {socialLinks.map((social) => (
-              <Link
-                key={social.id}
-                href={social.href}
-                className="hover:opacity-60 transition-opacity"
-              >
-                {social.icon}
-              </Link>
-            ))}
           </div>
         </div>
 
@@ -202,13 +212,6 @@ export default function Header({
           ))}
           <div className="mt-4">
             <LoginButton3D onClick={() => (window.location.href = "/login")} />
-          </div>
-          <div className="flex items-center gap-6 mt-4 pt-4 border-t border-current/20">
-             {socialLinks.map((social) => (
-              <Link key={social.id} href={social.href}>
-                {social.icon}
-              </Link>
-            ))}
           </div>
         </div>
       )}

@@ -2,8 +2,13 @@
 
 import React, { useRef } from "react";
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { useTheme } from "@/components/ThemeProvider"; // Update this path
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger, useGSAP);
+}
 
 export interface AnimatedTextTheme {
   light: { text: string };
@@ -16,6 +21,7 @@ export interface AnimatedTextProps {
   themeColors?: AnimatedTextTheme;
   animationDelay?: number;
   className?: string;
+  animateOnScroll?: boolean; // if true, trigger animation when scrolled into view
 }
 
 // A generic default fallback (you'll likely override this per instance)
@@ -30,17 +36,24 @@ export default function AnimatedText({
   themeColors = defaultTheme,
   animationDelay = 0.2,
   className = "",
+  animateOnScroll = false,
 }: AnimatedTextProps) {
   const elRef = useRef<HTMLElement>(null);
   const { theme } = useTheme();
 
   useGSAP(() => {
-    gsap.fromTo(
-      elRef.current,
-      { y: 30, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.8, delay: animationDelay, ease: "power3.out" }
-    );
-  }, [animationDelay]);
+    if (!elRef.current) return;
+    const fromVars: any = { y: 30, opacity: 0 };
+    const toVars: any = { y: 0, opacity: 1, duration: 0.8, delay: animationDelay, ease: "power3.out" };
+    if (animateOnScroll) {
+      toVars.scrollTrigger = {
+        trigger: elRef.current,
+        start: "top 85%",
+        toggleActions: "play none none none",
+      };
+    }
+    gsap.fromTo(elRef.current, fromVars, toVars);
+  }, [animationDelay, animateOnScroll]);
 
   const currentTheme = theme === "dark" ? themeColors.dark : themeColors.light;
 

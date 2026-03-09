@@ -19,12 +19,12 @@ export default function HomePage() {
       <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
           <div className="relative order-2 w-full lg:order-1 lg:w-1/2">
-            <FadedText text="Future" className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
+            <FadedText text="Resolve" className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
 
             <div className="relative z-10 max-w-xl pt-10 lg:pt-16">
               <AnimatedText
                 as="h1"
-                text="Map Design"
+                text="The Centralized Digital Command Center"
                 className="text-5xl font-bold tracking-tight md:text-6xl"
               />
 
@@ -32,7 +32,7 @@ export default function HomePage() {
 
               <AnimatedText
                 as="p"
-                text="Map data visualization will be widely used in various industries and will play a powerful role in the future."
+                text="Empowering communities with a smart Public Service CRM. Seamlessly organize citizen complaints, automate administrative workflows, and track resolution progress on a live interactive map."
                 className="mt-6 max-w-md text-xl leading-relaxed"
                 animationDelay={0.35}
               />
@@ -45,6 +45,54 @@ export default function HomePage() {
               <MapVisual
                 imageSrc="/Image1.jpg"
                 className="relative z-10 w-full rounded-2xl"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* second full screen page with Empower */}
+      <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
+          <div className="relative order-1 w-full lg:w-1/2">
+            <FadedText text="Empower" animateOnScroll className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
+            <div className="relative z-10 pt-10 lg:pt-16">
+              <AnimatedText
+                as="h2"
+                text="Empower Communities"
+                className="text-4xl font-bold tracking-tight md:text-5xl"
+                animateOnScroll
+              />
+              <AnimatedText
+                as="p"
+                text="Give citizens and administrators the tools they need to create lasting impact."
+                className="mt-6 max-w-md text-xl leading-relaxed"
+                animationDelay={0.2}
+                animateOnScroll
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* third full screen page with Connect */}
+      <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
+          <div className="relative order-1 w-full lg:w-1/2">
+            <FadedText text="Connect" animateOnScroll className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
+            <div className="relative z-10 pt-10 lg:pt-16">
+              <AnimatedText
+                as="h2"
+                text="Connect People"
+                className="text-4xl font-bold tracking-tight md:text-5xl"
+                animateOnScroll
+              />
+              <AnimatedText
+                as="p"
+                text="Bridge the gap between citizens and services through real-time communication and data."
+                className="mt-6 max-w-md text-xl leading-relaxed"
+                animationDelay={0.2}
+                animateOnScroll
               />
             </div>
           </div>
