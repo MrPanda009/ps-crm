@@ -22,7 +22,7 @@ function statusClasses(status: string): string {
   const normalized = status.trim().toLowerCase();
   if (normalized === "submitted") return "bg-amber-100 text-amber-700";
   if (normalized === "assigned") return "bg-blue-100 text-blue-700";
-  if (normalized === "in_progress" || normalized === "under_review") return "bg-purple-100 text-purple-700";
+  if (normalized === "in_progress" || normalized === "under_review") return "bg-amber-100 text-[#C9A84C]";
   if (normalized === "resolved") return "bg-green-100 text-green-700";
   if (normalized === "rejected") return "bg-red-100 text-red-700";
   return "bg-gray-100 text-gray-600";
@@ -248,7 +248,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex-shrink-0"
+                className="lg:hidden p-2 bg-[#C9A84C] text-white rounded-md hover:bg-[#B39340] transition-colors flex-shrink-0"
                 aria-label="Open menu"
               >
                 <Menu size={20} />
