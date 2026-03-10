@@ -43,8 +43,8 @@ export default function LoginPage() {
         <AnimatedAuth
           {...loginAuthColors}
           leftPanelSubtitle='Create an account to organize citizen complaints and ensure transparent grievance resolution.'
-          leftPanelTitle="JOIN Jan-Seva!"
-          rightPanelTitle='WELCOME TO Jan-Seva!'
+          leftPanelTitle="JOIN Jansamadhan!"
+          rightPanelTitle='WELCOME TO Jansamadhan!'
           rightPanelSubtitle='Log in to your digital command center. Manage workflows, assign tasks, and track real-time progress.'
           leftPanelImage='Image1.jpg'
           rightPanelImage='Image2.jpg'

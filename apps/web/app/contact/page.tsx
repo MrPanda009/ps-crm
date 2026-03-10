@@ -155,11 +155,11 @@ export default function ContactPage() {
               <div className="hero-anim mt-8 flex items-center gap-2">
                 <span className="text-sm font-medium" style={{ color: textSecondary }}>Get at</span>
                 <a
-                  href="mailto:contact@Jan-Seva.com"
+                  href="mailto:contact@Jansamadhan.com"
                   className="text-sm font-semibold underline underline-offset-4 transition-opacity hover:opacity-70"
                   style={{ color: textPrimary }}
                 >
-                  contact@Jan-Seva.com
+                  contact@Jansamadhan.com
                 </a>
               </div>
             </div>
