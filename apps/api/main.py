@@ -342,7 +342,14 @@ def reverse_geocode_from_coordinates(latitude: float, longitude: float) -> Dict[
         try:
             query = urllib.parse.urlencode({"lat": latitude, "lng": longitude})
             url = f"https://apis.mappls.com/advancedmaps/v1/{MAPPLS_API_KEY}/rev_geocode?{query}"
-            with urllib.request.urlopen(url, timeout=8) as res:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Referer": "https://jansamadhan.perkkk.dev",
+                    "User-Agent": "JanSamadhan/1.0",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=8) as res:
                 payload = json.loads(res.read().decode("utf-8"))
 
             results = payload.get("results") if isinstance(payload, dict) else None
