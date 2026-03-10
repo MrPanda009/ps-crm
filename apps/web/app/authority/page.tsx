@@ -14,11 +14,11 @@ import {
   type WorkerOption,
 } from "./_components/dashboard-types"
 
-import AuthorityStatsCards      from "./_components/AuthorityStatsCards"
-import AuthorityTrendChart      from "./_components/AuthorityTrendChart"
+import AuthorityStatsCards from "./_components/AuthorityStatsCards"
+import AuthorityTrendChart from "./_components/AuthorityTrendChart"
 import AuthorityStatusBreakdown from "./_components/AuthorityStatusBreakdown"
-import AuthorityRecentTickets   from "./_components/AuthorityRecentTickets"
-import AuthorityUrgentTickets   from "./_components/AuthorityUrgentTickets"
+import AuthorityRecentTickets from "./_components/AuthorityRecentTickets"
+import AuthorityUrgentTickets from "./_components/AuthorityUrgentTickets"
 
 // Exact columns that exist on complaints table per database.types.ts
 const COMPLAINT_SELECT =
@@ -30,14 +30,14 @@ const TREND_SELECT = "status, created_at, resolved_at"
 
 export default function AuthorityDashboardPage() {
   const [complaints, setComplaints] = useState<AuthorityComplaintRow[]>([])
-  const [workers,    setWorkers]    = useState<WorkerOption[]>([])
-  const [trend,      setTrend]      = useState<TrendPoint[]>([])
-  const [stats,      setStats]      = useState<DashboardStats>({
+  const [workers, setWorkers] = useState<WorkerOption[]>([])
+  const [trend, setTrend] = useState<TrendPoint[]>([])
+  const [stats, setStats] = useState<DashboardStats>({
     total: 0, pendingAction: 0, inProgress: 0, resolvedThisMonth: 0, slaBreached: 0,
   })
   const [department, setDepartment] = useState("")
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const { data: auth } = await supabase.auth.getUser()
@@ -80,7 +80,7 @@ export default function AuthorityDashboardPage() {
         .gte("created_at", cutoff.toISOString()),
     ])
 
-    allRows   = r1.data ?? []
+    allRows = r1.data ?? []
     trendRows = r2.data ?? []
 
     // Fallback: use assigned_department (the correct column name)
@@ -97,7 +97,7 @@ export default function AuthorityDashboardPage() {
           .eq("assigned_department", dept)   // ← correct column
           .gte("created_at", cutoff.toISOString()),
       ])
-      allRows   = r3.data ?? []
+      allRows = r3.data ?? []
       trendRows = r4.data ?? []
 
       if (r3.error) {
@@ -116,22 +116,22 @@ export default function AuthorityDashboardPage() {
     const mappedComplaints = allRows as unknown as AuthorityComplaintRow[]
 
     const mappedWorkers: WorkerOption[] = (wRows ?? []).map((w: any) => ({
-      id:           w.worker_id,
-      full_name:    w.profiles?.full_name ?? "Unknown",
+      id: w.worker_id,
+      full_name: w.profiles?.full_name ?? "Unknown",
       availability: w.availability,
-      department:   w.department ?? dept,
+      department: w.department ?? dept,
     }))
 
     // Build 6-month trend buckets
     const buckets = buildSixMonthBuckets()
-    ;(trendRows ?? []).forEach((r: any) => {
-      const mk = monthLabel(new Date(r.created_at))
-      if (buckets[mk]) buckets[mk].submitted++
-      if (r.status === "resolved" && r.resolved_at) {
-        const rk = monthLabel(new Date(r.resolved_at))
-        if (buckets[rk]) buckets[rk].resolved++
-      }
-    })
+      ; (trendRows ?? []).forEach((r: any) => {
+        const mk = monthLabel(new Date(r.created_at))
+        if (buckets[mk]) buckets[mk].submitted++
+        if (r.status === "resolved" && r.resolved_at) {
+          const rk = monthLabel(new Date(r.resolved_at))
+          if (buckets[rk]) buckets[rk].resolved++
+        }
+      })
     const trendPoints: TrendPoint[] = Object.entries(buckets).map(
       ([month, v]) => ({ month, ...v })
     )
@@ -149,7 +149,7 @@ export default function AuthorityDashboardPage() {
   useEffect(() => {
     const ch = supabase
       .channel("authority-dashboard-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "complaints"      }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "complaints" }, () => void load())
       .on("postgres_changes", { event: "*", schema: "public", table: "worker_profiles" }, () => void load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -158,16 +158,7 @@ export default function AuthorityDashboardPage() {
   const urgentTickets = getUrgentTickets(complaints)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-          Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"} 👋
-        </h1>
-        <p className="mt-0.5 text-sm text-gray-400">
-          {department ? `${department} · ` : ""}JanSamadhan Control Centre
-        </p>
-      </div>
-
+    <div className="space-y-4">
       <AuthorityStatsCards stats={stats} loading={loading} error={error} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
