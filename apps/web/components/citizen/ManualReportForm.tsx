@@ -435,7 +435,7 @@ export default function ManualReportForm() {
         let photoUrls: string[] = [];
         if (imageFile) {
           const ext = imageFile.name.split(".").pop() ?? "jpg";
-          const filePath = `${user.id}/${Date.now()}.${ext}`;
+          const filePath = `complaints/${crypto.randomUUID()}.${ext}`;
           const { error: uploadErr } = await supabase.storage
             .from("complaint-photos")
             .upload(filePath, imageFile, {
