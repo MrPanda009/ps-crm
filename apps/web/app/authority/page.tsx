@@ -28,7 +28,7 @@ import AuthorityUrgentTickets   from "./_components/AuthorityUrgentTickets"
 const COMPLAINT_SELECT =
   "id, ticket_id, title, status, effective_severity, sla_deadline, " +
   "escalation_level, created_at, resolved_at, address_text, assigned_worker_id, " +
-  "upvote_count, categories(name)"
+  "upvote_count, photo_urls, photo_count, categories(name)"
 
 // Trend rows: need status, created_at, resolved_at
 const TREND_SELECT = "status, created_at, resolved_at"

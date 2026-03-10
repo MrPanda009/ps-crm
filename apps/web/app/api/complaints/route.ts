@@ -5,7 +5,10 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/src/types/database.types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_SERVICE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const mapplsApiKey = process.env.MAPPLS_API_KEY ?? process.env.NEXT_PUBLIC_MAPPLS_API_KEY ?? "";
 const reverseGeocodeCache = new Map<string, ReverseGeo>();
 const ALLOWED_STATUSES = ["submitted", "verified", "assigned", "in_progress", "resolved", "closed"] as const;
@@ -210,7 +213,7 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<Reve
   if (!location.city) location.city = "Delhi";
   if (!location.state) location.state = "Delhi";
   if (!location.pincode) location.pincode = "000000";
-  if (!location.formattedAddress) location.formattedAddress = `Lat ${latitude.toFixed(6)}, Lng ${longitude.toFixed(6)}`;
+  if (!location.formattedAddress) location.formattedAddress = "Unknown location";
   if (!location.digipin) location.digipin = fallbackDigipin(latitude, longitude);
 
   if (reverseGeocodeCache.size >= 500) {
@@ -351,6 +354,19 @@ async function findRecentDuplicate(input: {
  * Creates a new complaint in Supabase.
  */
 export async function POST(req: NextRequest) {
+  // --- Server-side auth: verify JWT and extract citizen_id ---
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Missing or invalid Authorization header" }, { status: 401 });
+  }
+  const token = authHeader.slice(7);
+  const authSupabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
+  const { data: { user: authUser }, error: authError } = await authSupabase.auth.getUser(token);
+  if (authError || !authUser) {
+    return NextResponse.json({ error: "Authentication failed. Please log in again." }, { status: 401 });
+  }
+  const verifiedCitizenId = authUser.id;
+
   const body = (await req.json().catch(() => null)) as ComplaintPayload | null;
 
   if (!body) {
@@ -358,7 +374,6 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    citizen_id,
     category_id,
     issue_type,
     title,
@@ -377,9 +392,8 @@ export async function POST(req: NextRequest) {
     force_submit,
   } = body;
 
-  // Validate required fields
+  // Validate required fields (citizen_id comes from JWT, not body)
   if (
-    !citizen_id ||
     !category_id ||
     !title ||
     !description ||
@@ -389,7 +403,7 @@ export async function POST(req: NextRequest) {
     !timestamp
   ) {
     return NextResponse.json(
-      { error: "Missing required fields: citizen_id, category_id, title, description, latitude, longitude, accuracy, timestamp" },
+      { error: "Missing required fields: category_id, title, description, latitude, longitude, accuracy, timestamp" },
       { status: 400 },
     );
   }
@@ -400,9 +414,8 @@ export async function POST(req: NextRequest) {
   const resolvedAddress = (address_text?.trim() || resolved.formattedAddress).trim();
   const resolvedWard = (ward_name?.trim() || resolved.locality || "Unknown locality").trim();
   const resolvedCity = (city?.trim() || resolved.city || "Delhi").trim();
-  const addressWithMeta = `${resolvedAddress} | gps_lat=${latitude.toFixed(6)} | gps_lng=${longitude.toFixed(6)} | gps_accuracy_m=${accuracy.toFixed(1)} | gps_timestamp=${timestamp}`;
   const canonicalComplaint = buildCanonicalComplaintRecord({
-    userId: citizen_id,
+    userId: verifiedCitizenId,
     issueType: (issue_type?.trim() || title.trim()),
     severity: severity,
     description,
@@ -464,7 +477,7 @@ export async function POST(req: NextRequest) {
       ward_name: resolvedWard,
       pincode: canonicalComplaint.pincode,
       digipin: canonicalComplaint.digipin,
-      address_text: addressWithMeta,
+      address_text: resolvedAddress,
       assigned_department: canonicalComplaint.authority,
       city: canonicalComplaint.city,
       possible_duplicate: Boolean(duplicate),

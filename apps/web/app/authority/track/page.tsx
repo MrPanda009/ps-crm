@@ -10,7 +10,7 @@ import { getSeverityConfig } from "../_components/dashboard-types"
 const MapComponent = dynamic(() => import("@/app/MapComponent"), { ssr: false })
 
 type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated"
-type Sev    = string  // accept any string — getSeverityConfig handles normalisation
+type Sev = string  // accept any string — getSeverityConfig handles normalisation
 
 type Complaint = {
   id: string; ticket_id: string; title: string; status: Status
@@ -27,16 +27,16 @@ const SEV_RANK: Record<string, number> = {
 }
 
 const STATUS_META: Record<Status, { label: string; badge: string }> = {
-  submitted:    { label: "Submitted",    badge: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
+  submitted: { label: "Submitted", badge: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
   under_review: { label: "Under Review", badge: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
-  assigned:     { label: "Assigned",     badge: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
-  in_progress:  { label: "In Progress",  badge: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" },
-  resolved:     { label: "Resolved",     badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
-  rejected:     { label: "Rejected",     badge: "bg-red-50 text-red-600 ring-1 ring-red-200" },
-  escalated:    { label: "Escalated",    badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200" },
+  assigned: { label: "Assigned", badge: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
+  in_progress: { label: "In Progress", badge: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" },
+  resolved: { label: "Resolved", badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  rejected: { label: "Rejected", badge: "bg-red-50 text-red-600 ring-1 ring-red-200" },
+  escalated: { label: "Escalated", badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200" },
 }
 
-const TERMINAL_STATUSES:   Status[] = ["resolved", "rejected"]
+const TERMINAL_STATUSES: Status[] = ["resolved", "rejected"]
 const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated"]
 // Severity options shown in filter dropdown
 const SEV_FILTER_OPTIONS = [
@@ -47,25 +47,25 @@ const SEV_FILTER_OPTIONS = [
 ]
 
 const COMPLAINT_SELECT =
-  "id,ticket_id,title,status,effective_severity,sla_deadline," +
-  "escalation_level,created_at,resolved_at,address_text,assigned_worker_id,upvote_count,categories(name)"
+  "id,ticket_id,title,status,effective_severity,sla_breached,sla_deadline," +
+  "escalation_level,created_at,resolved_at,address_text,assigned_worker_id,upvote_count,photo_urls,photo_count,categories(name)"
 
 function slaStatus(deadline: string | null, status: Status): { breached: boolean; text: string; pill: string } {
   if (!deadline) return { breached: false, text: "—", pill: "text-gray-300" }
   if (status === "resolved" || status === "rejected") {
     return { breached: false, text: "Met", pill: "bg-emerald-50 text-emerald-600" }
   }
-  const diff  = new Date(deadline).getTime() - Date.now()
+  const diff = new Date(deadline).getTime() - Date.now()
   const hours = diff / 3_600_000
-  const days  = Math.ceil(diff / 86_400_000)
+  const days = Math.ceil(diff / 86_400_000)
   if (diff < 0) {
     const overH = Math.round(Math.abs(hours))
     return { breached: true, text: overH < 24 ? `${overH}h overdue` : `${Math.ceil(Math.abs(hours) / 24)}d overdue`, pill: "bg-red-100 text-red-600 font-bold" }
   }
-  if (hours < 4)  return { breached: false, text: `${Math.ceil(hours)}h left`, pill: "bg-orange-100 text-orange-600 font-bold" }
-  if (days === 0) return { breached: false, text: "Due today",                 pill: "bg-orange-100 text-orange-600 font-bold" }
-  if (days <= 2)  return { breached: false, text: `${days}d left`,             pill: "bg-amber-50 text-amber-600" }
-  return              { breached: false, text: `${days}d left`,             pill: "bg-gray-100 text-gray-500" }
+  if (hours < 4) return { breached: false, text: `${Math.ceil(hours)}h left`, pill: "bg-orange-100 text-orange-600 font-bold" }
+  if (days === 0) return { breached: false, text: "Due today", pill: "bg-orange-100 text-orange-600 font-bold" }
+  if (days <= 2) return { breached: false, text: `${days}d left`, pill: "bg-amber-50 text-amber-600" }
+  return { breached: false, text: `${days}d left`, pill: "bg-gray-100 text-gray-500" }
 }
 
 /** Normalise DB severity to L-code for filter matching */
@@ -79,19 +79,19 @@ function normaliseSev(v: string): string {
 }
 
 export default function TrackPage() {
-  const [complaints,   setComplaints]   = useState<Complaint[]>([])
-  const [workers,      setWorkers]      = useState<Worker[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState<string | null>(null)
-  const [search,       setSearch]       = useState("")
+  const [complaints, setComplaints] = useState<Complaint[]>([])
+  const [workers, setWorkers] = useState<Worker[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [sevFilter,    setSevFilter]    = useState("all")
-  const [sortBy,       setSortBy]       = useState("latest")
-  const [isSortOpen,   setIsSortOpen]   = useState(false)
-  const [isStatOpen,   setIsStatOpen]   = useState(false)
-  const [isSevOpen,    setIsSevOpen]    = useState(false)
-  const [selectedId,   setSelectedId]   = useState<string | null>(null)
-  const [expandedId,   setExpandedId]   = useState<string | null>(null)
+  const [sevFilter, setSevFilter] = useState("all")
+  const [sortBy, setSortBy] = useState("latest")
+  const [isSortOpen, setIsSortOpen] = useState(false)
+  const [isStatOpen, setIsStatOpen] = useState(false)
+  const [isSevOpen, setIsSevOpen] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
 
   async function fetchData() {
@@ -127,10 +127,10 @@ export default function TrackPage() {
         .select("worker_id,availability,department,profiles(full_name)")
         .eq("department", department)
       workerRows = (wRows ?? []).map((w: any) => ({
-        id:           w.worker_id,
-        full_name:    (Array.isArray(w.profiles) ? w.profiles[0] : w.profiles)?.full_name ?? "Unknown",
+        id: w.worker_id,
+        full_name: (Array.isArray(w.profiles) ? w.profiles[0] : w.profiles)?.full_name ?? "Unknown",
         availability: w.availability ?? "inactive",
-        department:   w.department ?? department,
+        department: w.department ?? department,
       }))
     }
 
@@ -143,9 +143,9 @@ export default function TrackPage() {
   useEffect(() => { void fetchData() }, [])
   useEffect(() => {
     const ch = supabase.channel("track-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "complaints" },      () => void fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "upvotes" },         () => void fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "worker_profiles" },() => void fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "complaints" }, () => void fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "upvotes" }, () => void fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "worker_profiles" }, () => void fetchData())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
@@ -172,14 +172,14 @@ export default function TrackPage() {
       return matchSearch && matchStatus && matchSev
     })
     .sort((a, b) => {
-      if (sortBy === "latest")   return +new Date(b.created_at) - +new Date(a.created_at)
-      if (sortBy === "oldest")   return +new Date(a.created_at) - +new Date(b.created_at)
+      if (sortBy === "latest") return +new Date(b.created_at) - +new Date(a.created_at)
+      if (sortBy === "oldest") return +new Date(a.created_at) - +new Date(b.created_at)
       if (sortBy === "severity") {
         const ra = SEV_RANK[a.effective_severity] ?? SEV_RANK[(a.effective_severity ?? "").toLowerCase()] ?? 0
         const rb = SEV_RANK[b.effective_severity] ?? SEV_RANK[(b.effective_severity ?? "").toLowerCase()] ?? 0
         return rb - ra
       }
-      if (sortBy === "upvotes")  return (b.upvote_count ?? 0) - (a.upvote_count ?? 0)
+      if (sortBy === "upvotes") return (b.upvote_count ?? 0) - (a.upvote_count ?? 0)
       if (sortBy === "sla") {
         const aLeft = a.sla_deadline ? new Date(a.sla_deadline).getTime() - Date.now() : Infinity
         const bLeft = b.sla_deadline ? new Date(b.sla_deadline).getTime() - Date.now() : Infinity
@@ -197,7 +197,7 @@ export default function TrackPage() {
 
   function exportCSV() {
     const rows = [
-      ["Ticket","Title","Category","Severity","Status","Upvotes","SLA","Created"],
+      ["Ticket", "Title", "Category", "Severity", "Status", "Upvotes", "SLA", "Created"],
       ...filtered.map(c => {
         const sev = getSeverityConfig(c.effective_severity)
         const sla = slaStatus(c.sla_deadline, c.status)
@@ -224,7 +224,7 @@ export default function TrackPage() {
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50/80 px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
           <div className="flex gap-5 text-sm font-medium text-gray-600">
-            {(["L1","L2","L3","L4"] as const).map(key => {
+            {(["L1", "L2", "L3", "L4"] as const).map(key => {
               const s = getSeverityConfig(key)
               return (
                 <span key={key} className="flex items-center gap-1.5">
@@ -284,13 +284,13 @@ export default function TrackPage() {
           <div className="relative">
             <button onClick={() => { setIsSortOpen(o => !o); setIsStatOpen(false); setIsSevOpen(false) }}
               className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {{ latest:"Latest", oldest:"Oldest", severity:"Severity", upvotes:"Most Upvoted", sla:"Urgent SLA" }[sortBy] ?? "Sort"}
+              {{ latest: "Latest", oldest: "Oldest", severity: "Severity", upvotes: "Most Upvoted", sla: "Urgent SLA" }[sortBy] ?? "Sort"}
               <span className="text-xs opacity-60">▼</span>
             </button>
             <div className={`absolute left-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isSortOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
-              {[["latest","Latest first"],["oldest","Oldest first"],["severity","By severity"],["upvotes","Most upvoted"],["sla","Urgent SLA first"]].map(([v,l]) => (
+              {[["latest", "Latest first"], ["oldest", "Oldest first"], ["severity", "By severity"], ["upvotes", "Most upvoted"], ["sla", "Urgent SLA first"]].map(([v, l]) => (
                 <button key={v} onClick={() => { setSortBy(v); setIsSortOpen(false) }}
-                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${sortBy===v?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
+                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${sortBy === v ? "font-semibold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}>
                   {l}
                 </button>
               ))}
@@ -306,7 +306,7 @@ export default function TrackPage() {
             </button>
             <div className={`absolute left-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isSevOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
               <button onClick={() => { setSevFilter("all"); setIsSevOpen(false) }}
-                className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${sevFilter==="all"?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
+                className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${sevFilter === "all" ? "font-semibold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}>
                 All severity
               </button>
               {SEV_FILTER_OPTIONS.map(({ key }) => {
@@ -332,9 +332,9 @@ export default function TrackPage() {
               <span className="text-xs opacity-60">▼</span>
             </button>
             <div className={`absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isStatOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
-              {[["all","All statuses"], ...ALL_STATUSES.map(s => [s, STATUS_META[s].label])].map(([v,l]) => (
+              {[["all", "All statuses"], ...ALL_STATUSES.map(s => [s, STATUS_META[s].label])].map(([v, l]) => (
                 <button key={v} onClick={() => { setStatusFilter(v); setIsStatOpen(false) }}
-                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${statusFilter===v?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
+                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${statusFilter === v ? "font-semibold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}>
                   {l}
                 </button>
               ))}
@@ -347,7 +347,7 @@ export default function TrackPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-gradient-to-r from-[#5b3a2e] to-[#8b5e49] text-white">
                 <tr>
-                  {["Ticket","Title","Severity","Status","Upvotes","SLA","Worker","View"].map(h => (
+                  {["Ticket", "Title", "Severity", "Status", "Upvotes", "SLA", "Worker", "View"].map(h => (
                     <th key={h} className="p-3 text-left text-xs font-semibold tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -356,8 +356,8 @@ export default function TrackPage() {
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      {[80,180,70,90,45,90,100,70].map((w,j) => (
-                        <td key={j} className="p-3"><div className="h-3 rounded-md bg-gray-100 dark:bg-gray-800" style={{width:w}}/></td>
+                      {[80, 180, 70, 90, 45, 90, 100, 70].map((w, j) => (
+                        <td key={j} className="p-3"><div className="h-3 rounded-md bg-gray-100 dark:bg-gray-800" style={{ width: w }} /></td>
                       ))}
                     </tr>
                   ))
@@ -366,9 +366,9 @@ export default function TrackPage() {
                     {complaints.length === 0 ? "No complaints assigned to your department yet." : "No complaints match your filters."}
                   </td></tr>
                 ) : filtered.map(c => {
-                  const sev        = getSeverityConfig(c.effective_severity)
-                  const st         = STATUS_META[c.status]
-                  const sla        = slaStatus(c.sla_deadline, c.status)
+                  const sev = getSeverityConfig(c.effective_severity)
+                  const st = STATUS_META[c.status]
+                  const sla = slaStatus(c.sla_deadline, c.status)
                   const isExpanded = expandedId === c.id
                   const isSelected = selectedId === c.id
 
@@ -376,7 +376,7 @@ export default function TrackPage() {
                     ? workers.find(w => w.id === c.assigned_worker_id) ?? null
                     : null
                   const workerIsValid = !!assignedWorkerProfile
-                  const isTerminal    = TERMINAL_STATUSES.includes(c.status)
+                  const isTerminal = TERMINAL_STATUSES.includes(c.status)
 
                   return (
                     <tr key={c.id}

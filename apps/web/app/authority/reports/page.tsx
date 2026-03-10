@@ -17,7 +17,7 @@ import { getSeverityConfig } from "../_components/dashboard-types"
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated"
 // Accept any string from DB — getSeverityConfig normalises "medium"/"L2"/etc.
-type Sev    = string
+type Sev = string
 
 type Complaint = {
   id: string; status: Status; effective_severity: Sev
@@ -35,7 +35,7 @@ const STATUS_LABEL: Record<string, string> = {
   in_progress: "In Progress", resolved: "Resolved", escalated: "Escalated",
 }
 
-const CAT_PALETTE = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#ec4899"]
+const CAT_PALETTE = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#f97316", "#ec4899"]
 
 const COMPLAINT_SELECT =
   "id,status,effective_severity,sla_deadline,created_at,resolved_at,escalation_level,categories(name)"
@@ -51,10 +51,10 @@ function isBreached(deadline: string | null, status: Status): boolean {
 type Granularity = "day" | "week" | "month" | "6month"
 
 const GRAN_OPTIONS: { value: Granularity; label: string }[] = [
-  { value: "day",    label: "Today (hourly)"  },
-  { value: "week",   label: "Last 7 days"     },
-  { value: "month",  label: "Last 30 days"    },
-  { value: "6month", label: "Last 6 months"   },
+  { value: "day", label: "Today (hourly)" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "Last 30 days" },
+  { value: "6month", label: "Last 6 months" },
 ]
 
 function bucketKey(d: Date, gran: Granularity): string {
@@ -95,9 +95,9 @@ function buildBuckets(gran: Granularity): string[] {
 
 function cutoffFor(gran: Granularity): Date {
   const d = new Date()
-  if (gran === "day")    { d.setHours(0, 0, 0, 0) }
-  if (gran === "week")   { d.setDate(d.getDate() - 6); d.setHours(0, 0, 0, 0) }
-  if (gran === "month")  { d.setDate(d.getDate() - 29); d.setHours(0, 0, 0, 0) }
+  if (gran === "day") { d.setHours(0, 0, 0, 0) }
+  if (gran === "week") { d.setDate(d.getDate() - 6); d.setHours(0, 0, 0, 0) }
+  if (gran === "month") { d.setDate(d.getDate() - 29); d.setHours(0, 0, 0, 0) }
   if (gran === "6month") { d.setMonth(d.getMonth() - 5); d.setDate(1); d.setHours(0, 0, 0, 0) }
   return d
 }
@@ -123,84 +123,16 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
     </div>
   )
 }
-function CardHead({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <div className="border-b border-gray-50 px-5 py-4 dark:border-gray-800">
-      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</p>
-      {sub && <p className="mt-0.5 text-[11px] text-gray-400">{sub}</p>}
-    </div>
-  )
-}
 
-function ChartTip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
-      {payload.map((p: any) => (
-        <div key={p.name} className="flex items-center justify-between gap-6 py-0.5">
-          <span className="flex items-center gap-1.5 text-xs text-gray-500">
-            <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />{p.name}
-          </span>
-          <span className="text-xs font-bold text-gray-800 dark:text-gray-200">{p.value}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
+const COMPLAINT_SELECT =
+  "id,status,effective_severity,sla_breached,created_at,resolved_at,photo_urls,photo_count,categories(name)"
 
-function Skel() {
-  return <div className="h-52 animate-pulse rounded-xl bg-gray-50 dark:bg-gray-800" />
-}
-
-function Delta({ now, prev, invert = false }: { now: number; prev: number; invert?: boolean }) {
-  if (!prev) return null
-  const d = now - prev
-  const p = Math.abs(Math.round((d / prev) * 100))
-  const good = invert ? d < 0 : d > 0
-  if (d === 0) return <span className="flex items-center gap-0.5 text-[10px] text-gray-400"><Minus size={9} />same</span>
-  return (
-    <span className={`flex items-center gap-0.5 text-[10px] font-semibold ${good ? "text-emerald-600" : "text-red-500"}`}>
-      {d > 0 ? <ArrowUp size={9} /> : <ArrowDown size={9} />}{p}% vs prev
-    </span>
-  )
-}
-
-// ── Granularity dropdown ──────────────────────────────────────────────────────
-function GranDropdown({ value, onChange }: { value: Granularity; onChange: (v: Granularity) => void }) {
-  const [open, setOpen] = useState(false)
-  const active = GRAN_OPTIONS.find(o => o.value === value)!
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-      >
-        {active.label}
-        <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      <div className={`absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 transition-all duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
-        {GRAN_OPTIONS.map(o => (
-          <button
-            key={o.value}
-            onClick={() => { onChange(o.value); setOpen(false) }}
-            className={`block w-full px-4 py-2.5 text-left text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${value === o.value ? "font-bold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
-  const [complaints,     setComplaints] = useState<Complaint[]>([])
-  const [prevComplaints, setPrev]       = useState<Complaint[]>([])
-  const [loading,        setLoading]    = useState(true)
-  const [dept,           setDept]       = useState("")
-  const [gran,           setGran]       = useState<Granularity>("week")
+  const [complaints, setComplaints] = useState<Complaint[]>([])
+  const [prevComplaints, setPrev] = useState<Complaint[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dept, setDept] = useState("")
+  const [gran, setGran] = useState<Granularity>("week")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -213,11 +145,11 @@ export default function ReportsPage() {
     const department = profile?.department ?? ""
     setDept(department)
 
-    const cutoff     = cutoffFor(gran)
+    const cutoff = cutoffFor(gran)
     const prevCutoff = new Date(cutoff)
-    if (gran === "day")    prevCutoff.setDate(prevCutoff.getDate() - 1)
-    if (gran === "week")   prevCutoff.setDate(prevCutoff.getDate() - 7)
-    if (gran === "month")  prevCutoff.setDate(prevCutoff.getDate() - 30)
+    if (gran === "day") prevCutoff.setDate(prevCutoff.getDate() - 1)
+    if (gran === "week") prevCutoff.setDate(prevCutoff.getDate() - 7)
+    if (gran === "month") prevCutoff.setDate(prevCutoff.getDate() - 30)
     if (gran === "6month") prevCutoff.setMonth(prevCutoff.getMonth() - 6)
 
     async function fetchPeriod(from: Date, to: Date) {
@@ -252,12 +184,12 @@ export default function ReportsPage() {
   }, [load])
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
-  const total     = complaints.length
-  const resolved  = complaints.filter(c => c.status === "resolved").length
-  const breached  = complaints.filter(c => isBreached(c.sla_deadline, c.status)).length
+  const total = complaints.length
+  const resolved = complaints.filter(c => c.status === "resolved").length
+  const breached = complaints.filter(c => isBreached(c.sla_deadline, c.status)).length
   const escalated = complaints.filter(c => c.escalation_level > 0).length
-  const slaRate   = pct(total - breached, total)
-  const resRate   = pct(resolved, total)
+  const slaRate = pct(total - breached, total)
+  const resRate = pct(resolved, total)
 
   const prevBreached = prevComplaints.filter(c => isBreached(c.sla_deadline, c.status)).length
 
@@ -271,7 +203,7 @@ export default function ReportsPage() {
       const k = bucketKey(new Date(c.created_at), gran)
       if (map[k]) {
         map[k].submitted++
-        if (c.status === "assigned")    map[k].assigned++
+        if (c.status === "assigned") map[k].assigned++
         if (c.status === "in_progress") map[k].in_progress++
       }
       if (c.status === "resolved" && c.resolved_at) {
@@ -295,7 +227,7 @@ export default function ReportsPage() {
       const norm = normMap[(c.effective_severity ?? "").toLowerCase().trim()] ?? c.effective_severity
       if (norm in counts) counts[norm]++
     })
-    return (["L4","L3","L2","L1"] as const).map(s => ({
+    return (["L4", "L3", "L2", "L1"] as const).map(s => ({
       sev: s,
       label: getSeverityConfig(s).label,
       color: getSeverityConfig(s).color,
@@ -310,7 +242,7 @@ export default function ReportsPage() {
       value: complaints.filter(c => c.status === s).length,
       color,
     })).filter(d => d.value > 0).sort((a, b) => b.value - a.value),
-  [complaints])
+    [complaints])
 
   // ── Category ───────────────────────────────────────────────────────────────
   const catData = useMemo(() => {
@@ -337,8 +269,8 @@ export default function ReportsPage() {
       l1: "L1", l2: "L2", l3: "L3", l4: "L4",
       low: "L1", medium: "L2", med: "L2", high: "L3", critical: "L4", crit: "L4",
     }
-    return (["L4","L3","L2","L1"] as const).map(s => {
-      const g  = complaints.filter(c => (normMap[(c.effective_severity ?? "").toLowerCase().trim()] ?? c.effective_severity) === s)
+    return (["L4", "L3", "L2", "L1"] as const).map(s => {
+      const g = complaints.filter(c => (normMap[(c.effective_severity ?? "").toLowerCase().trim()] ?? c.effective_severity) === s)
       const br = g.filter(c => isBreached(c.sla_deadline, c.status)).length
       const sc = getSeverityConfig(s)
       return {
@@ -354,11 +286,11 @@ export default function ReportsPage() {
     const b = { "<1d": 0, "1–3d": 0, "4–7d": 0, "8–14d": 0, "15d+": 0 }
     complaints.filter(c => c.status === "resolved" && c.resolved_at).forEach(c => {
       const days = (new Date(c.resolved_at!).getTime() - new Date(c.created_at).getTime()) / 86_400_000
-      if (days < 1)       b["<1d"]++
+      if (days < 1) b["<1d"]++
       else if (days <= 3) b["1–3d"]++
       else if (days <= 7) b["4–7d"]++
       else if (days <= 14) b["8–14d"]++
-      else                b["15d+"]++
+      else b["15d+"]++
     })
     return Object.entries(b).map(([label, value]) => ({ label, value }))
   }, [complaints])
@@ -381,23 +313,23 @@ export default function ReportsPage() {
   }
 
   const TREND_LINES = [
-    { key: "submitted",   label: "Submitted",   color: "#b4725a" },
-    { key: "assigned",    label: "Assigned",    color: "#3b82f6" },
+    { key: "submitted", label: "Submitted", color: "#b4725a" },
+    { key: "assigned", label: "Assigned", color: "#3b82f6" },
     { key: "in_progress", label: "In Progress", color: "#6366f1" },
-    { key: "resolved",    label: "Resolved",    color: "#10b981" },
+    { key: "resolved", label: "Resolved", color: "#10b981" },
   ]
 
   // Thin out x-axis ticks for 30-day view to avoid crowding
   const xInterval =
-    gran === "day"   ? 2 :
-    gran === "week"  ? 0 :
-    gran === "month" ? 4 :   // show every ~5th day label over 30 days
-    "preserveStartEnd"
+    gran === "day" ? 2 :
+      gran === "week" ? 0 :
+        gran === "month" ? 4 :   // show every ~5th day label over 30 days
+          "preserveStartEnd"
 
   const granLabel = {
-    day:    "Today (hourly)",
-    week:   "Last 7 days",
-    month:  "Last 30 days",
+    day: "Today (hourly)",
+    week: "Last 7 days",
+    month: "Last 30 days",
     "6month": "Last 6 months",
   }[gran]
 
@@ -429,12 +361,12 @@ export default function ReportsPage() {
       {/* KPI Strip */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
-          { icon: FileText,      label: "Total Filed",     value: total,               color: "text-gray-900 dark:text-white",                       extra: <Delta now={total}    prev={prevComplaints.length} /> },
-          { icon: CheckCircle2,  label: "Resolved",        value: resolved,            color: "text-emerald-600",                                    extra: <Delta now={resolved} prev={prevComplaints.filter(c => c.status === "resolved").length} /> },
-          { icon: TrendingUp,    label: "Resolution Rate", value: `${resRate}%`,       color: resRate >= 60 ? "text-emerald-600" : "text-amber-500", extra: <span className="text-[10px] text-gray-400">{resolved} of {total}</span> },
-          { icon: Clock,         label: "Avg Resolution",  value: avgDays(complaints), color: "text-blue-600",                                       extra: null },
-          { icon: ShieldAlert,   label: "SLA Compliance",  value: `${slaRate}%`,       color: slaRate >= 80 ? "text-emerald-600" : "text-red-500",   extra: <span className="text-[10px] text-gray-400">{total - breached} on-time</span> },
-          { icon: AlertTriangle, label: "SLA Breached",    value: breached,            color: breached > 0 ? "text-red-500" : "text-gray-400",       extra: <Delta now={breached} prev={prevBreached} invert /> },
+          { icon: FileText, label: "Total Filed", value: total, color: "text-gray-900 dark:text-white", extra: <Delta now={total} prev={prevComplaints.length} /> },
+          { icon: CheckCircle2, label: "Resolved", value: resolved, color: "text-emerald-600", extra: <Delta now={resolved} prev={prevComplaints.filter(c => c.status === "resolved").length} /> },
+          { icon: TrendingUp, label: "Resolution Rate", value: `${resRate}%`, color: resRate >= 60 ? "text-emerald-600" : "text-amber-500", extra: <span className="text-[10px] text-gray-400">{resolved} of {total}</span> },
+          { icon: Clock, label: "Avg Resolution", value: avgDays(complaints), color: "text-blue-600", extra: null },
+          { icon: ShieldAlert, label: "SLA Compliance", value: `${slaRate}%`, color: slaRate >= 80 ? "text-emerald-600" : "text-red-500", extra: <span className="text-[10px] text-gray-400">{total - breached} on-time</span> },
+          { icon: AlertTriangle, label: "SLA Breached", value: breached, color: breached > 0 ? "text-red-500" : "text-gray-400", extra: <Delta now={breached} prev={prevBreached} invert /> },
         ].map(({ icon: Icon, label, value, color, extra }) => (
           <Card key={label} className="p-4">
             <div className="flex items-start justify-between gap-1">
@@ -619,7 +551,7 @@ export default function ReportsPage() {
             ) : (
               <div className="space-y-3">
                 {resBuckets.map(b => {
-                  const p    = pct(b.value, resolved)
+                  const p = pct(b.value, resolved)
                   const fast = b.label === "<1d" || b.label === "1–3d"
                   const slow = b.label === "15d+"
                   return (

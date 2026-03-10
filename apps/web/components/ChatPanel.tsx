@@ -6,6 +6,7 @@ import gsap from "gsap";
 import { sendToGemini } from "@/lib/gemini";
 import type { ChatMessage, ExtractedComplaint, GeminiResponse } from "@/lib/gemini";
 import { supabase } from "@/src/lib/supabase";
+import { uploadMultiplePhotos } from "@/src/lib/uploadPhoto";
 import dynamic from "next/dynamic";
 
 const LocationPinPicker = dynamic(() => import("@/components/LocationPinPicker"), {
@@ -152,12 +153,14 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   const [initialized, setInitialized] = useState(false);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [expandedImagePreview, setExpandedImagePreview] = useState<Record<string, boolean>>({});
+  const [pendingTextPhotos, setPendingTextPhotos] = useState<File[]>([]);
 
   /* ----- refs ----- */
   const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textPhotoInputRef = useRef<HTMLInputElement>(null);
 
   /* ----- conversation history for Gemini (role: user | model) ----- */
   const historyRef = useRef<ChatMessage[]>([]);
@@ -239,6 +242,21 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       setTimeout(scrollToBottom, 80);
     },
     [scrollToBottom],
+  );
+
+  /** Attach photos to a pending text-based complaint (no AI analysis) */
+  const handleTextPhotoAttach = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      e.target.value = "";
+      setPendingTextPhotos((prev) => {
+        const combined = [...prev, ...Array.from(files)];
+        return combined.slice(0, 5); // max 5 photos
+      });
+      addBotMessage(`📎 ${files.length} photo(s) attached. They will be uploaded when you confirm.`);
+    },
+    [addBotMessage],
   );
 
   /* ----- IMAGE UPLOAD: + button handler ----- */
@@ -510,6 +528,13 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
     setSubmitting(true);
 
     try {
+      const token = await getAuthToken();
+      if (!token) {
+        addBotMessage("⚠️ You must be logged in to submit a complaint. Please log in and try again.");
+        setSubmitting(false);
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -526,7 +551,10 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
 
       const res = await fetch("/api/complaints", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({
           citizen_id: user.id,
           category_id: categoryId,
@@ -557,11 +585,24 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         throw new Error(data.error || "Failed to submit complaint");
       }
 
+      // Upload attached photos if any
+      const complaintId = data.complaint?.id;
+      if (complaintId && pendingTextPhotos.length > 0) {
+        const photoUrls = await uploadMultiplePhotos(pendingTextPhotos, complaintId);
+        if (photoUrls.length > 0) {
+          await supabase
+            .from("complaints")
+            .update({ photo_urls: photoUrls, photo_count: photoUrls.length })
+            .eq("id", complaintId);
+        }
+      }
+
       setSubmitted(true);
       setPendingComplaint(null);
       setPendingLocation(null);
       setDuplicateContext(null);
       setLocationConfirmed(false);
+      setPendingTextPhotos([]);
       addBotMessage(
         `✅ **Complaint submitted successfully!**\n\n🎫 Ticket ID: **${data.complaint?.ticket_id ?? data.complaint?.id}**\nStatus: **Submitted**\n\nYou can track your complaint from the "Your Tickets" section. Is there anything else I can help you with?`,
       );
@@ -628,141 +669,140 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       {/* -- Messages -- */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
         <div className="flex flex-col justify-end space-y-3 min-h-full">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "rounded-br-sm bg-[#b4725a] text-white dark:bg-[#C9A84C] dark:text-black"
-                  : "rounded-bl-sm bg-gray-100 text-gray-800 dark:bg-[#252525] dark:text-gray-100"
-              }`}
-            >
-              {/* User-uploaded image thumbnail */}
-              {msg.imageUrl && (
-                <img
-                  src={msg.imageUrl}
-                  alt="Uploaded issue"
-                  className="mb-2 rounded-lg max-h-40 w-full object-cover"
-                />
-              )}
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "user"
+                    ? "rounded-br-sm bg-[#b4725a] text-white dark:bg-[#C9A84C] dark:text-black"
+                    : "rounded-bl-sm bg-gray-100 text-gray-800 dark:bg-[#252525] dark:text-gray-100"
+                  }`}
+              >
+                {/* User-uploaded image thumbnail */}
+                {msg.imageUrl && (
+                  <img
+                    src={msg.imageUrl}
+                    alt="Uploaded issue"
+                    className="mb-2 rounded-lg max-h-40 w-full object-cover"
+                  />
+                )}
 
-              {!msg.imagePreview && renderMarkdown(msg.text)}
+                {!msg.imagePreview && renderMarkdown(msg.text)}
 
-              {/* Text-based extracted complaint summary table */}
-              {msg.extracted && (
-                <div className="mt-3 rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-                  <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">📋 Confirm Your Complaint</p>
-                  <table className="w-full text-left">
-                    <tbody>
-                      {(
-                        [
-                          ["Title", msg.extracted.title],
-                          ["Issue Type", msg.extracted.issue_type],
-                          ["Severity", msg.extracted.severity],
-                          ["Location", msg.geoDetails?.formatted_address || "Detecting\u2026"],
-                          ["Description", msg.extracted.description],
-                          ["DIGIPIN", msg.geoDetails?.digipin || "Detecting\u2026"],
-                        ] as [string, string][]
-                      ).map(([label, value]) => (
-                        <tr key={label} className="border-b border-gray-100 last:border-0 dark:border-[#2a2a2a]">
-                          <td className="py-1 pr-2 font-medium text-gray-500 dark:text-gray-400">{label}</td>
-                          <td className="py-1 text-gray-800 dark:text-gray-200">{value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">
-                    Type <strong>YES</strong> to confirm submission
-                  </p>
-                </div>
-              )}
-
-              {/* Image-based ticket preview from FastAPI /analyze */}
-              {msg.imagePreview && (
-                <div className="mt-3 w-full max-w-[34rem] rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-                  <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">Confirm Your Complaint</p>
-                  <div className={`grid gap-3 ${pendingImageDataUrl ? "grid-cols-[96px_minmax(0,1fr)]" : "grid-cols-1"}`}>
-                    {pendingImageDataUrl && (
-                      <div className="h-24 w-24 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#252525]">
-                        <img
-                          src={pendingImageDataUrl}
-                          alt="Issue photo"
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                    )}
-
-                    <div className="min-w-0">
-                      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-left">
-                        {[
-                          ["Title", msg.imagePreview.title],
-                          ["Issue Type", msg.imagePreview.issue_name],
-                          ["Severity", `${msg.imagePreview.severity} (${msg.imagePreview.severity_db})`],
-                          ["Location", msg.imagePreview.formatted_address],
-                          ["Description", msg.imagePreview.description],
-                          ["DIGIPIN", msg.imagePreview.digipin],
-                        ].map(([label, value]) => {
-                          const shouldTrimLongText =
-                            !expandedImagePreview[msg.id] &&
-                            (label === "Location" || label === "Description") &&
-                            value.length > 110;
-                          const displayValue = shouldTrimLongText ? `${value.slice(0, 110)}...` : value;
-
-                          return (
-                            <React.Fragment key={label}>
-                              <p className="py-0.5 font-medium text-gray-500 dark:text-gray-400">{label}</p>
-                              <p className="py-0.5 break-words text-gray-800 dark:text-gray-200">{displayValue}</p>
-                            </React.Fragment>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleImagePreviewDetails(msg.id)}
-                        className="mt-2 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors dark:text-gray-400 dark:hover:bg-[#2a2a2a] dark:hover:text-gray-100"
-                      >
-                        {expandedImagePreview[msg.id] ? (
-                          <>
-                            <ChevronUp size={13} /> Show less
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown size={13} /> Show full details
-                          </>
-                        )}
-                      </button>
-                    </div>
+                {/* Text-based extracted complaint summary table */}
+                {msg.extracted && (
+                  <div className="mt-3 rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                    <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">📋 Confirm Your Complaint</p>
+                    <table className="w-full text-left">
+                      <tbody>
+                        {(
+                          [
+                            ["Title", msg.extracted.title],
+                            ["Issue Type", msg.extracted.issue_type],
+                            ["Severity", msg.extracted.severity],
+                            ["Location", msg.geoDetails?.formatted_address || "Detecting\u2026"],
+                            ["Description", msg.extracted.description],
+                            ["DIGIPIN", msg.geoDetails?.digipin || "Detecting\u2026"],
+                          ] as [string, string][]
+                        ).map(([label, value]) => (
+                          <tr key={label} className="border-b border-gray-100 last:border-0 dark:border-[#2a2a2a]">
+                            <td className="py-1 pr-2 font-medium text-gray-500 dark:text-gray-400">{label}</td>
+                            <td className="py-1 text-gray-800 dark:text-gray-200">{value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">
+                      Type <strong>YES</strong> to confirm submission
+                    </p>
                   </div>
+                )}
 
-                  <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">
-                    Type <strong>YES</strong> to confirm submission
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+                {/* Image-based ticket preview from FastAPI /analyze */}
+                {msg.imagePreview && (
+                  <div className="mt-3 w-full max-w-[34rem] rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                    <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">Confirm Your Complaint</p>
+                    <div className={`grid gap-3 ${pendingImageDataUrl ? "grid-cols-[96px_minmax(0,1fr)]" : "grid-cols-1"}`}>
+                      {pendingImageDataUrl && (
+                        <div className="h-24 w-24 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#252525]">
+                          <img
+                            src={pendingImageDataUrl}
+                            alt="Issue photo"
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                      )}
 
-        {/* Typing indicator */}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 dark:bg-[#252525]">
-              <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
-              <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
-              <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
-            </div>
-          </div>
-        )}
+                      <div className="min-w-0">
+                        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-left">
+                          {[
+                            ["Title", msg.imagePreview.title],
+                            ["Issue Type", msg.imagePreview.issue_name],
+                            ["Severity", `${msg.imagePreview.severity} (${msg.imagePreview.severity_db})`],
+                            ["Location", msg.imagePreview.formatted_address],
+                            ["Description", msg.imagePreview.description],
+                            ["DIGIPIN", msg.imagePreview.digipin],
+                          ].map(([label, value]) => {
+                            const shouldTrimLongText =
+                              !expandedImagePreview[msg.id] &&
+                              (label === "Location" || label === "Description") &&
+                              value.length > 110;
+                            const displayValue = shouldTrimLongText ? `${value.slice(0, 110)}...` : value;
 
-        {/* Submitting state */}
-        {submitting && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-600 dark:bg-[#252525] dark:text-gray-300">
-              <Loader2 size={16} className="animate-spin" /> Submitting your complaint…
+                            return (
+                              <React.Fragment key={label}>
+                                <p className="py-0.5 font-medium text-gray-500 dark:text-gray-400">{label}</p>
+                                <p className="py-0.5 break-words text-gray-800 dark:text-gray-200">{displayValue}</p>
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleImagePreviewDetails(msg.id)}
+                          className="mt-2 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors dark:text-gray-400 dark:hover:bg-[#2a2a2a] dark:hover:text-gray-100"
+                        >
+                          {expandedImagePreview[msg.id] ? (
+                            <>
+                              <ChevronUp size={13} /> Show less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown size={13} /> Show full details
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">
+                      Type <strong>YES</strong> to confirm submission
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          ))}
+
+          {/* Typing indicator */}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 dark:bg-[#252525]">
+                <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
+                <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+                <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
+              </div>
+            </div>
+          )}
+
+          {/* Submitting state */}
+          {submitting && (
+            <div className="flex justify-start">
+              <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-600 dark:bg-[#252525] dark:text-gray-300">
+                <Loader2 size={16} className="animate-spin" /> Submitting your complaint…
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -842,17 +882,58 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
             </div>
           </div>
         )}
+        {/* Attached text-flow photos preview */}
+        {pendingComplaint && pendingTextPhotos.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {pendingTextPhotos.map((file, i) => (
+              <div key={`${file.name}-${i}`} className="relative group">
+                <div className="h-12 w-12 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 overflow-hidden dark:border-gray-600 dark:bg-gray-800">
+                  {file.type.startsWith('image/') ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    file.name.slice(0, 8)
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingTextPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Remove photo"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <span className="self-center text-[11px] text-gray-500 dark:text-gray-400">{pendingTextPhotos.length}/5</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
-          {/* + button for image upload */}
+          {/* + button: AI image analysis when no pending, photo attach when pending text complaint */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (pendingComplaint && !pendingImagePreview) {
+                textPhotoInputRef.current?.click();
+              } else {
+                fileInputRef.current?.click();
+              }
+            }}
             disabled={isLoading || submitting}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
-            aria-label="Upload photo"
-            title="Upload a photo of the issue"
+            aria-label={pendingComplaint ? "Attach photo" : "Upload photo"}
+            title={pendingComplaint ? "Attach a photo to your complaint" : "Upload a photo of the issue"}
           >
             <Plus size={18} />
           </button>
+
+          <input
+            ref={textPhotoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleTextPhotoAttach}
+            className="hidden"
+          />
 
           <input
             ref={fileInputRef}

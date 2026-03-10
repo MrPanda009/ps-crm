@@ -26,6 +26,8 @@ type ComplaintRow = {
   assigned_department: string | null
   assigned_worker_id: string | null
   assigned_officer_id: string | null
+  photo_urls: string[] | null
+  photo_count: number | null
   categories: { name: string | null }[] | { name: string | null } | null
 }
 
@@ -54,7 +56,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("complaints")
     .select(
-      "id, ticket_id, title, category_id, address_text, ward_name, city, status, severity, escalation_level, created_at, assigned_department, assigned_worker_id, assigned_officer_id, categories(name)",
+      "id, ticket_id, title, category_id, address_text, ward_name, city, status, severity, escalation_level, created_at, assigned_department, assigned_worker_id, assigned_officer_id, photo_urls, photo_count, categories(name)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
