@@ -9,6 +9,7 @@ import {
   getSeverityConfig,
   isBreached,
   timeAgo,
+  isBreached,
   type AuthorityComplaintRow,
 } from "./dashboard-types"
 import { ComplaintDetailPanel } from "./ComplaintDetailPanel"
@@ -46,9 +47,9 @@ function UrgentRow({
       className="w-full px-5 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
     >
       <div className="flex flex-wrap items-center gap-1.5 mb-1">
-        <span
+        <span 
           className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-          style={{ background: sev.color + "22", color: sev.color }}
+          style={{ backgroundColor: `${sev.color}22`, color: sev.color }}
         >
           {sev.label}
         </span>
@@ -109,11 +110,10 @@ export default function AuthorityUrgentTickets({ tickets, loading, error }: Prop
               Urgent / Escalated
             </h2>
           </div>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-            tickets.length > 0
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tickets.length > 0
               ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
               : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
-          }`}>
+            }`}>
             {tickets.length}
           </span>
         </div>
