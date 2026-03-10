@@ -452,10 +452,22 @@ export default function AnimatedAuth({
               <button
                 type="button"
                 onClick={handleForgotPassword}
-                className="text-xs hover:underline transition-colors"
+                className="relative text-xs transition-colors"
                 style={{ color: activeThemeColor }}
+                onMouseEnter={(e) => {
+                  const underline = e.currentTarget.querySelector('.forgot-underline');
+                  if (underline) gsap.to(underline, { scaleX: 1, duration: 0.3, ease: 'power2.out' });
+                }}
+                onMouseLeave={(e) => {
+                  const underline = e.currentTarget.querySelector('.forgot-underline');
+                  if (underline) gsap.to(underline, { scaleX: 0, duration: 0.3, ease: 'power2.in' });
+                }}
               >
                 Forgot Password?
+                <span
+                  className="forgot-underline absolute left-0 bottom-0 w-full h-[1px] origin-left"
+                  style={{ backgroundColor: activeThemeColor, transform: 'scaleX(0)' }}
+                />
               </button>
             </div>
           </div>
