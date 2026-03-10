@@ -35,7 +35,7 @@ const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_pro
 
 const COMPLAINT_SELECT =
   "id,ticket_id,title,status,effective_severity,sla_breached,sla_deadline," +
-  "escalation_level,created_at,resolved_at,address_text,assigned_worker_id,upvote_count,categories(name)"
+  "escalation_level,created_at,resolved_at,address_text,assigned_worker_id,upvote_count,photo_urls,photo_count,categories(name)"
 
 export default function TrackPage() {
   const [complaints, setComplaints] = useState<Complaint[]>([])

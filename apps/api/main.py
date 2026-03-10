@@ -35,7 +35,15 @@ GEMINI_PRIMARY_MODEL = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-2.5-flash")
 GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.0-flash")
 MAPPLS_API_KEY = os.getenv("MAPPLS_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+_svc_key = os.getenv("SUPABASE_SERVICE_KEY")
+if not _svc_key:
+    import warnings
+    warnings.warn(
+        "SUPABASE_SERVICE_KEY is not set — falling back to NEXT_PUBLIC_SUPABASE_ANON_KEY. "
+        "Storage uploads and RLS-bypassed inserts may fail with the anon key.",
+        stacklevel=1,
+    )
+SUPABASE_SERVICE_KEY = _svc_key or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable not set.")
@@ -238,11 +246,15 @@ def upload_image_to_supabase(image_data: bytes, filename: str) -> str:
     bucket = "complaint-photos"
     path   = f"complaints/{filename}"
 
-    supabase.storage.from_(bucket).upload(
+    result = supabase.storage.from_(bucket).upload(
         path=path,
         file=image_data,
         file_options={"content-type": "image/jpeg", "upsert": "true"},
     )
+
+    # Check if upload actually succeeded
+    if hasattr(result, 'json') and isinstance(result.json(), dict) and result.json().get('error'):
+        raise Exception(f"Storage upload error: {result.json()['error']}")
 
     public_url = supabase.storage.from_(bucket).get_public_url(path)
     return public_url
@@ -823,15 +835,18 @@ async def confirm(
     try:
         photo_url = upload_image_to_supabase(image_data, filename)
         photo_urls = [photo_url]
-    except Exception:
-        # Non-fatal: store empty list if upload fails
-        photo_urls = []
+    except Exception as upload_err:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=502,
+            detail=f"Image upload to storage failed: {upload_err}. "
+                   f"Bucket=complaint-photos, path=complaints/{filename}",
+        )
 
     # 3. Build PostGIS geography point string
     location_wkt = f"POINT({longitude} {latitude})"
-    address_text = (
-        f"{formatted_address} | gps_accuracy_m={accuracy:.1f} | gps_timestamp={timestamp}"
-    )
+    address_text = formatted_address
     complaint_record = build_complaint_record(
         user_id=citizen_id,
         issue_type=category["name"],

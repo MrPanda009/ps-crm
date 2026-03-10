@@ -100,7 +100,7 @@ export default function WorkerDashboardPage() {
       supabase
         .from("complaints")
         .select(
-          "id, ticket_id, description, address_text, severity, status, created_at, resolved_at, location, categories(name)",
+          "id, ticket_id, description, address_text, severity, status, created_at, resolved_at, location, photo_urls, photo_count, categories(name)",
         )
         .eq("assigned_worker_id", currentWorkerId)
         .in("status", ["assigned", "in_progress", "resolved"]),

@@ -6,6 +6,7 @@ import gsap from "gsap";
 import { sendToGemini } from "@/lib/gemini";
 import type { ChatMessage, ExtractedComplaint, GeminiResponse } from "@/lib/gemini";
 import { supabase } from "@/src/lib/supabase";
+import { uploadMultiplePhotos } from "@/src/lib/uploadPhoto";
 import dynamic from "next/dynamic";
 
 const LocationPinPicker = dynamic(() => import("@/components/LocationPinPicker"), {
@@ -152,12 +153,14 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   const [initialized, setInitialized] = useState(false);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [expandedImagePreview, setExpandedImagePreview] = useState<Record<string, boolean>>({});
+  const [pendingTextPhotos, setPendingTextPhotos] = useState<File[]>([]);
 
   /* ----- refs ----- */
   const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textPhotoInputRef = useRef<HTMLInputElement>(null);
 
   /* ----- conversation history for Gemini (role: user | model) ----- */
   const historyRef = useRef<ChatMessage[]>([]);
@@ -239,6 +242,21 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       setTimeout(scrollToBottom, 80);
     },
     [scrollToBottom],
+  );
+
+  /** Attach photos to a pending text-based complaint (no AI analysis) */
+  const handleTextPhotoAttach = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      e.target.value = "";
+      setPendingTextPhotos((prev) => {
+        const combined = [...prev, ...Array.from(files)];
+        return combined.slice(0, 5); // max 5 photos
+      });
+      addBotMessage(`📎 ${files.length} photo(s) attached. They will be uploaded when you confirm.`);
+    },
+    [addBotMessage],
   );
 
   /* ----- IMAGE UPLOAD: + button handler ----- */
@@ -510,6 +528,13 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
     setSubmitting(true);
 
     try {
+      const token = await getAuthToken();
+      if (!token) {
+        addBotMessage("⚠️ You must be logged in to submit a complaint. Please log in and try again.");
+        setSubmitting(false);
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -526,7 +551,10 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
 
       const res = await fetch("/api/complaints", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({
           citizen_id: user.id,
           category_id: categoryId,
@@ -557,11 +585,24 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         throw new Error(data.error || "Failed to submit complaint");
       }
 
+      // Upload attached photos if any
+      const complaintId = data.complaint?.id;
+      if (complaintId && pendingTextPhotos.length > 0) {
+        const photoUrls = await uploadMultiplePhotos(pendingTextPhotos, complaintId);
+        if (photoUrls.length > 0) {
+          await supabase
+            .from("complaints")
+            .update({ photo_urls: photoUrls, photo_count: photoUrls.length })
+            .eq("id", complaintId);
+        }
+      }
+
       setSubmitted(true);
       setPendingComplaint(null);
       setPendingLocation(null);
       setDuplicateContext(null);
       setLocationConfirmed(false);
+      setPendingTextPhotos([]);
       addBotMessage(
         `✅ **Complaint submitted successfully!**\n\n🎫 Ticket ID: **${data.complaint?.ticket_id ?? data.complaint?.id}**\nStatus: **Submitted**\n\nYou can track your complaint from the "Your Tickets" section. Is there anything else I can help you with?`,
       );
@@ -842,17 +883,58 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
             </div>
           </div>
         )}
+        {/* Attached text-flow photos preview */}
+        {pendingComplaint && pendingTextPhotos.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {pendingTextPhotos.map((file, i) => (
+              <div key={`${file.name}-${i}`} className="relative group">
+                <div className="h-12 w-12 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 overflow-hidden dark:border-gray-600 dark:bg-gray-800">
+                  {file.type.startsWith('image/') ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    file.name.slice(0, 8)
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingTextPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Remove photo"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <span className="self-center text-[11px] text-gray-500 dark:text-gray-400">{pendingTextPhotos.length}/5</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
-          {/* + button for image upload */}
+          {/* + button: AI image analysis when no pending, photo attach when pending text complaint */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (pendingComplaint && !pendingImagePreview) {
+                textPhotoInputRef.current?.click();
+              } else {
+                fileInputRef.current?.click();
+              }
+            }}
             disabled={isLoading || submitting}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-purple-600 dark:hover:text-white dark:hover:border-purple-600 dark:focus:ring-purple-500 dark:focus:ring-offset-gray-900"
-            aria-label="Upload photo"
-            title="Upload a photo of the issue"
+            aria-label={pendingComplaint ? "Attach photo" : "Upload photo"}
+            title={pendingComplaint ? "Attach a photo to your complaint" : "Upload a photo of the issue"}
           >
             <Plus size={18} />
           </button>
+
+          <input
+            ref={textPhotoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleTextPhotoAttach}
+            className="hidden"
+          />
 
           <input
             ref={fileInputRef}

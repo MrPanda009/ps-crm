@@ -8,7 +8,7 @@ import type { Database } from "@/src/types/database.types";
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
 type TicketListRow = Pick<
   ComplaintRow,
-  "id" | "ticket_id" | "title" | "address_text" | "assigned_department" | "status" | "created_at" | "upvote_count"
+  "id" | "ticket_id" | "title" | "address_text" | "assigned_department" | "status" | "created_at" | "upvote_count" | "photo_urls" | "photo_count"
 >;
 
 function formatStatus(status: string): string {
@@ -167,7 +167,7 @@ export default function CitizenTicketsPage() {
 
       const { data, error: ticketError } = await supabase
         .from("complaints")
-        .select("id, ticket_id, title, address_text, assigned_department, status, created_at, upvote_count")
+        .select("id, ticket_id, title, address_text, assigned_department, status, created_at, upvote_count, photo_urls, photo_count")
         .eq("citizen_id", citizenId)
         .order("created_at", { ascending: false });
 
@@ -192,6 +192,8 @@ export default function CitizenTicketsPage() {
       status: row.status,
       created_at: row.created_at,
       upvote_count: row.upvote_count,
+      photo_urls: row.photo_urls,
+      photo_count: row.photo_count,
     });
 
     const upsertTicket = (prev: TicketListRow[], incoming: TicketListRow): TicketListRow[] => {

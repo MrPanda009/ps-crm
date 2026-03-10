@@ -35,7 +35,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 const COMPLAINT_SELECT =
-  "id,status,effective_severity,sla_breached,created_at,resolved_at,categories(name)"
+  "id,status,effective_severity,sla_breached,created_at,resolved_at,photo_urls,photo_count,categories(name)"
 
 export default function ReportsPage() {
   const [complaints, setComplaints] = useState<Complaint[]>([])
