@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from "react";
-import { LayoutGrid, MapPin, Menu, Ticket, Bell, UserCircle2, ChevronDown, LogOut } from "lucide-react";
+import { LayoutGrid, ClipboardList, MapPin, Menu, Ticket, Bell, UserCircle2, ChevronDown, LogOut } from "lucide-react";
 import Sidebar, { defaultSidebarConfig, SidebarNavigationItem } from "@/components/Sidebar";
 import { usePathname } from "next/navigation";
 import { supabase } from '@/src/lib/supabase';
@@ -185,6 +185,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       isActive: pathname === "/citizen",
     },
     {
+      id: "report",
+      name: "Report Issue",
+      icon: <ClipboardList size={20} strokeWidth={2} />,
+      href: "/citizen/report",
+      isActive: pathname === "/citizen/report",
+    },
+    {
       id: "track",
       name: "Your Tickets",
       icon: <Ticket size={20} strokeWidth={2} />,
@@ -255,10 +262,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </button>
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">
-                  {pathname === '/citizen/tickets' ? 'Your Tickets' : pathname === '/citizen/nearby' ? 'Nearby Tickets' : 'JanSamadhan AI Assistant'}
+                  {pathname === '/citizen/tickets' ? 'Your Tickets' : pathname === '/citizen/nearby' ? 'Nearby Tickets' : pathname === '/citizen/report' ? 'Report Issue' : 'JanSamadhan AI Assistant'}
                 </h1>
                 <p className="mt-0.5 text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
-                  {pathname === '/citizen/tickets' ? 'Track all complaints you have reported in one list.' : pathname === '/citizen/nearby' ? 'See complaints reported near your location.' : 'Report an issue quickly, then track what happened next.'}
+                  {pathname === '/citizen/tickets' ? 'Track all complaints you have reported in one list.' : pathname === '/citizen/nearby' ? 'See complaints reported near your location.' : pathname === '/citizen/report' ? 'Report a civic issue to the relevant authorities.' : 'Report an issue quickly, then track what happened next.'}
                 </p>
               </div>
             </div>
