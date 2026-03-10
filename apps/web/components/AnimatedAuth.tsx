@@ -367,6 +367,28 @@ export default function AnimatedAuth({
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!loginEmail.trim()) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    setError('');
+    setMessage('');
+    setLoading(true);
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      loginEmail.trim(),
+      { redirectTo: `${window.location.origin}/auth/callback` }
+    );
+
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      setMessage('Password reset link sent! Check your email.');
+    }
+  };
+
   return (
     <div
       className="flex items-center justify-center min-h-screen p-4 bg-cover bg-center"
@@ -424,6 +446,28 @@ export default function AnimatedAuth({
                 className="absolute right-0 text-xs text-[var(--auth-text-secondary)] hover:text-[var(--auth-text)]"
               >
                 {showLoginPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <div className="flex justify-end mt-1">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="relative text-xs transition-colors"
+                style={{ color: activeThemeColor }}
+                onMouseEnter={(e) => {
+                  const underline = e.currentTarget.querySelector('.forgot-underline');
+                  if (underline) gsap.to(underline, { scaleX: 1, duration: 0.3, ease: 'power2.out' });
+                }}
+                onMouseLeave={(e) => {
+                  const underline = e.currentTarget.querySelector('.forgot-underline');
+                  if (underline) gsap.to(underline, { scaleX: 0, duration: 0.3, ease: 'power2.in' });
+                }}
+              >
+                Forgot Password?
+                <span
+                  className="forgot-underline absolute left-0 bottom-0 w-full h-[1px] origin-left"
+                  style={{ backgroundColor: activeThemeColor, transform: 'scaleX(0)' }}
+                />
               </button>
             </div>
           </div>
