@@ -137,19 +137,22 @@ export default function AuthorityNotificationBell() {
     setLoading(false);
   }
 
-  // Fetch when dropdown opens
+  // Fetch on mount so badge count is live immediately (not just on open)
+  useEffect(() => { void buildFeed(); }, []);
+
+  // Re-fetch when dropdown opens (refresh stale data)
   useEffect(() => {
     if (open) void buildFeed();
   }, [open]);
 
-  // Realtime updates while open
+  // Always-on realtime: SLA breaches + new complaints update badge even when closed
   useEffect(() => {
     const ch = supabase.channel('authority-notif-bell')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints'     }, () => { if (open) void buildFeed(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_history' }, () => { if (open) void buildFeed(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints'     }, () => void buildFeed())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_history' }, () => void buildFeed())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [open]);
+  }, []);
 
   function markRead(id: string) {
     setReadSet(prev => { const next = new Set(prev); next.add(id); saveReadSet(next); return next; });

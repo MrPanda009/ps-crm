@@ -11,14 +11,12 @@ export type ComplaintStatus =
 
 export type SeverityLevel = "L1" | "L2" | "L3" | "L4"
 
-// Matches complaints table exactly per database.types.ts
 export type AuthorityComplaintRow = {
   id: string
   ticket_id: string
   title: string
   status: ComplaintStatus
   effective_severity: SeverityLevel
-  sla_breached: boolean
   sla_deadline: string | null
   escalation_level: number
   created_at: string
@@ -30,9 +28,11 @@ export type AuthorityComplaintRow = {
 }
 
 export type TrendPoint = {
-  month: string
+  label: string
   submitted: number
   resolved: number
+  in_progress: number
+  assigned: number
 }
 
 export type WorkerOption = {
@@ -55,47 +55,119 @@ export const ACTIVE_STATUSES:    ComplaintStatus[] = ["assigned", "in_progress"]
 export const ESCALATED_STATUSES: ComplaintStatus[] = ["escalated"]
 export const URGENT_SEVERITIES:  SeverityLevel[]   = ["L3", "L4"]
 
-export const SEVERITY_RANK: Record<SeverityLevel, number> = {
+export const SEVERITY_RANK: Record<string, number> = {
+  // L-code format
   L4: 4, L3: 3, L2: 2, L1: 1,
+  // String format (what DB may actually store)
+  critical: 4, high: 3, medium: 2, low: 1,
 }
 
-export const SEVERITY_META: Record<SeverityLevel, { label: string; dot: string; badge: string }> = {
-  L1: { label: "L1", dot: "bg-blue-400",   badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-  L2: { label: "L2", dot: "bg-yellow-400", badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
-  L3: { label: "L3 High",     dot: "bg-orange-500", badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
-  L4: { label: "L4 Critical", dot: "bg-red-500",    badge: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+// ── getSeverityConfig ─────────────────────────────────────────────────────────
+// Handles EVERY format the DB might store:
+//   "L1"/"L2"/"L3"/"L4"          ← typed enum format
+//   "low"/"medium"/"high"/"critical"  ← lowercase string format
+//   "Low"/"Medium"/"High"/"Critical"  ← title-case string format
+//   null / undefined / anything else  ← shown as gray "Unknown" (NOT silently Medium)
+// Uses hex colors so Tailwind purge never strips them.
+
+export type SeverityConfig = {
+  label: string
+  shortLabel: string
+  color: string   // hex — use as style={{ background: color+"22", color }}
+  dot: string     // tailwind dot class (for legacy use only)
+  level: number
 }
 
-export const STATUS_META: Record<ComplaintStatus, { label: string; badge: string }> = {
-  submitted:    { label: "Submitted",    badge: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
-  under_review: { label: "Under Review", badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" },
-  assigned:     { label: "Assigned",     badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-  in_progress:  { label: "In Progress",  badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" },
-  resolved:     { label: "Resolved",     badge: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
-  rejected:     { label: "Rejected",     badge: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" },
-  escalated:    { label: "Escalated",    badge: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+const BY_LCODE: Record<string, SeverityConfig> = {
+  L1: { label: "Low",      shortLabel: "Low",  color: "#38bdf8", dot: "bg-sky-400",    level: 1 },
+  L2: { label: "Medium",   shortLabel: "Med",  color: "#f59e0b", dot: "bg-amber-400",  level: 2 },
+  L3: { label: "High",     shortLabel: "High", color: "#f97316", dot: "bg-orange-500", level: 3 },
+  L4: { label: "Critical", shortLabel: "Crit", color: "#ef4444", dot: "bg-red-500",    level: 4 },
+}
+
+// Map every possible string the DB might store → canonical config
+const BY_STRING: Record<string, SeverityConfig> = {
+  low:      BY_LCODE.L1,
+  medium:   BY_LCODE.L2,
+  med:      BY_LCODE.L2,
+  high:     BY_LCODE.L3,
+  critical: BY_LCODE.L4,
+  crit:     BY_LCODE.L4,
+}
+
+const UNKNOWN_CONFIG: SeverityConfig = {
+  label: "Unknown", shortLabel: "?", color: "#6b7280", dot: "bg-gray-400", level: 0,
+}
+
+export function getSeverityConfig(level: string | null | undefined): SeverityConfig {
+  if (!level) return UNKNOWN_CONFIG
+  // Try exact L-code match first ("L1", "L2", "L3", "L4")
+  if (level in BY_LCODE) return BY_LCODE[level]
+  // Try lowercase string match ("low", "medium", "high", "critical")
+  const lower = level.toLowerCase().trim()
+  if (lower in BY_STRING) return BY_STRING[lower]
+  return UNKNOWN_CONFIG
+}
+
+// Legacy alias — kept so existing imports don't break
+export const SEVERITY_META = BY_LCODE
+
+// ── Status ────────────────────────────────────────────────────────────────────
+
+export const STATUS_META: Record<ComplaintStatus, { label: string; badge: string; step: number }> = {
+  submitted:    { label: "Submitted",    badge: "bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300",              step: 1 },
+  under_review: { label: "Under Review", badge: "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300",  step: 2 },
+  assigned:     { label: "Assigned",     badge: "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-900/30 dark:text-blue-300",             step: 3 },
+  in_progress:  { label: "In Progress",  badge: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300",  step: 4 },
+  resolved:     { label: "Resolved",     badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300", step: 5 },
+  rejected:     { label: "Rejected",     badge: "bg-red-50 text-red-600 ring-1 ring-red-200 dark:bg-red-900/30 dark:text-red-400",                  step: 0 },
+  escalated:    { label: "Escalated",    badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-900/30 dark:text-purple-300",   step: 6 },
 }
 
 export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
-  submitted:    "#9ca3af",
-  under_review: "#fbbf24",
-  assigned:     "#60a5fa",
-  in_progress:  "#818cf8",
-  resolved:     "#4ade80",
-  rejected:     "#f87171",
-  escalated:    "#c084fc",
+  submitted:    "#94a3b8",
+  under_review: "#f59e0b",
+  assigned:     "#3b82f6",
+  in_progress:  "#6366f1",
+  resolved:     "#10b981",
+  rejected:     "#ef4444",
+  escalated:    "#a855f7",
+}
+
+// ── SLA helper ────────────────────────────────────────────────────────────────
+
+export function isBreached(deadline: string | null, status: ComplaintStatus): boolean {
+  if (!deadline) return false
+  if (status === "resolved" || status === "rejected") return false
+  return new Date(deadline) < new Date()
+}
+
+// ── Time helpers ──────────────────────────────────────────────────────────────
+
+export function dayLabel(date: Date): string {
+  return date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" })
 }
 
 export function monthLabel(date: Date): string {
   return date.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })
 }
 
-export function buildSixMonthBuckets(): Record<string, { submitted: number; resolved: number }> {
-  const buckets: Record<string, { submitted: number; resolved: number }> = {}
+export function buildDayBuckets(n = 7): Record<string, Omit<TrendPoint, "label">> {
+  const buckets: Record<string, Omit<TrendPoint, "label">> = {}
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    buckets[dayLabel(d)] = { submitted: 0, resolved: 0, in_progress: 0, assigned: 0 }
+  }
+  return buckets
+}
+
+export function buildSixMonthBuckets(): Record<string, Omit<TrendPoint, "label">> {
+  const buckets: Record<string, Omit<TrendPoint, "label">> = {}
   for (let i = 5; i >= 0; i--) {
     const d = new Date()
     d.setMonth(d.getMonth() - i)
-    buckets[monthLabel(d)] = { submitted: 0, resolved: 0 }
+    buckets[monthLabel(d)] = { submitted: 0, resolved: 0, in_progress: 0, assigned: 0 }
   }
   return buckets
 }
@@ -110,9 +182,7 @@ export function computeStats(complaints: AuthorityComplaintRow[]): DashboardStat
     resolvedThisMonth: complaints.filter(
       c => c.status === "resolved" && new Date(c.created_at).getTime() >= monthStart
     ).length,
-    slaBreached: complaints.filter(
-      c => c.sla_breached && c.status !== "resolved"
-    ).length,
+    slaBreached: complaints.filter(c => isBreached(c.sla_deadline, c.status)).length,
   }
 }
 
@@ -124,10 +194,15 @@ export function getUrgentTickets(
     .filter(c =>
       c.status !== "resolved" &&
       c.status !== "rejected" &&
-      (ESCALATED_STATUSES.includes(c.status) || URGENT_SEVERITIES.includes(c.effective_severity))
+      (ESCALATED_STATUSES.includes(c.status) ||
+        URGENT_SEVERITIES.includes(c.effective_severity) ||
+        // also catch string-format high/critical from DB
+        ["high","critical","l3","l4"].includes((c.effective_severity ?? "").toLowerCase()))
     )
     .sort((a, b) => {
-      const diff = SEVERITY_RANK[b.effective_severity] - SEVERITY_RANK[a.effective_severity]
+      const ra = SEVERITY_RANK[a.effective_severity] ?? SEVERITY_RANK[(a.effective_severity ?? "").toLowerCase()] ?? 0
+      const rb = SEVERITY_RANK[b.effective_severity] ?? SEVERITY_RANK[(b.effective_severity ?? "").toLowerCase()] ?? 0
+      const diff = rb - ra
       return diff !== 0 ? diff : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
     .slice(0, limit)
@@ -162,3 +237,11 @@ export function timeAgo(dateStr: string): string {
   if (hours < 24) return `${hours}h ago`
   return `${days}d ago`
 }
+
+export const WORKFLOW_STEPS: { key: ComplaintStatus | "_worker"; label: string; actor: string }[] = [
+  { key: "submitted",    label: "Filed",        actor: "Citizen"   },
+  { key: "under_review", label: "Under Review", actor: "Admin"     },
+  { key: "assigned",     label: "Assigned",     actor: "Authority" },
+  { key: "in_progress",  label: "In Progress",  actor: "Worker"    },
+  { key: "resolved",     label: "Resolved",     actor: "Worker"    },
+]
