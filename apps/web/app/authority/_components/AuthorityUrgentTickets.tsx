@@ -37,7 +37,7 @@ function UrgentRow({
   onSelect: (c: AuthorityComplaintRow) => void
 }) {
   const sev = SEVERITY_META[c.effective_severity]
-  const st  = STATUS_META[c.status]
+  const st = STATUS_META[c.status]
 
   return (
     <button
@@ -105,11 +105,10 @@ export default function AuthorityUrgentTickets({ tickets, loading, error }: Prop
               Urgent / Escalated
             </h2>
           </div>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-            tickets.length > 0
+          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tickets.length > 0
               ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
               : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
-          }`}>
+            }`}>
             {tickets.length}
           </span>
         </div>
