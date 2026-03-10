@@ -397,7 +397,7 @@ export function ComplaintDetailPanel({
 
   // ── Header ──────────────────────────────────────────────────────────────────
   const header = (
-    <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+    <div className="flex items-start justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
       <div className="flex-1 pr-4">
         <div className="flex flex-wrap gap-1.5 mb-2">
           {/* Severity — inline style matching citizen page */}
@@ -432,7 +432,7 @@ export function ComplaintDetailPanel({
 
   // ── Body ────────────────────────────────────────────────────────────────────
   const body = (
-    <div className={`${inline ? "" : "flex-1 overflow-y-auto"} px-6 py-5 space-y-5`}>
+    <div className={`${inline ? "" : "flex-1 overflow-y-auto"} px-4 py-3 space-y-3`}>
       <WorkflowStepper status={complaint.status} escalationLevel={complaint.escalation_level} />
 
       <div className="h-px bg-gray-100 dark:bg-gray-800" />
@@ -474,7 +474,7 @@ export function ComplaintDetailPanel({
         </div>
       </Field>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-2 gap-3">
         <Field label="Upvotes">
           <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
             {complaint.upvote_count ?? 0}
@@ -519,7 +519,7 @@ export function ComplaintDetailPanel({
 
   // ── Footer ──────────────────────────────────────────────────────────────────
   const footer = (
-    <div className="border-t border-gray-100 px-6 py-4 dark:border-gray-800 space-y-3">
+    <div className="border-t border-gray-100 px-4 py-3 dark:border-gray-800 space-y-3">
       {canAssign && workers && onAssigned && (
         <>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">

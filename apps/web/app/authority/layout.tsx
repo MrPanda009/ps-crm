@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import {
   BarChart2, ChevronDown, ClipboardList,
-  LayoutGrid, LogOut, Menu, Users,
+  LayoutGrid, LogOut, Menu, Users, UserCircle2,
 } from "lucide-react"
 import Sidebar, { defaultSidebarConfig } from "@/components/Sidebar"
 import { supabase } from "@/src/lib/supabase"
@@ -133,16 +133,13 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
                 <button
                   type="button"
                   onClick={() => setProfileOpen(o => !o)}
-                  className="flex items-center gap-1.5 rounded-full border border-gray-200
-                             bg-white py-1 pl-1 pr-2 shadow-sm transition-colors
+                  className="flex h-10 items-center gap-2 rounded-full border border-gray-200
+                             bg-white px-3 shadow-sm transition-colors
                              hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900
                              dark:hover:bg-gray-800"
                 >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full
-                                  bg-[#b4725a] text-[11px] font-bold text-white">
-                    {initials}
-                  </div>
-                  <ChevronDown size={13} className="text-gray-500 dark:text-gray-400" />
+                  <UserCircle2 size={18} className="text-gray-700 dark:text-gray-300" />
+                  <ChevronDown size={16} className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 {profileOpen && (

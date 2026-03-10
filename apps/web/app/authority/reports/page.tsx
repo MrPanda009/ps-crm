@@ -16,7 +16,6 @@ import { getSeverityConfig } from "../_components/dashboard-types"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated"
-// Accept any string from DB — getSeverityConfig normalises "medium"/"L2"/etc.
 type Sev    = string
 
 type Complaint = {
@@ -34,39 +33,29 @@ const STATUS_LABEL: Record<string, string> = {
   submitted: "Submitted", under_review: "Under Review", assigned: "Assigned",
   in_progress: "In Progress", resolved: "Resolved", escalated: "Escalated",
 }
-
 const CAT_PALETTE = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#ec4899"]
-
 const COMPLAINT_SELECT =
   "id,status,effective_severity,sla_deadline,created_at,resolved_at,escalation_level,categories(name)"
 
-// ── SLA: computed from deadline, not stale DB column ──────────────────────────
 function isBreached(deadline: string | null, status: Status): boolean {
   if (!deadline) return false
   if (status === "resolved" || status === "rejected") return false
   return new Date(deadline) < new Date()
 }
 
-// ── Granularity ───────────────────────────────────────────────────────────────
 type Granularity = "day" | "week" | "month" | "6month"
 
 const GRAN_OPTIONS: { value: Granularity; label: string }[] = [
-  { value: "day",    label: "Today (hourly)"  },
-  { value: "week",   label: "Last 7 days"     },
-  { value: "month",  label: "Last 30 days"    },
-  { value: "6month", label: "Last 6 months"   },
+  { value: "day",    label: "Today (hourly)" },
+  { value: "week",   label: "Last 7 days"    },
+  { value: "month",  label: "Last 30 days"   },
+  { value: "6month", label: "Last 6 months"  },
 ]
 
 function bucketKey(d: Date, gran: Granularity): string {
-  if (gran === "day") {
-    return `${String(d.getHours()).padStart(2, "0")}:00`
-  }
-  if (gran === "week") {
-    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" })
-  }
-  if (gran === "month") {
-    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-  }
+  if (gran === "day")    return `${String(d.getHours()).padStart(2, "0")}:00`
+  if (gran === "week")   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" })
+  if (gran === "month")  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
   return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })
 }
 
@@ -102,7 +91,6 @@ function cutoffFor(gran: Granularity): Date {
   return d
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function pct(a: number, b: number) { return b === 0 ? 0 : Math.round((a / b) * 100) }
 
 function avgDays(complaints: Complaint[]): string {
@@ -115,19 +103,22 @@ function avgDays(complaints: Complaint[]): string {
   return d === 0 ? "<1 day" : `${d}d avg`
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Compact card wrapper ───────────────────────────────────────────────────────
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900 ${className}`}>
+    <div className={`rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900 ${className}`}>
       {children}
     </div>
   )
 }
-function CardHead({ title, sub }: { title: string; sub?: string }) {
+function CardHead({ title, sub, action }: { title: string; sub?: string; action?: React.ReactNode }) {
   return (
-    <div className="border-b border-gray-50 px-5 py-4 dark:border-gray-800">
-      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</p>
-      {sub && <p className="mt-0.5 text-[11px] text-gray-400">{sub}</p>}
+    <div className="flex items-center justify-between border-b border-gray-50 px-4 py-3 dark:border-gray-800">
+      <div>
+        <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{title}</p>
+        {sub && <p className="mt-0.5 text-[10px] text-gray-400">{sub}</p>}
+      </div>
+      {action}
     </div>
   )
 }
@@ -135,14 +126,14 @@ function CardHead({ title, sub }: { title: string; sub?: string }) {
 function ChartTip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
+    <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
       {payload.map((p: any) => (
-        <div key={p.name} className="flex items-center justify-between gap-6 py-0.5">
-          <span className="flex items-center gap-1.5 text-xs text-gray-500">
-            <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />{p.name}
+        <div key={p.name} className="flex items-center justify-between gap-4 py-0.5">
+          <span className="flex items-center gap-1 text-[11px] text-gray-500">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: p.color }} />{p.name}
           </span>
-          <span className="text-xs font-bold text-gray-800 dark:text-gray-200">{p.value}</span>
+          <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200">{p.value}</span>
         </div>
       ))}
     </div>
@@ -150,7 +141,7 @@ function ChartTip({ active, payload, label }: any) {
 }
 
 function Skel() {
-  return <div className="h-52 animate-pulse rounded-xl bg-gray-50 dark:bg-gray-800" />
+  return <div className="h-36 animate-pulse rounded-lg bg-gray-50 dark:bg-gray-800" />
 }
 
 function Delta({ now, prev, invert = false }: { now: number; prev: number; invert?: boolean }) {
@@ -158,15 +149,14 @@ function Delta({ now, prev, invert = false }: { now: number; prev: number; inver
   const d = now - prev
   const p = Math.abs(Math.round((d / prev) * 100))
   const good = invert ? d < 0 : d > 0
-  if (d === 0) return <span className="flex items-center gap-0.5 text-[10px] text-gray-400"><Minus size={9} />same</span>
+  if (d === 0) return <span className="flex items-center gap-0.5 text-[10px] text-gray-400"><Minus size={8} />same</span>
   return (
     <span className={`flex items-center gap-0.5 text-[10px] font-semibold ${good ? "text-emerald-600" : "text-red-500"}`}>
-      {d > 0 ? <ArrowUp size={9} /> : <ArrowDown size={9} />}{p}% vs prev
+      {d > 0 ? <ArrowUp size={8} /> : <ArrowDown size={8} />}{p}% vs prev
     </span>
   )
 }
 
-// ── Granularity dropdown ──────────────────────────────────────────────────────
 function GranDropdown({ value, onChange }: { value: Granularity; onChange: (v: Granularity) => void }) {
   const [open, setOpen] = useState(false)
   const active = GRAN_OPTIONS.find(o => o.value === value)!
@@ -174,17 +164,17 @@ function GranDropdown({ value, onChange }: { value: Granularity; onChange: (v: G
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
       >
         {active.label}
-        <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      <div className={`absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 transition-all duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
+      <div className={`absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 transition-all duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
         {GRAN_OPTIONS.map(o => (
           <button
             key={o.value}
             onClick={() => { onChange(o.value); setOpen(false) }}
-            className={`block w-full px-4 py-2.5 text-left text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${value === o.value ? "font-bold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}
+            className={`block w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${value === o.value ? "font-bold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}
           >
             {o.label}
           </button>
@@ -258,7 +248,6 @@ export default function ReportsPage() {
   const escalated = complaints.filter(c => c.escalation_level > 0).length
   const slaRate   = pct(total - breached, total)
   const resRate   = pct(resolved, total)
-
   const prevBreached = prevComplaints.filter(c => isBreached(c.sla_deadline, c.status)).length
 
   // ── Trend data ─────────────────────────────────────────────────────────────
@@ -266,7 +255,6 @@ export default function ReportsPage() {
     const keys = buildBuckets(gran)
     const map: Record<string, { submitted: number; resolved: number; in_progress: number; assigned: number }> = {}
     keys.forEach(k => { map[k] = { submitted: 0, resolved: 0, in_progress: 0, assigned: 0 } })
-
     complaints.forEach(c => {
       const k = bucketKey(new Date(c.created_at), gran)
       if (map[k]) {
@@ -279,12 +267,10 @@ export default function ReportsPage() {
         if (map[rk]) map[rk].resolved++
       }
     })
-
     return keys.map(label => ({ label, ...map[label] }))
   }, [complaints, gran])
 
   // ── Severity ───────────────────────────────────────────────────────────────
-  // Group by normalised severity so "medium" and "L2" both count correctly
   const sevCounts = useMemo(() => {
     const normMap: Record<string, string> = {
       l1: "L1", l2: "L2", l3: "L3", l4: "L4",
@@ -324,7 +310,7 @@ export default function ReportsPage() {
     return Object.entries(map)
       .sort((a, b) => b[1].filed - a[1].filed).slice(0, 8)
       .map(([name, v], i) => ({
-        name: name.length > 22 ? name.slice(0, 20) + "…" : name,
+        name: name.length > 20 ? name.slice(0, 18) + "…" : name,
         filed: v.filed, resolved: v.resolved,
         rate: pct(v.resolved, v.filed),
         color: CAT_PALETTE[i % CAT_PALETTE.length],
@@ -354,11 +340,11 @@ export default function ReportsPage() {
     const b = { "<1d": 0, "1–3d": 0, "4–7d": 0, "8–14d": 0, "15d+": 0 }
     complaints.filter(c => c.status === "resolved" && c.resolved_at).forEach(c => {
       const days = (new Date(c.resolved_at!).getTime() - new Date(c.created_at).getTime()) / 86_400_000
-      if (days < 1)       b["<1d"]++
-      else if (days <= 3) b["1–3d"]++
-      else if (days <= 7) b["4–7d"]++
+      if (days < 1)        b["<1d"]++
+      else if (days <= 3)  b["1–3d"]++
+      else if (days <= 7)  b["4–7d"]++
       else if (days <= 14) b["8–14d"]++
-      else                b["15d+"]++
+      else                 b["15d+"]++
     })
     return Object.entries(b).map(([label, value]) => ({ label, value }))
   }, [complaints])
@@ -387,99 +373,70 @@ export default function ReportsPage() {
     { key: "resolved",    label: "Resolved",    color: "#10b981" },
   ]
 
-  // Thin out x-axis ticks for 30-day view to avoid crowding
   const xInterval =
-    gran === "day"   ? 2 :
+    gran === "day"   ? 3 :
     gran === "week"  ? 0 :
-    gran === "month" ? 4 :   // show every ~5th day label over 30 days
+    gran === "month" ? 5 :
     "preserveStartEnd"
 
-  const granLabel = {
-    day:    "Today (hourly)",
-    week:   "Last 7 days",
-    month:  "Last 30 days",
-    "6month": "Last 6 months",
-  }[gran]
+  const granLabel = { day: "Today", week: "7 days", month: "30 days", "6month": "6 months" }[gran]
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-4 pb-8">
 
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Reports & Analytics</h1>
-          <p className="mt-0.5 text-sm text-gray-400">
-            {dept && <span className="font-medium text-gray-700 dark:text-gray-300">{dept}</span>}
-            {dept && " · "}
-            {loading ? "Loading…" : `${total} complaints · ${granLabel}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <GranDropdown value={gran} onChange={setGran} />
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <Download size={13} /> Export
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Strip */}
+      {/* ── KPI Strip ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
-          { icon: FileText,      label: "Total Filed",     value: total,               color: "text-gray-900 dark:text-white",                       extra: <Delta now={total}    prev={prevComplaints.length} /> },
-          { icon: CheckCircle2,  label: "Resolved",        value: resolved,            color: "text-emerald-600",                                    extra: <Delta now={resolved} prev={prevComplaints.filter(c => c.status === "resolved").length} /> },
-          { icon: TrendingUp,    label: "Resolution Rate", value: `${resRate}%`,       color: resRate >= 60 ? "text-emerald-600" : "text-amber-500", extra: <span className="text-[10px] text-gray-400">{resolved} of {total}</span> },
-          { icon: Clock,         label: "Avg Resolution",  value: avgDays(complaints), color: "text-blue-600",                                       extra: null },
-          { icon: ShieldAlert,   label: "SLA Compliance",  value: `${slaRate}%`,       color: slaRate >= 80 ? "text-emerald-600" : "text-red-500",   extra: <span className="text-[10px] text-gray-400">{total - breached} on-time</span> },
-          { icon: AlertTriangle, label: "SLA Breached",    value: breached,            color: breached > 0 ? "text-red-500" : "text-gray-400",       extra: <Delta now={breached} prev={prevBreached} invert /> },
+          { icon: FileText,      label: "Total Filed",     value: total,               color: "text-gray-900 dark:text-white",                        extra: <Delta now={total}    prev={prevComplaints.length} /> },
+          { icon: CheckCircle2,  label: "Resolved",        value: resolved,            color: "text-emerald-600",                                     extra: <Delta now={resolved} prev={prevComplaints.filter(c => c.status === "resolved").length} /> },
+          { icon: TrendingUp,    label: "Resolution Rate", value: `${resRate}%`,       color: resRate >= 60 ? "text-emerald-600" : "text-amber-500",  extra: <span className="text-[10px] text-gray-400">{resolved}/{total}</span> },
+          { icon: Clock,         label: "Avg Resolution",  value: avgDays(complaints), color: "text-blue-600",                                        extra: null },
+          { icon: ShieldAlert,   label: "SLA Compliance",  value: `${slaRate}%`,       color: slaRate >= 80 ? "text-emerald-600" : "text-red-500",    extra: <span className="text-[10px] text-gray-400">{total - breached} on-time</span> },
+          { icon: AlertTriangle, label: "SLA Breached",    value: breached,            color: breached > 0 ? "text-red-500" : "text-gray-400",        extra: <Delta now={breached} prev={prevBreached} invert /> },
         ].map(({ icon: Icon, label, value, color, extra }) => (
-          <Card key={label} className="p-4">
+          <Card key={label} className="p-3.5">
             <div className="flex items-start justify-between gap-1">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 leading-tight">{label}</p>
                 {loading
-                  ? <div className="mt-1.5 h-7 w-12 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
-                  : <p className={`mt-1 text-2xl font-bold leading-none ${color}`}>{value}</p>}
+                  ? <div className="mt-1 h-6 w-10 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+                  : <p className={`mt-0.5 text-xl font-bold leading-none ${color}`}>{value}</p>}
                 {!loading && <div className="mt-1">{extra}</div>}
               </div>
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
-                <Icon size={13} className="text-gray-400" />
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+                <Icon size={12} className="text-gray-400" />
               </div>
             </div>
           </Card>
         ))}
       </div>
 
-      {/* Trend chart */}
+      {/* ── Trend chart ──────────────────────────────────────────────────── */}
       <Card>
-        <div className="flex items-start justify-between border-b border-gray-50 px-5 py-4 dark:border-gray-800">
-          <div>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Complaint Volume Trend</p>
-            <p className="mt-0.5 text-[11px] text-gray-400">{dept || "All Departments"} · {granLabel}</p>
-          </div>
-          <GranDropdown value={gran} onChange={setGran} />
-        </div>
-        <div className="p-5">
+        <CardHead
+          title="Complaint Volume Trend"
+          sub={`${dept || "All Departments"} · ${granLabel}`}
+          action={<GranDropdown value={gran} onChange={setGran} />}
+        />
+        <div className="p-4">
           {loading ? <Skel /> : trendData.length === 0 ? (
-            <div className="flex h-52 items-center justify-center text-sm text-gray-400">No data for this period</div>
+            <div className="flex h-36 items-center justify-center text-xs text-gray-400">No data for this period</div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={trendData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={trendData} margin={{ top: 2, right: 4, left: -26, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(156,163,175,0.15)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={xInterval as any} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} width={28} />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={xInterval as any} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} width={24} />
                 <Tooltip content={<ChartTip />} cursor={{ stroke: "rgba(156,163,175,0.2)", strokeWidth: 1 }} />
                 <Legend
-                  wrapperStyle={{ fontSize: 11, paddingTop: 14 }} iconType="circle" iconSize={7}
-                  formatter={(v) => <span style={{ color: "#6b7280", fontSize: 11 }}>{v}</span>}
+                  wrapperStyle={{ fontSize: 10, paddingTop: 10 }} iconType="circle" iconSize={6}
+                  formatter={(v) => <span style={{ color: "#6b7280", fontSize: 10 }}>{v}</span>}
                 />
                 {TREND_LINES.map(({ key, label, color }) => (
-                  <Line key={key} type="monotone" dataKey={key} name={label} stroke={color} strokeWidth={2}
-                    dot={{ r: gran === "month" ? 2 : 3, fill: color, strokeWidth: 0 }}
-                    activeDot={{ r: 5, strokeWidth: 0 }} />
+                  <Line key={key} type="monotone" dataKey={key} name={label} stroke={color} strokeWidth={1.5}
+                    dot={{ r: gran === "month" ? 1.5 : 2, fill: color, strokeWidth: 0 }}
+                    activeDot={{ r: 4, strokeWidth: 0 }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
@@ -487,39 +444,39 @@ export default function ReportsPage() {
         </div>
       </Card>
 
-      {/* Row: Severity + Status */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      {/* ── 4 Graphs (Scrollable) ────────────────────────────────────────── */}
+      <div className="flex flex-nowrap overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar">
 
         {/* Severity */}
-        <Card>
-          <CardHead title="Severity Distribution" sub={`Urgency profile · ${granLabel}`} />
-          <div className="p-5">
+        <Card className="min-w-[300px] flex-1 snap-start shrink-0">
+          <CardHead title="Severity Distribution" sub={granLabel} />
+          <div className="p-4">
             {loading ? <Skel /> : sevCounts.length === 0 ? (
-              <div className="flex h-48 items-center justify-center text-sm text-gray-400">No data</div>
+              <div className="flex h-36 items-center justify-center text-xs text-gray-400">No data</div>
             ) : (
-              <div className="space-y-4">
-                <div className="flex h-5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+              <div className="space-y-3">
+                <div className="flex h-4 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                   {sevCounts.map(s => {
                     const p = pct(s.count, total); if (!p) return null
                     return <div key={s.sev} style={{ width: `${p}%`, background: s.color }} className="transition-all" title={`${s.label}: ${s.count}`} />
                   })}
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {sevCounts.map(s => {
                     const p = pct(s.count, total)
                     return (
                       <div key={s.sev}>
-                        <div className="mb-1 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{s.label}</span>
+                        <div className="mb-0.5 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{s.label}</span>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold text-gray-900 dark:text-white">{s.count}</span>
-                            <span className="w-8 text-right text-[11px] text-gray-400">{p}%</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-900 dark:text-white">{s.count}</span>
+                            <span className="w-7 text-right text-[10px] text-gray-400">{p}%</span>
                           </div>
                         </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                           <div className="h-full rounded-full transition-all" style={{ width: `${p}%`, background: s.color }} />
                         </div>
                       </div>
@@ -532,17 +489,17 @@ export default function ReportsPage() {
         </Card>
 
         {/* Status donut */}
-        <Card>
-          <CardHead title="Status Breakdown" sub={`Pipeline view · ${granLabel}`} />
-          <div className="p-5">
+        <Card className="min-w-[320px] flex-1 snap-start shrink-0">
+          <CardHead title="Status Breakdown" sub={granLabel} />
+          <div className="p-4">
             {loading ? <Skel /> : statusData.length === 0 ? (
-              <div className="flex h-48 items-center justify-center text-sm text-gray-400">No data</div>
+              <div className="flex h-36 items-center justify-center text-xs text-gray-400">No data</div>
             ) : (
-              <div className="flex items-center gap-5">
+              <div className="flex items-center gap-4">
                 <div className="shrink-0">
-                  <ResponsiveContainer width={140} height={140}>
+                  <ResponsiveContainer width={150} height={150}>
                     <PieChart>
-                      <Pie data={statusData} cx="50%" cy="50%" innerRadius={40} outerRadius={65}
+                      <Pie data={statusData} cx="50%" cy="50%" innerRadius={45} outerRadius={70}
                         dataKey="value" paddingAngle={2} startAngle={90} endAngle={450}>
                         {statusData.map((d, i) => <Cell key={i} fill={d.color} />)}
                       </Pie>
@@ -550,16 +507,16 @@ export default function ReportsPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex-1 min-w-0 space-y-1.5 overflow-y-auto max-h-[130px]">
                   {statusData.map(d => (
                     <div key={d.name} className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.color }} />
-                        <span className="truncate text-xs text-gray-600 dark:text-gray-400">{d.name}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: d.color }} />
+                        <span className="truncate text-[11px] text-gray-600 dark:text-gray-400">{d.name}</span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-bold text-gray-900 dark:text-white">{d.value}</span>
-                        <span className="w-7 text-right text-[10px] text-gray-400">{pct(d.value, total)}%</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[11px] font-bold text-gray-900 dark:text-white">{d.value}</span>
+                        <span className="w-6 text-right text-[10px] text-gray-400">{pct(d.value, total)}%</span>
                       </div>
                     </div>
                   ))}
@@ -568,38 +525,34 @@ export default function ReportsPage() {
             )}
           </div>
         </Card>
-      </div>
-
-      {/* Row: SLA by Severity + Resolution Time */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
 
         {/* SLA compliance */}
-        <Card>
-          <CardHead title="SLA Compliance by Severity" sub="Computed from deadline, not DB flag" />
-          <div className="p-5">
+        <Card className="min-w-[300px] flex-1 snap-start shrink-0">
+          <CardHead title="SLA Compliance by Severity" sub="Computed from deadline" />
+          <div className="p-4">
             {loading ? <Skel /> : slaBySev.length === 0 ? (
-              <div className="flex h-48 items-center justify-center text-sm text-gray-400">No data</div>
+              <div className="flex h-36 items-center justify-center text-xs text-gray-400">No data</div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 overflow-y-auto max-h-[200px] pr-1">
                 {slaBySev.map(s => (
                   <div key={s.name}>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{s.name}</span>
+                    <div className="mb-1 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{s.name}</span>
                         <span className="text-[10px] text-gray-400">({s.total})</span>
                       </div>
-                      <span className={`text-sm font-bold ${s.rate >= 80 ? "text-emerald-600" : s.rate >= 50 ? "text-amber-500" : "text-red-500"}`}>
+                      <span className={`text-xs font-bold ${s.rate >= 80 ? "text-emerald-600" : s.rate >= 50 ? "text-amber-500" : "text-red-500"}`}>
                         {s.rate}%
                       </span>
                     </div>
-                    <div className="flex h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                    <div className="flex h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                       <div className="h-full bg-emerald-400 transition-all" style={{ width: `${pct(s.compliant, s.total)}%` }} />
                       {s.breached > 0 && (
                         <div className="h-full bg-red-400 transition-all" style={{ width: `${pct(s.breached, s.total)}%` }} />
                       )}
                     </div>
-                    <div className="mt-1 flex gap-3 text-[10px]">
+                    <div className="mt-0.5 flex gap-2 text-[10px]">
                       <span className="text-emerald-600">✓ {s.compliant} on-time</span>
                       {s.breached > 0 && <span className="text-red-500">✗ {s.breached} breached</span>}
                     </div>
@@ -611,27 +564,27 @@ export default function ReportsPage() {
         </Card>
 
         {/* Resolution time */}
-        <Card>
-          <CardHead title="Resolution Time Distribution" sub="How quickly complaints are closed" />
-          <div className="p-5">
+        <Card className="min-w-[300px] flex-1 snap-start shrink-0">
+          <CardHead title="Resolution Time Distribution" sub="How quickly complaints close" />
+          <div className="p-4">
             {loading ? <Skel /> : resolved === 0 ? (
-              <div className="flex h-48 items-center justify-center text-sm text-gray-400">No resolved complaints yet</div>
+              <div className="flex h-36 items-center justify-center text-xs text-gray-400">No resolved complaints yet</div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5 overflow-y-auto max-h-[200px] pr-1">
                 {resBuckets.map(b => {
                   const p    = pct(b.value, resolved)
                   const fast = b.label === "<1d" || b.label === "1–3d"
                   const slow = b.label === "15d+"
                   return (
                     <div key={b.label}>
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{b.label}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-gray-900 dark:text-white">{b.value}</span>
-                          <span className="w-7 text-right text-[11px] text-gray-400">{p}%</span>
+                      <div className="mb-0.5 flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{b.label}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-900 dark:text-white">{b.value}</span>
+                          <span className="w-6 text-right text-[10px] text-gray-400">{p}%</span>
                         </div>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                         <div
                           className={`h-full rounded-full transition-all ${fast ? "bg-emerald-400" : slow ? "bg-red-400" : "bg-amber-400"}`}
                           style={{ width: `${p}%` }}
@@ -640,8 +593,8 @@ export default function ReportsPage() {
                     </div>
                   )
                 })}
-                <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-800">
-                  <p className="text-[11px] text-gray-500">
+                <div className="mt-1 rounded-lg bg-gray-50 px-3 py-1.5 dark:bg-gray-800">
+                  <p className="text-[10px] text-gray-500">
                     Average: <span className="font-semibold text-gray-700 dark:text-gray-300">{avgDays(complaints)}</span> · {resolved} resolved
                   </p>
                 </div>
@@ -651,21 +604,21 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      {/* Category bars */}
+      {/* ── Category bars ─────────────────────────────────────────────────── */}
       <Card>
         <CardHead title="Complaints by Category" sub="Solid = resolved · faint = total filed" />
-        <div className="p-5">
+        <div className="p-4">
           {loading ? <Skel /> : catData.length === 0 ? (
-            <div className="flex h-40 items-center justify-center text-sm text-gray-400">No data</div>
+            <div className="flex h-32 items-center justify-center text-xs text-gray-400">No data</div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-2 overflow-y-auto max-h-[220px] pr-1">
               {catData.map(c => (
-                <div key={c.name} className="flex items-center gap-3">
-                  <div className="flex w-36 shrink-0 items-center justify-end gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: c.color }} />
-                    <span className="truncate text-xs text-gray-600 dark:text-gray-400">{c.name}</span>
+                <div key={c.name} className="flex items-center gap-2">
+                  <div className="flex w-32 shrink-0 items-center justify-end gap-1">
+                    <span className="h-2 w-2 rounded-sm shrink-0" style={{ background: c.color }} />
+                    <span className="truncate text-[11px] text-gray-600 dark:text-gray-400">{c.name}</span>
                   </div>
-                  <div className="relative flex-1 h-5">
+                  <div className="relative flex-1 h-4">
                     <div className="absolute inset-0 overflow-hidden rounded-full" style={{ background: `${c.color}20` }}>
                       <div className="h-full rounded-full transition-all" style={{ width: `${pct(c.filed, catData[0].filed)}%`, background: `${c.color}50` }} />
                     </div>
@@ -673,8 +626,8 @@ export default function ReportsPage() {
                       <div className="h-full rounded-full transition-all" style={{ width: `${pct(c.resolved, catData[0].filed)}%`, background: c.color }} />
                     </div>
                   </div>
-                  <span className="w-7 shrink-0 text-center text-xs font-bold text-gray-800 dark:text-gray-200">{c.filed}</span>
-                  <span className={`w-9 shrink-0 text-right text-[11px] font-semibold ${c.rate >= 60 ? "text-emerald-600" : c.rate >= 30 ? "text-amber-500" : "text-red-500"}`}>
+                  <span className="w-6 shrink-0 text-center text-[11px] font-bold text-gray-800 dark:text-gray-200">{c.filed}</span>
+                  <span className={`w-8 shrink-0 text-right text-[10px] font-semibold ${c.rate >= 60 ? "text-emerald-600" : c.rate >= 30 ? "text-amber-500" : "text-red-500"}`}>
                     {c.rate}%
                   </span>
                 </div>
@@ -684,47 +637,47 @@ export default function ReportsPage() {
         </div>
       </Card>
 
-      {/* Insights */}
+      {/* ── Insights ──────────────────────────────────────────────────────── */}
       {!loading && total > 0 && (
         <Card className="border-[#b4725a]/15 bg-gradient-to-br from-[#fdf8f6] to-white dark:from-[#2a1f1a]/60 dark:to-gray-900">
-          <div className="p-5">
-            <p className="mb-3 text-sm font-semibold text-[#4f392e] dark:text-[#b4725a]">Period Insights</p>
+          <div className="p-4">
+            <p className="mb-2.5 text-xs font-semibold text-[#4f392e] dark:text-[#b4725a]">Period Insights</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
               {breached > 0 && (
-                <div className="flex gap-2 rounded-xl bg-red-50 p-3 dark:bg-red-900/20">
-                  <AlertTriangle size={13} className="mt-0.5 shrink-0 text-red-500" />
+                <div className="flex gap-2 rounded-lg bg-red-50 p-2.5 dark:bg-red-900/20">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0 text-red-500" />
                   <span className="text-red-700 dark:text-red-400 leading-snug">
                     <strong>SLA breached ({breached} tickets)</strong> — deadlines passed without resolution.
                   </span>
                 </div>
               )}
               {resRate < 30 && (
-                <div className="flex gap-2 rounded-xl bg-amber-50 p-3 dark:bg-amber-900/20">
-                  <Clock size={13} className="mt-0.5 shrink-0 text-amber-500" />
+                <div className="flex gap-2 rounded-lg bg-amber-50 p-2.5 dark:bg-amber-900/20">
+                  <Clock size={12} className="mt-0.5 shrink-0 text-amber-500" />
                   <span className="text-amber-700 dark:text-amber-400 leading-snug">
                     <strong>Low resolution rate ({resRate}%)</strong> — {total - resolved} complaints still open.
                   </span>
                 </div>
               )}
               {escalated > 0 && (
-                <div className="flex gap-2 rounded-xl bg-purple-50 p-3 dark:bg-purple-900/20">
-                  <TrendingUp size={13} className="mt-0.5 shrink-0 text-purple-500" />
+                <div className="flex gap-2 rounded-lg bg-purple-50 p-2.5 dark:bg-purple-900/20">
+                  <TrendingUp size={12} className="mt-0.5 shrink-0 text-purple-500" />
                   <span className="text-purple-700 dark:text-purple-400 leading-snug">
                     <strong>{escalated} escalated</strong> — requires senior review.
                   </span>
                 </div>
               )}
               {resRate >= 70 && (
-                <div className="flex gap-2 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-900/20">
-                  <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-emerald-500" />
+                <div className="flex gap-2 rounded-lg bg-emerald-50 p-2.5 dark:bg-emerald-900/20">
+                  <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-emerald-500" />
                   <span className="text-emerald-700 dark:text-emerald-400 leading-snug">
                     <strong>Strong performance ({resRate}%)</strong> — {resolved} of {total} resolved.
                   </span>
                 </div>
               )}
               {catData[0] && (
-                <div className="flex gap-2 rounded-xl bg-blue-50 p-3 dark:bg-blue-900/20">
-                  <FileText size={13} className="mt-0.5 shrink-0 text-blue-500" />
+                <div className="flex gap-2 rounded-lg bg-blue-50 p-2.5 dark:bg-blue-900/20">
+                  <FileText size={12} className="mt-0.5 shrink-0 text-blue-500" />
                   <span className="text-blue-700 dark:text-blue-400 leading-snug">
                     Top category: <strong>{catData[0].name}</strong> — {catData[0].filed} complaints, {catData[0].rate}% resolved.
                   </span>

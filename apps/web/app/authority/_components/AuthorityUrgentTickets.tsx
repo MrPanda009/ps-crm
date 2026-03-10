@@ -5,8 +5,9 @@
 import React, { useState } from "react"
 import { AlertTriangle } from "lucide-react"
 import {
-  SEVERITY_META,
   STATUS_META,
+  getSeverityConfig,
+  isBreached,
   timeAgo,
   type AuthorityComplaintRow,
 } from "./dashboard-types"
@@ -36,7 +37,7 @@ function UrgentRow({
   c: AuthorityComplaintRow
   onSelect: (c: AuthorityComplaintRow) => void
 }) {
-  const sev = SEVERITY_META[c.effective_severity]
+  const sev = getSeverityConfig(c.effective_severity)
   const st  = STATUS_META[c.status]
 
   return (
@@ -45,7 +46,10 @@ function UrgentRow({
       className="w-full px-5 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
     >
       <div className="flex flex-wrap items-center gap-1.5 mb-1">
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${sev.badge}`}>
+        <span
+          className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+          style={{ background: sev.color + "22", color: sev.color }}
+        >
           {sev.label}
         </span>
         {c.status === "escalated" && (
@@ -53,7 +57,7 @@ function UrgentRow({
             Escalated
           </span>
         )}
-        {c.sla_breached && (
+        {isBreached(c.sla_deadline, c.status) && (
           <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-600 dark:bg-red-900/30 dark:text-red-400">
             SLA
           </span>

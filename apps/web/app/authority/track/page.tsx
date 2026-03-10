@@ -10,7 +10,7 @@ import { getSeverityConfig } from "../_components/dashboard-types"
 const MapComponent = dynamic(() => import("@/app/MapComponent"), { ssr: false })
 
 type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated"
-type Sev    = string  // accept any string — getSeverityConfig handles normalisation
+type Sev    = string
 
 type Complaint = {
   id: string; ticket_id: string; title: string; status: Status
@@ -36,9 +36,8 @@ const STATUS_META: Record<Status, { label: string; badge: string }> = {
   escalated:    { label: "Escalated",    badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200" },
 }
 
-const TERMINAL_STATUSES:   Status[] = ["resolved", "rejected"]
+const TERMINAL_STATUSES: Status[] = ["resolved", "rejected"]
 const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated"]
-// Severity options shown in filter dropdown
 const SEV_FILTER_OPTIONS = [
   { key: "L4", label: "Critical" },
   { key: "L3", label: "High" },
@@ -60,15 +59,14 @@ function slaStatus(deadline: string | null, status: Status): { breached: boolean
   const days  = Math.ceil(diff / 86_400_000)
   if (diff < 0) {
     const overH = Math.round(Math.abs(hours))
-    return { breached: true, text: overH < 24 ? `${overH}h overdue` : `${Math.ceil(Math.abs(hours) / 24)}d overdue`, pill: "bg-red-100 text-red-600 font-bold" }
+    return { breached: true, text: overH < 24 ? `${overH}h over` : `${Math.ceil(Math.abs(hours) / 24)}d over`, pill: "bg-red-100 text-red-600 font-bold" }
   }
   if (hours < 4)  return { breached: false, text: `${Math.ceil(hours)}h left`, pill: "bg-orange-100 text-orange-600 font-bold" }
-  if (days === 0) return { breached: false, text: "Due today",                 pill: "bg-orange-100 text-orange-600 font-bold" }
-  if (days <= 2)  return { breached: false, text: `${days}d left`,             pill: "bg-amber-50 text-amber-600" }
-  return              { breached: false, text: `${days}d left`,             pill: "bg-gray-100 text-gray-500" }
+  if (days === 0) return { breached: false, text: "Due today", pill: "bg-orange-100 text-orange-600 font-bold" }
+  if (days <= 2)  return { breached: false, text: `${days}d left`, pill: "bg-amber-50 text-amber-600" }
+  return              { breached: false, text: `${days}d left`, pill: "bg-gray-100 text-gray-500" }
 }
 
-/** Normalise DB severity to L-code for filter matching */
 function normaliseSev(v: string): string {
   if (!v) return ""
   const map: Record<string, string> = {
@@ -119,7 +117,6 @@ export default function TrackPage() {
       rows = (d2 ?? []) as unknown as Complaint[]
     }
 
-    // Load workers for this department — these are the ONLY valid workers
     let workerRows: Worker[] = []
     if (department) {
       const { data: wRows } = await supabase
@@ -167,7 +164,6 @@ export default function TrackPage() {
         (c.address_text ?? "").toLowerCase().includes(q) ||
         (c.categories?.name ?? "").toLowerCase().includes(q)
       const matchStatus = statusFilter === "all" || c.status === statusFilter
-      // Severity filter: normalise DB value before comparing
       const matchSev = sevFilter === "all" || normaliseSev(c.effective_severity) === sevFilter
       return matchSearch && matchStatus && matchSev
     })
@@ -220,9 +216,14 @@ export default function TrackPage() {
   return (
     <div className="space-y-5">
 
-      {/* MAP */}
+      {/* ── MAP ─────────────────────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50/80 px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
+        {/*
+          IMPORTANT: position:relative + z-[1000] ensures this header bar always
+          renders on top of the Leaflet map canvas/tiles during pan & zoom.
+        */}
+        <div className="relative z-[1000] flex items-center justify-between border-b border-gray-200
+                        bg-gray-50/80 px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
           <div className="flex gap-5 text-sm font-medium text-gray-600">
             {(["L1","L2","L3","L4"] as const).map(key => {
               const s = getSeverityConfig(key)
@@ -250,16 +251,17 @@ export default function TrackPage() {
             </button>
           </div>
         </div>
-        <div className="h-[400px] w-full">
+        <div className="h-[380px] w-full">
           <MapComponent selectedComplaintId={selectedId} />
         </div>
       </div>
 
-      {/* TABLE */}
-      <div className="rounded-2xl bg-[#eef3f4] p-5 dark:bg-gray-900/50">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      {/* ── TABLE ───────────────────────────────────────────────────────────── */}
+      <div className="rounded-2xl bg-[#eef3f4] p-4 dark:bg-gray-900/50">
+        {/* Table header */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">Complaints Overview</h2>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Complaints Overview</h2>
             <p className="text-xs text-gray-500">
               {loading ? "Loading…" : error ? error : `Showing ${filtered.length} of ${complaints.length}`}
               {!loading && !hasWorkers && (
@@ -268,29 +270,29 @@ export default function TrackPage() {
             </p>
           </div>
           <button onClick={exportCSV}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
             Export CSV
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="mb-4 flex flex-wrap gap-2">
+        {/* Filters row */}
+        <div className="mb-3 flex flex-wrap gap-2">
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search ticket, title, address…"
-            className="flex-1 min-w-48 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b4725a] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            className="flex-1 min-w-44 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b4725a] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           />
 
           {/* Sort */}
           <div className="relative">
             <button onClick={() => { setIsSortOpen(o => !o); setIsStatOpen(false); setIsSevOpen(false) }}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {{ latest:"Latest", oldest:"Oldest", severity:"Severity", upvotes:"Most Upvoted", sla:"Urgent SLA" }[sortBy] ?? "Sort"}
-              <span className="text-xs opacity-60">▼</span>
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              {{ latest:"Latest", oldest:"Oldest", severity:"Severity", upvotes:"Upvoted", sla:"SLA" }[sortBy] ?? "Sort"}
+              <span className="text-[10px] opacity-60">▼</span>
             </button>
-            <div className={`absolute left-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isSortOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
+            <div className={`absolute left-0 top-full z-50 mt-1 w-38 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isSortOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
               {[["latest","Latest first"],["oldest","Oldest first"],["severity","By severity"],["upvotes","Most upvoted"],["sla","Urgent SLA first"]].map(([v,l]) => (
                 <button key={v} onClick={() => { setSortBy(v); setIsSortOpen(false) }}
-                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${sortBy===v?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
+                  className={`block w-full px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${sortBy===v?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
                   {l}
                 </button>
               ))}
@@ -300,20 +302,20 @@ export default function TrackPage() {
           {/* Severity filter */}
           <div className="relative">
             <button onClick={() => { setIsSevOpen(o => !o); setIsStatOpen(false); setIsSortOpen(false) }}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               {sevFilter === "all" ? "All severity" : getSeverityConfig(sevFilter).label}
-              <span className="text-xs opacity-60">▼</span>
+              <span className="text-[10px] opacity-60">▼</span>
             </button>
-            <div className={`absolute left-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isSevOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
+            <div className={`absolute left-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isSevOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
               <button onClick={() => { setSevFilter("all"); setIsSevOpen(false) }}
-                className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${sevFilter==="all"?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
+                className={`block w-full px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700 ${sevFilter==="all"?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
                 All severity
               </button>
               {SEV_FILTER_OPTIONS.map(({ key }) => {
                 const sc = getSeverityConfig(key)
                 return (
                   <button key={key} onClick={() => { setSevFilter(key); setIsSevOpen(false) }}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700">
                     <span className="h-2 w-2 rounded-full shrink-0" style={{ background: sc.color }} />
                     <span style={{ color: sevFilter === key ? sc.color : undefined, fontWeight: sevFilter === key ? 600 : undefined }}>
                       {sc.label}
@@ -327,14 +329,14 @@ export default function TrackPage() {
           {/* Status */}
           <div className="relative">
             <button onClick={() => { setIsStatOpen(o => !o); setIsSortOpen(false); setIsSevOpen(false) }}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               {statusFilter === "all" ? "All statuses" : STATUS_META[statusFilter as Status].label}
-              <span className="text-xs opacity-60">▼</span>
+              <span className="text-[10px] opacity-60">▼</span>
             </button>
-            <div className={`absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isStatOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
+            <div className={`absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isStatOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
               {[["all","All statuses"], ...ALL_STATUSES.map(s => [s, STATUS_META[s].label])].map(([v,l]) => (
                 <button key={v} onClick={() => { setStatusFilter(v); setIsStatOpen(false) }}
-                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${statusFilter===v?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
+                  className={`block w-full px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${statusFilter===v?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
                   {l}
                 </button>
               ))}
@@ -342,13 +344,14 @@ export default function TrackPage() {
           </div>
         </div>
 
+        {/* Compact table */}
         <div className="overflow-hidden rounded-xl bg-white shadow-sm dark:bg-gray-900">
-          <div className="max-h-[520px] overflow-y-auto">
-            <table className="w-full text-sm">
+          <div className="max-h-[460px] overflow-y-auto">
+            <table className="w-full text-xs">
               <thead className="sticky top-0 z-10 bg-gradient-to-r from-[#5b3a2e] to-[#8b5e49] text-white">
                 <tr>
-                  {["Ticket","Title","Severity","Status","Upvotes","SLA","Worker","View"].map(h => (
-                    <th key={h} className="p-3 text-left text-xs font-semibold tracking-wide">{h}</th>
+                  {["Ticket","Title","Sev","Status","↑","SLA","Worker",""].map(h => (
+                    <th key={h} className="px-2.5 py-2 text-left text-[10px] font-semibold tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -356,13 +359,13 @@ export default function TrackPage() {
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      {[80,180,70,90,45,90,100,70].map((w,j) => (
-                        <td key={j} className="p-3"><div className="h-3 rounded-md bg-gray-100 dark:bg-gray-800" style={{width:w}}/></td>
+                      {[70,160,60,80,35,75,90,55].map((w,j) => (
+                        <td key={j} className="px-2.5 py-2"><div className="h-2.5 rounded-md bg-gray-100 dark:bg-gray-800" style={{width:w}}/></td>
                       ))}
                     </tr>
                   ))
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={8} className="p-10 text-center text-sm text-gray-400">
+                  <tr><td colSpan={8} className="p-8 text-center text-xs text-gray-400">
                     {complaints.length === 0 ? "No complaints assigned to your department yet." : "No complaints match your filters."}
                   </td></tr>
                 ) : filtered.map(c => {
@@ -376,61 +379,64 @@ export default function TrackPage() {
                     ? workers.find(w => w.id === c.assigned_worker_id) ?? null
                     : null
                   const workerIsValid = !!assignedWorkerProfile
-                  const isTerminal    = TERMINAL_STATUSES.includes(c.status)
+                  const isTerminal   = TERMINAL_STATUSES.includes(c.status)
 
                   return (
                     <tr key={c.id}
                       onClick={() => setSelectedId(prev => prev === c.id ? null : c.id)}
                       className={`cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${isSelected ? "bg-amber-50/70 dark:bg-amber-900/10" : ""}`}>
 
-                      <td className="p-3 font-mono text-xs text-gray-400 whitespace-nowrap">{c.ticket_id}</td>
+                      {/* Ticket ID */}
+                      <td className="px-2.5 py-2 font-mono text-[10px] text-gray-400 whitespace-nowrap">{c.ticket_id}</td>
 
-                      <td className="p-3 max-w-[200px]">
+                      {/* Title */}
+                      <td className="px-2.5 py-2 max-w-[180px]">
                         <p className="truncate font-medium text-gray-800 dark:text-gray-200">{c.title}</p>
-                        {c.categories?.name && <p className="text-[10px] text-gray-400">{c.categories.name}</p>}
+                        {c.categories?.name && <p className="text-[9px] text-gray-400">{c.categories.name}</p>}
                       </td>
 
-                      {/* Severity — inline style, reads actual DB value */}
-                      <td className="p-3">
-                        <div className="flex flex-col gap-0.5">
-                          <span
-                            className="w-fit rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase"
-                            style={{ background: sev.color + "22", color: sev.color }}
-                          >
-                            {sev.label}
+                      {/* Severity */}
+                      <td className="px-2.5 py-2 whitespace-nowrap">
+                        <span
+                          className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+                          style={{ background: sev.color + "22", color: sev.color }}
+                        >
+                          {sev.label}
+                        </span>
+                        {c.escalation_level > 0 && c.status !== "escalated" && (
+                          <span className="ml-1 inline-flex rounded-full bg-purple-50 px-1.5 py-0.5 text-[9px] font-bold text-purple-600">
+                            Esc
                           </span>
-                          {c.escalation_level > 0 && c.status !== "escalated" && (
-                            <span className="w-fit rounded-full bg-purple-50 px-2 py-0.5 text-[9px] font-bold text-purple-600 ring-1 ring-purple-200">
-                              Esc.
-                            </span>
-                          )}
-                        </div>
+                        )}
                       </td>
 
-                      <td className="p-3">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${st.badge}`}>
+                      {/* Status */}
+                      <td className="px-2.5 py-2 whitespace-nowrap">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.badge}`}>
                           {st.label}
                         </span>
                       </td>
 
-                      <td className="p-3 text-xs">
+                      {/* Upvotes */}
+                      <td className="px-2.5 py-2 whitespace-nowrap text-[10px]">
                         {(c.upvote_count ?? 0) > 0
-                          ? <span className="font-semibold text-[#b4725a]">▲ {c.upvote_count}</span>
+                          ? <span className="font-semibold text-[#b4725a]">▲{c.upvote_count}</span>
                           : <span className="text-gray-300">—</span>}
                       </td>
 
-                      <td className="p-3">
+                      {/* SLA */}
+                      <td className="px-2.5 py-2 whitespace-nowrap">
                         {!c.sla_deadline
                           ? <span className="text-[10px] text-gray-300">—</span>
-                          : <span className={`rounded-full px-2 py-0.5 text-[10px] ${sla.pill}`}>{sla.text}</span>}
+                          : <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] ${sla.pill}`}>{sla.text}</span>}
                       </td>
 
-                      {/* Worker column — always show dropdown for active tickets */}
-                      <td className="p-3" onClick={e => e.stopPropagation()}>
+                      {/* Worker */}
+                      <td className="px-2.5 py-2" onClick={e => e.stopPropagation()}>
                         {isTerminal ? (
                           workerIsValid
-                            ? <span className="text-[11px] text-gray-500">{assignedWorkerProfile!.full_name}</span>
-                            : <span className="text-[11px] text-gray-300">—</span>
+                            ? <span className="text-[10px] text-gray-500">{assignedWorkerProfile!.full_name}</span>
+                            : <span className="text-[10px] text-gray-300">—</span>
                         ) : (
                           <AssignDropdown
                             complaintId={c.id}
@@ -442,10 +448,11 @@ export default function TrackPage() {
                         )}
                       </td>
 
-                      <td className="p-3" onClick={e => e.stopPropagation()}>
+                      {/* View button */}
+                      <td className="px-2.5 py-2" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => setExpandedId(prev => prev === c.id ? null : c.id)}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${isExpanded ? "bg-[#b4725a] text-white" : "border border-gray-200 bg-white text-gray-600 hover:border-[#b4725a] hover:text-[#b4725a] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"}`}>
+                          className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${isExpanded ? "bg-[#b4725a] text-white" : "border border-gray-200 bg-white text-gray-600 hover:border-[#b4725a] hover:text-[#b4725a] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"}`}>
                           {isExpanded ? "Close" : "View"}
                         </button>
                       </td>
