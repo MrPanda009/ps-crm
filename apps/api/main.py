@@ -261,7 +261,61 @@ def _pick_first(data: Dict, keys: List[str]) -> str:
     return ""
 
 
-def _fallback_digipin(latitude: float, longitude: float) -> str:
+def _compute_digipin(latitude: float, longitude: float) -> str:
+    """Official DIGIPIN encoding algorithm (India Post / IIT Hyderabad / ISRO).
+
+    Ported from the official source at github.com/INDIAPOST-gov/digipin.
+    Encodes lat/lng into a 10-character alphanumeric code by subdividing
+    India's bounding box into a 4×4 grid 10 times using 16 characters.
+    Returns formatted code like 'J49-L3M-2345'.
+    """
+    # India bounding box (EPSG:4326 / WGS84)
+    MIN_LAT, MAX_LAT = 2.5, 38.5
+    MIN_LNG, MAX_LNG = 63.5, 99.5
+
+    # Official 4×4 character grid (from INDIAPOST-gov/digipin)
+    GRID = [
+        ["F", "C", "9", "8"],
+        ["J", "3", "2", "7"],
+        ["K", "4", "5", "6"],
+        ["L", "M", "P", "T"],
+    ]
+
+    # Clamp coordinates to India's bounding box
+    lat = max(MIN_LAT, min(MAX_LAT, latitude))
+    lng = max(MIN_LNG, min(MAX_LNG, longitude))
+
+    lat_min, lat_max = MIN_LAT, MAX_LAT
+    lng_min, lng_max = MIN_LNG, MAX_LNG
+
+    code = []
+    for _ in range(10):
+        lat_div = (lat_max - lat_min) / 4.0
+        lng_div = (lng_max - lng_min) / 4.0
+
+        # Row: reversed bottom-up (matches official JS logic)
+        row = 3 - int((lat - lat_min) / lat_div)
+        col = int((lng - lng_min) / lng_div)
+
+        # Clamp to valid range
+        row = max(0, min(row, 3))
+        col = max(0, min(col, 3))
+
+        code.append(GRID[row][col])
+
+        # Update bounds (official reverse logic for row)
+        lat_max = lat_min + lat_div * (4 - row)
+        lat_min = lat_min + lat_div * (3 - row)
+        lng_min = lng_min + lng_div * col
+        lng_max = lng_min + lng_div
+
+    # Format as XXX-XXX-XXXX
+    raw = "".join(code)
+    return f"{raw[:3]}-{raw[3:6]}-{raw[6:]}"
+
+
+def _fallback_digipin_raw(latitude: float, longitude: float) -> str:
+    """Last-resort fallback: coordinate-based DG code if algorithm fails."""
     lat = str(abs(latitude)).replace(".", "")[:8]
     lng = str(abs(longitude)).replace(".", "")[:8]
     return f"DG-{lat}-{lng}"
@@ -342,7 +396,14 @@ def reverse_geocode_from_coordinates(latitude: float, longitude: float) -> Dict[
         try:
             query = urllib.parse.urlencode({"lat": latitude, "lng": longitude})
             url = f"https://apis.mappls.com/advancedmaps/v1/{MAPPLS_API_KEY}/rev_geocode?{query}"
-            with urllib.request.urlopen(url, timeout=8) as res:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "Referer": "https://jansamadhan.perkkk.dev",
+                    "User-Agent": "JanSamadhan/1.0",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=8) as res:
                 payload = json.loads(res.read().decode("utf-8"))
 
             results = payload.get("results") if isinstance(payload, dict) else None
@@ -357,7 +418,8 @@ def reverse_geocode_from_coordinates(latitude: float, longitude: float) -> Dict[
                     result,
                     ["formatted_address", "formattedAddress", "placeAddress", "address"],
                 )
-                location["digipin"] = _pick_first(result, ["digipin", "DIGIPIN", "digitalPin", "digital_pin"])
+                # Note: Mappls rev_geocode does not return a digipin field;
+                # DIGIPIN is computed independently via _compute_digipin below.
         except Exception:
             pass
 
@@ -403,8 +465,11 @@ def reverse_geocode_from_coordinates(latitude: float, longitude: float) -> Dict[
         location["pincode"] = "000000"
     if not location["formatted_address"]:
         location["formatted_address"] = f"Lat {latitude:.6f}, Lng {longitude:.6f}"
-    if not location["digipin"]:
-        location["digipin"] = _fallback_digipin(latitude, longitude)
+    # Always compute DIGIPIN using the official India Post algorithm (primary)
+    try:
+        location["digipin"] = _compute_digipin(latitude, longitude)
+    except Exception:
+        location["digipin"] = _fallback_digipin_raw(latitude, longitude)
 
     if len(REVERSE_GEOCODE_CACHE) >= 500:
         first_key = next(iter(REVERSE_GEOCODE_CACHE))

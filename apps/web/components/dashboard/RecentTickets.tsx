@@ -4,67 +4,14 @@ import { useEffect, useState } from "react";
 import { MapPin, Building2 } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
+import {
+  formatStatus,
+  formatTimestamp,
+  getSeverityDotColor,
+  statusClasses,
+} from "@/lib/ticket-formatters";
 
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
-
-// Helper function to format status text (in_progress → In Progress)
-function formatStatus(status: string): string {
-  return status
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-}
-
-// Severity dot color mapping (L4=red, L3=yellow, L2=blue, L1=gray)
-function getSeverityDotColor(severity: string): string {
-  const normalized = severity.trim().toUpperCase();
-  if (normalized === "L4") return "bg-red-500";
-  if (normalized === "L3") return "bg-yellow-500";
-  if (normalized === "L2") return "bg-blue-500";
-  if (normalized === "L1") return "bg-gray-400";
-  return "bg-gray-300";
-}
-
-// Format timestamp to relative time or date
-function formatTimestamp(timestamp: string): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) return "Just now";
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-
-  // For older dates, show formatted date
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
-}
-
-// Status badge color mapping (light mode only)
-function statusClasses(status: string): string {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === "submitted") {
-    return "bg-amber-100 text-amber-700";
-  }
-  if (normalized === "assigned") {
-    return "bg-blue-100 text-blue-700";
-  }
-  if (normalized === "in_progress") {
-    return "bg-purple-100 text-purple-700";
-  }
-  if (normalized === "under_review") {
-    return "bg-purple-100 text-purple-700";
-  }
-  if (normalized === "resolved") {
-    return "bg-green-100 text-green-700";
-  }
-  return "bg-gray-100 text-gray-600";
-}
 
 interface TicketCardProps {
   ticket: ComplaintRow;
