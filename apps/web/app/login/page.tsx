@@ -52,7 +52,7 @@ export default function LoginPage() {
         />
       </main>
       <MegaFooter
-        brandName="Bits"
+        brandName="Team 404"
         tagline="Designing delightful digital experiences."
         socialLinks={[
           { platform: "twitter", href: "https://twitter.com" },

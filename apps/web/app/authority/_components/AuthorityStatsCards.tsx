@@ -1,5 +1,4 @@
 // apps/web/app/authority/_components/AuthorityStatsCards.tsx
-
 "use client"
 
 import {

@@ -32,7 +32,6 @@ export interface HeaderTheme {
 
 export interface HeaderProps {
   logoText?: string;
-  avatarSrc?: string;
   navLinks?: { label: string; href: string }[];
   themeColors?: HeaderTheme;
 }
@@ -53,8 +52,7 @@ const defaultTheme: HeaderTheme = {
 };
 
 export default function Header({
-  logoText = "SHREY.",
-  avatarSrc = "/avatar-placeholder.jpg", // Replace with your actual path
+  logoText = "JANSAMADHAN",
   navLinks = [
     { label: "HOME", href: "/" },
     { label: "CONTACT", href: "/contact" },
@@ -148,18 +146,26 @@ export default function Header({
       style={{ opacity: 0 }}
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        
+
         {/* Left Side: theme toggle, Avatar, Logo & Socials */}
         <div className="flex items-center gap-6">
           <div className="scale-65">
             <ThemeToggle />
           </div>
           <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={avatarSrc}
-              alt="Avatar"
-              className="w-10 h-10 rounded-full object-cover grayscale brightness-90"
+            <div
+              className="w-10 h-10"
+              style={{
+                backgroundColor: 'currentColor',
+                WebkitMaskImage: 'url(/Emblem.svg)',
+                WebkitMaskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskImage: 'url(/Emblem.svg)',
+                maskSize: 'contain',
+                maskRepeat: 'no-repeat',
+                maskPosition: 'center',
+              }}
             />
             <span className="font-bold text-lg tracking-wider hidden sm:block">
               {logoText}
@@ -188,33 +194,33 @@ export default function Header({
             className="flex flex-col gap-1.5 z-50 p-2"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
-          <span className={`block w-6 h-0.5 bg-current transition-transform ${isMobileMenuOpen ? "rotate-45 translate-y-2" : ""}`}></span>
-          <span className={`block w-6 h-0.5 bg-current transition-opacity ${isMobileMenuOpen ? "opacity-0" : ""}`}></span>
-          <span className={`block w-6 h-0.5 bg-current transition-transform ${isMobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`}></span>
-        </button>
-      </div>
-
-      {/* Mobile Nav Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="md:hidden absolute top-full left-0 w-full py-6 px-6 flex flex-col gap-4 shadow-lg border-t border-black/10"
-          style={{ backgroundColor: currentTheme.bgScrolled, color: currentTheme.textScrolled }}
-        >
-          {navLinks.map((link, idx) => (
-            <Link
-              key={idx}
-              href={link.href}
-              className="text-sm font-medium tracking-widest uppercase"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <div className="mt-4">
-            <LoginButton3D onClick={() => (window.location.href = "/login")} />
-          </div>
+            <span className={`block w-6 h-0.5 bg-current transition-transform ${isMobileMenuOpen ? "rotate-45 translate-y-2" : ""}`}></span>
+            <span className={`block w-6 h-0.5 bg-current transition-opacity ${isMobileMenuOpen ? "opacity-0" : ""}`}></span>
+            <span className={`block w-6 h-0.5 bg-current transition-transform ${isMobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`}></span>
+          </button>
         </div>
-      )}
+
+        {/* Mobile Nav Overlay */}
+        {isMobileMenuOpen && (
+          <div
+            className="md:hidden absolute top-full left-0 w-full py-6 px-6 flex flex-col gap-4 shadow-lg border-t border-black/10"
+            style={{ backgroundColor: currentTheme.bgScrolled, color: currentTheme.textScrolled }}
+          >
+            {navLinks.map((link, idx) => (
+              <Link
+                key={idx}
+                href={link.href}
+                className="text-sm font-medium tracking-widest uppercase"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="mt-4">
+              <LoginButton3D onClick={() => (window.location.href = "/login")} />
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

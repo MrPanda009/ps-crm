@@ -162,6 +162,11 @@ interface NearbyTicketsMapProps {
   radiusMeters: number;
   onRadiusChange: (radiusMeters: number) => void;
   onMarkerClick: (complaint: MappedComplaint) => void;
+  reportLocation?: { lat: number; lng: number };
+  onReportLocationMove?: (lat: number, lng: number) => void;
+  customHeight?: string;
+  hideCollapse?: boolean;
+  onRecenterClick?: () => void;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -183,6 +188,11 @@ export default function NearbyTicketsMap({
   radiusMeters,
   onRadiusChange,
   onMarkerClick,
+  reportLocation,
+  onReportLocationMove,
+  customHeight,
+  hideCollapse,
+  onRecenterClick,
 }: NearbyTicketsMapProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
@@ -221,7 +231,11 @@ export default function NearbyTicketsMap({
   }, []);
 
   function handleRecenter() {
-    setRecenterSignal((prev) => prev + 1);
+    if (onRecenterClick) {
+      onRecenterClick();
+    } else {
+      setRecenterSignal((prev) => prev + 1);
+    }
   }
 
   function toggleCollapsed() {
@@ -237,7 +251,7 @@ export default function NearbyTicketsMap({
 
   return (
     <>
-      <div className="relative overflow-hidden transition-all duration-300" style={{ height: collapsed ? 0 : expandedMapHeight }}>
+      <div className="relative overflow-hidden transition-all duration-300" style={{ height: collapsed ? 0 : customHeight || expandedMapHeight }}>
         {!collapsed && L && (
           <MapContainer
             key={mapSessionKey}
@@ -249,6 +263,21 @@ export default function NearbyTicketsMap({
             <TileLayer attribution="© OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <FlyToTarget target={flyTarget} />
             <LiveFollow userLocation={userLocation} recenterSignal={recenterSignal} />
+
+            {/* If used in report form, show the draggable pin */}
+            {reportLocation && (
+              <Marker
+                position={[reportLocation.lat, reportLocation.lng]}
+                draggable
+                eventHandlers={{
+                  dragend: (event) => {
+                    const marker = event.target as any;
+                    const pos = marker.getLatLng();
+                    onReportLocationMove?.(pos.lat, pos.lng);
+                  },
+                }}
+              />
+            )}
 
             {userLocation && (
               <>
@@ -317,8 +346,8 @@ export default function NearbyTicketsMap({
             </button>
 
             {/* Bottom left: Radius slider */}
-            <div className="absolute bottom-3 left-3 z-[1000] rounded-lg border border-gray-200 bg-white/95 px-2 py-1.5 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-900/95">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Radius</div>
+            <div className="absolute bottom-3 left-3 z-[1000] flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur dark:border-gray-700 dark:bg-gray-900/95">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Radius</span>
               <input
                 type="range"
                 min={500}
@@ -326,12 +355,12 @@ export default function NearbyTicketsMap({
                 step={500}
                 value={radiusMeters}
                 onChange={(e) => onRadiusChange(Number(e.target.value))}
-                className="h-1.5 w-28 cursor-pointer accent-violet-600"
+                className="h-1 w-20 cursor-pointer accent-violet-600"
                 aria-label="Nearby ticket radius"
               />
-              <div className="mt-1 text-center text-[11px] font-semibold text-violet-700 dark:text-violet-300">
+              <span className="w-10 text-right text-[11px] font-bold text-violet-700 dark:text-violet-300">
                 {formatDistance(radiusMeters)}
-              </div>
+              </span>
             </div>
 
             {/* Bottom right: Recenter button */}
@@ -347,22 +376,26 @@ export default function NearbyTicketsMap({
         )}
       </div>
 
-      <div className="group relative flex h-7 shrink-0 select-none items-center justify-center border-y border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-900">
-        <button
-          onClick={toggleCollapsed}
-          className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-[10px] font-semibold text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
-        >
-          {collapsed ? (
-            <>
-              <ChevronDown size={13} /> Map
-            </>
-          ) : (
-            <>
-              <ChevronUp size={13} /> Hide
-            </>
-          )}
-        </button>
-      </div>
+
+
+      {!hideCollapse && (
+        <div className="group relative flex h-7 shrink-0 select-none items-center justify-center border-y border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-900">
+          <button
+            onClick={toggleCollapsed}
+            className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-[10px] font-semibold text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+          >
+            {collapsed ? (
+              <>
+                <ChevronDown size={13} /> Map
+              </>
+            ) : (
+              <>
+                <ChevronUp size={13} /> Hide
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </>
   );
 }

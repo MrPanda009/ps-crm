@@ -1,16 +1,45 @@
 'use client';
 
+import { useRef } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
 import Animatedheader from "@/components/Animatedheader";
 import FadedText from "@/components/Fadedtext";
 import AnimatedText from "@/components/Animatedtext";
 import DecorativeLine from "@/components/Decorativeline";
 import MapVisual from "@/components/Mapvisual";
+import PhoneMockup from "@/components/PhoneMockup";
 import { MegaFooter } from "@/components/MegaFooter";
 import { useTheme } from "@/components/ThemeProvider";
+
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger, useGSAP);
+}
 
 export default function HomePage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const dashboardRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (!dashboardRef.current) return;
+    gsap.fromTo(
+      dashboardRef.current,
+      { y: 50, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 1,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: dashboardRef.current,
+          start: 'top 85%',
+          toggleActions: 'play none none none',
+        },
+      }
+    );
+  }, []);
 
   return (
     <main className={`flex min-h-screen flex-col transition-colors duration-500 ${isDark ? "bg-[#2a221c]" : "bg-[#ddd1c0]"}`}>
@@ -51,50 +80,81 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* second full screen page with Empower */}
-      <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
-          <div className="relative order-1 w-full lg:w-1/2">
-            <FadedText text="Empower" animateOnScroll className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
-            <div className="relative z-10 pt-10 lg:pt-16">
+      {/* second full screen page – Transforming Public Service */}
+      <section className="relative flex min-h-screen items-center px-6 py-10 lg:px-20 lg:py-6">
+        <div className="relative mx-auto w-full max-w-7xl">
+          {/* Text block – upper left */}
+          <div className="relative z-10 max-w-lg">
+            <FadedText text="Empower" animateOnScroll className="absolute -top-6 left-0 text-5xl md:text-7xl lg:text-8xl" />
+            <div className="relative z-10 pt-6 lg:pt-10">
               <AnimatedText
                 as="h2"
-                text="Empower Communities"
-                className="text-4xl font-bold tracking-tight md:text-5xl"
+                text="Transforming Public Service with the JanSamadhan Platform"
+                className="text-3xl font-bold tracking-tight md:text-4xl lg:text-[2.75rem] lg:leading-tight"
                 animateOnScroll
               />
+
+              <DecorativeLine width="w-20" className="mt-4" />
+
               <AnimatedText
                 as="p"
-                text="Give citizens and administrators the tools they need to create lasting impact."
-                className="mt-6 max-w-md text-xl leading-relaxed"
+                text="Centralized, automated, and transparent grievance resolution for modern cities."
+                className="mt-4 max-w-md text-lg leading-relaxed"
                 animationDelay={0.2}
                 animateOnScroll
               />
             </div>
           </div>
+
+          {/* Dashboard image – wide landscape rectangle */}
+          <div ref={dashboardRef} className="relative z-20 mt-6 ml-auto w-full lg:mt-4 lg:w-[65%]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/Dashboard-mockup.jpg"
+              alt="PS-CRM Command Center Dashboard"
+              className={`w-full max-h-[45vh] object-cover object-top rounded-2xl ${isDark ? "shadow-[8px_8px_0px_0px_rgba(91,66,56,0.4)]" : "shadow-[8px_8px_0px_0px_rgba(160,140,120,0.3)]"}`}
+            />
+          </div>
         </div>
       </section>
 
-      {/* third full screen page with Connect */}
+      {/* third full screen page – Citizen Impact & Transparency */}
       <section className="relative flex min-h-screen items-center px-6 py-16 lg:px-20 lg:py-10">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 lg:flex-row lg:items-center lg:gap-16">
-          <div className="relative order-1 w-full lg:w-1/2">
-            <FadedText text="Connect" animateOnScroll className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
+          {/* Left column – text content */}
+          <div className="relative order-2 w-full lg:order-1 lg:w-1/2">
+            <FadedText text="Impact" animateOnScroll className="absolute -top-8 left-0 text-6xl md:text-8xl lg:text-9xl" />
             <div className="relative z-10 pt-10 lg:pt-16">
               <AnimatedText
                 as="h2"
-                text="Connect People"
+                text="Citizen Impact and Transparency"
                 className="text-4xl font-bold tracking-tight md:text-5xl"
                 animateOnScroll
               />
+
+              <DecorativeLine width="w-24" className="mt-6" />
+
+              <AnimatedText
+                as="h3"
+                text="Building Trust through Accountability"
+                className="mt-6 text-2xl font-semibold tracking-tight md:text-3xl"
+                animationDelay={0.25}
+                animateOnScroll
+              />
+
               <AnimatedText
                 as="p"
-                text="Bridge the gap between citizens and services through real-time communication and data."
-                className="mt-6 max-w-md text-xl leading-relaxed"
-                animationDelay={0.2}
+                text="Building trust through accountability. JanSamadhan provides citizens with a clear, real-time portal to track the entire grievance resolution process, from submission to final resolution."
+                className="mt-6 max-w-md text-base leading-relaxed opacity-80"
+                animationDelay={0.35}
                 animateOnScroll
               />
             </div>
+          </div>
+
+          {/* Right column – phone mockup */}
+          <div className="order-1 flex w-full items-center justify-center lg:order-2 lg:w-1/2">
+            <PhoneMockup />
           </div>
         </div>
       </section>
@@ -104,7 +164,7 @@ export default function HomePage() {
         brandColorDark="#ffffff"
         newsletterTitleColor="#000000"
         newsletterTitleColorDark="#ffffff"
-        brandName="Bits"
+        brandName="Team 404"
         tagline="Designing delightful digital experiences."
         socialLinks={[
           { platform: "twitter", href: "https://twitter.com" },

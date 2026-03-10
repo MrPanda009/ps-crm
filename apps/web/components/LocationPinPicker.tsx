@@ -15,7 +15,7 @@ function RecenterMap({ center }: { center: LatLngExpression }) {
   const map = useMap();
 
   useEffect(() => {
-    map.setView(center);
+    map.flyTo(center, 15, { duration: 1.5 });
   }, [map, center]);
 
   return null;

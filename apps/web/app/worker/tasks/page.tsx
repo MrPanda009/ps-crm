@@ -1,0 +1,261 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/src/lib/supabase";
+import type { Database } from "@/src/types/database.types";
+
+type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
+
+function formatStatus(status: string): string {
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function statusClasses(status: string): string {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "submitted") return "bg-amber-100 text-amber-700";
+  if (normalized === "assigned") return "bg-blue-100 text-blue-700";
+  if (normalized === "in_progress" || normalized === "under_review") return "bg-purple-100 text-purple-700";
+  if (normalized === "resolved") return "bg-green-100 text-green-700";
+  if (normalized === "rejected") return "bg-red-100 text-red-700";
+  return "bg-gray-100 text-gray-600";
+}
+
+function formatReportedTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return "Just now";
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function extractRelevantAddress(fullAddress: string | null | undefined): string {
+  if (!fullAddress) return "Address unavailable";
+  const beforeGPS = fullAddress.split("|")[0].trim();
+  const lines = beforeGPS
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && line.length < 100);
+  return lines.slice(0, 3).join(", ") || beforeGPS;
+}
+
+export default function WorkerTasksPage() {
+  const [tasks, setTasks] = useState<ComplaintRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function fetchTasks() {
+      if (!isActive) return;
+      setLoading(true);
+
+      const { data: authData } = await supabase.auth.getUser();
+      const currentWorkerId = authData.user?.id;
+
+      if (!currentWorkerId) {
+        setError("User not authenticated");
+        setLoading(false);
+        return;
+      }
+
+      if (!isActive) return;
+
+      const { data: complaintRows, error: complaintError } = await supabase
+        .from("complaints")
+        .select("*")
+        .eq("assigned_worker_id", currentWorkerId)
+        .in("status", ["assigned", "in_progress", "resolved"])
+        .order("created_at", { ascending: false });
+
+      if (complaintError) {
+        if (isActive) {
+          setError("Failed to load tasks.");
+          setLoading(false);
+        }
+        return;
+      }
+
+      if (isActive) {
+        setTasks(complaintRows || []);
+        setLoading(false);
+      }
+    }
+
+    const upsertTask = (prev: ComplaintRow[], incoming: ComplaintRow): ComplaintRow[] => {
+      // Only keep assigned, in_progress, or resolved tickets in this view
+      const isValidStatus = ["assigned", "in_progress", "resolved"].includes(incoming.status || "");
+      
+      const existingIndex = prev.findIndex((item) => item.id === incoming.id);
+      
+      if (existingIndex === -1) {
+        if (!isValidStatus) return prev; // Don't add if status is not valid
+        return [incoming, ...prev].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+
+      if (!isValidStatus) {
+        // Ticket changed to a status not visible on this board (e.g. escalated), remove it
+        return prev.filter(item => item.id !== incoming.id);
+      }
+
+      const next = [...prev];
+      next[existingIndex] = incoming;
+      return next.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    };
+
+    fetchTasks();
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    supabase.auth.getUser().then(({ data: authData }) => {
+      const currentWorkerId = authData.user?.id;
+      if (!currentWorkerId) return;
+
+      channel = supabase
+        .channel(`worker-tasks-sync-${currentWorkerId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "complaints",
+            filter: `assigned_worker_id=eq.${currentWorkerId}`,
+          },
+          (payload) => {
+            const incoming = payload.new as ComplaintRow;
+            setTasks((prev) => upsertTask(prev, incoming));
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "complaints",
+            filter: `assigned_worker_id=eq.${currentWorkerId}`,
+          },
+          (payload) => {
+            const incoming = payload.new as ComplaintRow;
+            setTasks((prev) => upsertTask(prev, incoming));
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "complaints",
+            filter: `assigned_worker_id=eq.${currentWorkerId}`,
+          },
+          (payload) => {
+            const deletedId = (payload.old as { id?: string }).id;
+            if (!deletedId) return;
+            setTasks((prev) => prev.filter((item) => item.id !== deletedId));
+          }
+        )
+        .subscribe((status) => {
+          if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && isActive) {
+            void fetchTasks();
+          }
+        });
+    });
+
+    const pollInterval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchTasks();
+      }
+    }, 15000);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(pollInterval);
+      if (channel) {
+        void channel.unsubscribe();
+      }
+    };
+  }, []);
+
+  return (
+    <div className="w-full flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-4">
+      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-8rem)]">
+        <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
+          <div className="min-w-[980px] flex flex-col flex-1 min-h-0">
+            <div className="sticky top-0 z-10 grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <span>Ticket ID</span>
+              <span>Issue Title</span>
+              <span>Locality / Address</span>
+              <span>Severity</span>
+              <span>Status</span>
+              <span>Reported Time</span>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {loading && <div className="px-5 py-8 text-sm text-gray-500">Loading tasks...</div>}
+              {!loading && error && <div className="px-5 py-8 text-sm text-red-600">{error}</div>}
+              {!loading && !error && tasks.length === 0 && (
+                <div className="px-5 py-8 text-sm text-gray-500">No tasks assigned yet.</div>
+              )}
+
+              {!loading && !error && tasks.length > 0 && (
+                <ul className="divide-y divide-gray-100">
+                  {tasks.map((task) => (
+                    <li
+                      key={task.id}
+                      className="grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr] gap-3 px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate">
+                        {task.ticket_id || "N/A"}
+                      </span>
+
+                      <span className="text-gray-900 font-medium line-clamp-2 leading-snug">
+                        {task.title || "Untitled issue"}
+                      </span>
+
+                      <span
+                        className="text-gray-600 line-clamp-1 leading-snug cursor-pointer"
+                        title={task.address_text || "Address unavailable"}
+                      >
+                        {extractRelevantAddress(task.address_text) || "Address unavailable"}
+                      </span>
+
+                      <span className="text-gray-700 line-clamp-2 leading-snug">
+                        {task.severity || "Unknown"}
+                      </span>
+
+                      <span>
+                        <span
+                          className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${statusClasses(
+                            task.status || ""
+                          )}`}
+                        >
+                          {formatStatus(task.status || "assigned")}
+                        </span>
+                      </span>
+
+                      <span className="text-gray-500 text-xs sm:text-sm">
+                        {formatReportedTime(task.created_at)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

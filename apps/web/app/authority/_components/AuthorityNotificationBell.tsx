@@ -179,9 +179,7 @@ export default function AuthorityNotificationBell() {
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#b4725a] text-[9px] font-bold text-white">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
         )}
       </button>
 
