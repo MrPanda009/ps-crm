@@ -46,8 +46,8 @@ export default function LoginPage() {
           leftPanelTitle="JOIN Jansamadhan!"
           rightPanelTitle='WELCOME TO Jansamadhan!'
           rightPanelSubtitle='Log in to your digital command center. Manage workflows, assign tasks, and track real-time progress.'
-          leftPanelImage='Image1.jpg'
-          rightPanelImage='Image2.jpg'
+          leftPanelImage='/Image1.jpg'
+          rightPanelImage='/Image2.jpg'
         // text color props can also be overridden here directly if needed
         />
       </main>
