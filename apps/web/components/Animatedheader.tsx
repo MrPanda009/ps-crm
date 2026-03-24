@@ -34,6 +34,7 @@ export interface HeaderProps {
   logoText?: string;
   navLinks?: { label: string; href: string }[];
   themeColors?: HeaderTheme;
+  hideLoginButton?: boolean;
 }
 
 const defaultTheme: HeaderTheme = {
@@ -60,6 +61,7 @@ export default function Header({
     { label: "ABOUT", href: "/about" },
   ],
   themeColors = defaultTheme,
+  hideLoginButton = false,
 }: HeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -152,7 +154,7 @@ export default function Header({
           <div className="scale-65">
             <ThemeToggle />
           </div>
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity" aria-label="Go to home page">
             <div
               className="w-10 h-10"
               style={{
@@ -170,7 +172,7 @@ export default function Header({
             <span className="font-bold text-lg tracking-wider hidden sm:block">
               {logoText}
             </span>
-          </div>
+          </Link>
         </div>
 
         {/* Right Side: Desktop Nav (links + login) */}
@@ -185,7 +187,9 @@ export default function Header({
               <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-current transition-all duration-300 group-hover:w-full"></span>
             </Link>
           ))}
-          <LoginButton3D className="scale-65" onClick={() => (window.location.href = "/login")} />
+          {!hideLoginButton && (
+            <LoginButton3D className="scale-65" onClick={() => (window.location.href = "/login")} />
+          )}
         </nav>
 
         {/* Mobile Menu Toggle */}
@@ -216,9 +220,11 @@ export default function Header({
                 {link.label}
               </Link>
             ))}
-            <div className="mt-4">
-              <LoginButton3D onClick={() => (window.location.href = "/login")} />
-            </div>
+            {!hideLoginButton && (
+              <div className="mt-4">
+                <LoginButton3D onClick={() => (window.location.href = "/login")} />
+              </div>
+            )}
           </div>
         )}
       </div>

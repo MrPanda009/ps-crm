@@ -71,7 +71,29 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
 
   const sidebarConfig = {
     ...defaultSidebarConfig,
-    branding: { ...defaultSidebarConfig.branding, title: "Authority" },
+    branding: {
+      ...defaultSidebarConfig.branding,
+      title: "Authority",
+      icon: (
+        <div
+          className="w-10 h-10 lg:w-[42px] lg:h-[42px] bg-[#C9A84C]"
+          style={{
+            WebkitMaskImage: 'url(/Emblem.svg)',
+            WebkitMaskSize: 'contain',
+            WebkitMaskRepeat: 'no-repeat',
+            WebkitMaskPosition: 'center',
+            maskImage: 'url(/Emblem.svg)',
+            maskSize: 'contain',
+            maskRepeat: 'no-repeat',
+            maskPosition: 'center',
+          }}
+        />
+      ),
+    },
+    colors: {
+      ...defaultSidebarConfig.colors,
+      textMain: "text-white dark:text-white",
+    },
     navigation: [
       { id: "dashboard", name: "Dashboard",        icon: <LayoutGrid    size={20} strokeWidth={2} />, href: "/authority",         isActive: pathname === "/authority" },
       { id: "track",     name: "Track Complaints", icon: <ClipboardList size={20} strokeWidth={2} />, href: "/authority/track",   isActive: pathname.startsWith("/authority/track") },

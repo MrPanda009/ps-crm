@@ -136,6 +136,16 @@ export default function AnimatedAuth({
     }
   }, []);
 
+  useEffect(() => {
+    const preload = (src?: string) => {
+      if (!src) return;
+      const img = new Image();
+      img.src = src;
+    };
+    preload(leftPanelImage);
+    preload(rightPanelImage);
+  }, [leftPanelImage, rightPanelImage]);
+
   const [isLogin, setIsLogin] = useState(true);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
