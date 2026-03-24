@@ -63,8 +63,49 @@ export function markerColor(level: SeverityLevel): string {
   return "#16a34a"
 }
 
+/**
+ * Parse a hex-encoded WKB or EWKB POINT into {lat, lng}.
+ * Handles both little-endian (01) and big-endian (00) byte order.
+ * WKB  POINT: byteOrder(1) + type(4) + X(8) + Y(8)  = 42 hex chars
+ * EWKB POINT with SRID: byteOrder(1) + type(4) + SRID(4) + X(8) + Y(8) = 50 hex chars
+ */
+function parseHexWkbPoint(hex: string): { lat: number; lng: number } | null {
+  // Only valid hex strings of expected lengths
+  if (!/^[0-9a-fA-F]+$/.test(hex)) return null
+
+  const buf = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < buf.length; i++) {
+    buf[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16)
+  }
+
+  const view = new DataView(buf.buffer)
+  const littleEndian = buf[0] === 1
+
+  const typeWord = view.getUint32(1, littleEndian)
+  // WKB type 1 = Point; EWKB sets bit 0x20000000 for SRID presence
+  const hasZ = (typeWord & 0x80000000) !== 0
+  const hasM = (typeWord & 0x40000000) !== 0
+  const hasSrid = (typeWord & 0x20000000) !== 0
+  const geomType = typeWord & 0x000000ff
+
+  if (geomType !== 1) return null // not a Point
+  if (hasZ || hasM) return null  // skip Z/M variants for now
+
+  const coordOffset = hasSrid ? 9 : 5 // skip SRID (4 bytes) if present
+  if (buf.length < coordOffset + 16) return null
+
+  const lng = view.getFloat64(coordOffset, littleEndian)
+  const lat = view.getFloat64(coordOffset + 8, littleEndian)
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+
+  return { lat, lng }
+}
+
 export function parseLatLng(value: unknown): { lat: number; lng: number } | null {
   if (typeof value === "string") {
+    // WKT / EWKT: SRID=4326;POINT(lng lat) or POINT(lng lat)
     const wktMatch = /POINT\(([-0-9.]+)\s+([-0-9.]+)\)/.exec(value)
     if (wktMatch) {
       return {
@@ -72,6 +113,10 @@ export function parseLatLng(value: unknown): { lat: number; lng: number } | null
         lat: Number(wktMatch[2]),
       }
     }
+
+    // Hex-encoded WKB / EWKB (PostGIS default output via Supabase)
+    const hexCoords = parseHexWkbPoint(value)
+    if (hexCoords) return hexCoords
   }
 
   if (value && typeof value === "object") {

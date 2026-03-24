@@ -260,7 +260,7 @@ export default function WorkerDashboardPage() {
   const urgentTask = useMemo(() => (sortedAssignedTasks.length > 0 ? sortedAssignedTasks[0] : null), [sortedAssignedTasks])
 
   const updateTaskStatus = useCallback(
-    async (complaintId: string, nextStatus: "in_progress" | "resolved", note?: string) => {
+    async (complaintId: string, nextStatus: "in_progress" | "resolved" | "escalated", note?: string) => {
       if (!workerId) return
 
       const task = tasks.find((item) => item.id === complaintId)
@@ -300,6 +300,13 @@ export default function WorkerDashboardPage() {
       }
 
       if (nextStatus === "resolved") {
+        await supabase
+          .from("worker_profiles")
+          .update({ current_complaint_id: null, availability: "available" })
+          .eq("worker_id", workerId)
+      }
+
+      if (nextStatus === "escalated") {
         await supabase
           .from("worker_profiles")
           .update({ current_complaint_id: null, availability: "available" })
@@ -455,10 +462,11 @@ export default function WorkerDashboardPage() {
                   "noopener,noreferrer",
                 )
               }}
-              onUpdate={async (ticketId) => {
-                const note = window.prompt("Add progress note")?.trim() ?? ""
-                if (!note) return
+              onUpdate={async (ticketId, note) => {
                 await handleUpdateProgress(ticketId, note)
+              }}
+              onStatusChange={async (ticketId, newStatus) => {
+                await updateTaskStatus(ticketId, newStatus as "in_progress" | "resolved" | "escalated")
               }}
               onMarkCompleted={(_ticketId) => setIsCompletionModalOpen(true)}
             />

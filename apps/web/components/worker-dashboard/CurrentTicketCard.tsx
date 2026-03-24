@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin, Building2, Navigation, NotebookPen, CheckCircle2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { MapPin, Building2, Navigation, NotebookPen, CheckCircle2, ChevronDown } from "lucide-react";
 import type { DashboardTask } from "./dashboard-types";
 import {
   formatTimestamp,
@@ -12,7 +13,8 @@ import {
 interface CurrentTicketCardProps {
   ticket: DashboardTask;
   onNavigate: (latitude: number, longitude: number) => void;
-  onUpdate: (ticketId: string) => void;
+  onUpdate: (ticketId: string, note: string) => void;
+  onStatusChange: (ticketId: string, newStatus: string) => void;
   onMarkCompleted: (ticketId: string) => void;
 }
 
@@ -20,8 +22,27 @@ export default function CurrentTicketCard({
   ticket,
   onNavigate,
   onUpdate,
+  onStatusChange,
   onMarkCompleted,
 }: CurrentTicketCardProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [noteMode, setNoteMode] = useState(false);
+  const [progressNote, setProgressNote] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+        setNoteMode(false);
+        setProgressNote("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownOpen]);
+
   const canNavigate = ticket.latitude !== null && ticket.longitude !== null;
   const canComplete = ticket.status === "in_progress";
 
@@ -95,15 +116,122 @@ export default function CurrentTicketCard({
           Navigate
         </button>
 
-        <button
-          type="button"
-          onClick={() => onUpdate(ticket.id)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-[#3a3a3a] dark:text-gray-200 dark:hover:bg-[#2a2a2a] transition-colors"
-          title="Add progress note"
-        >
-          <NotebookPen size={16} />
-          Update
-        </button>
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setDropdownOpen((prev) => !prev);
+              setNoteMode(false);
+              setProgressNote("");
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-[#3a3a3a] dark:text-gray-200 dark:hover:bg-[#2a2a2a] transition-colors"
+            title="Update ticket status"
+          >
+            <NotebookPen size={16} />
+            Update
+            <ChevronDown size={14} className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {dropdownOpen && (
+            <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-[#3a3a3a] dark:bg-[#1e1e1e]">
+              {!noteMode ? (
+                <ul className="py-1">
+                  {ticket.status === "assigned" && (
+                    <li>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
+                        onClick={() => {
+                          onStatusChange(ticket.id, "in_progress");
+                          setDropdownOpen(false);
+                        }}
+                      >
+                        <span className="h-2 w-2 rounded-full bg-blue-500" />
+                        Start Work
+                      </button>
+                    </li>
+                  )}
+                  {ticket.status === "in_progress" && (
+                    <li>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                        onClick={() => {
+                          onMarkCompleted(ticket.id);
+                          setDropdownOpen(false);
+                        }}
+                      >
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        Mark Completed
+                      </button>
+                    </li>
+                  )}
+                  {ticket.status === "in_progress" && (
+                    <li>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                        onClick={() => {
+                          onStatusChange(ticket.id, "escalated");
+                          setDropdownOpen(false);
+                        }}
+                      >
+                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        Escalate
+                      </button>
+                    </li>
+                  )}
+                  <li>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
+                      onClick={() => setNoteMode(true)}
+                    >
+                      <NotebookPen size={14} />
+                      Add Progress Note
+                    </button>
+                  </li>
+                </ul>
+              ) : (
+                <div className="p-3 space-y-2">
+                  <textarea
+                    value={progressNote}
+                    onChange={(e) => setProgressNote(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-700 placeholder:text-gray-400 dark:border-[#3a3a3a] dark:bg-[#1a1a1a] dark:text-gray-200"
+                    placeholder="Enter progress note..."
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      className="rounded-md px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-[#2a2a2a]"
+                      onClick={() => {
+                        setNoteMode(false);
+                        setProgressNote("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      disabled={!progressNote.trim()}
+                      onClick={() => {
+                        onUpdate(ticket.id, progressNote.trim());
+                        setDropdownOpen(false);
+                        setNoteMode(false);
+                        setProgressNote("");
+                      }}
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
