@@ -115,7 +115,7 @@ function makeMarkerIcon(complaint: MappedComplaint, L: any, isSelected: boolean,
   const photoHtml = photo
     ? `<img src="${photo}"
          style="width:100%;height:100%;object-fit:cover;border-radius:50%;"
-         onerror="this.style.display='none';this.nextSibling.style.display='flex'" />
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
        <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;
          font-size:${size * 0.38}px;background:${sev.color}22;border-radius:50%;">📍</div>`
     : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;

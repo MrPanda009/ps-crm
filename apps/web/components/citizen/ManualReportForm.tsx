@@ -152,6 +152,23 @@ const SEVERITIES = [
   { label: "Critical", value: "L4" as const },
 ] as const;
 
+/* ---------- Validation Badge Component ---------- */
+function ValidationBadge({ isValid }: { isValid: boolean }) {
+  if (isValid) {
+    return (
+      <span className="flex items-center gap-1 text-[11px] font-medium text-green-600 dark:text-green-500">
+        <CheckCircle2 size={12} />
+        done
+      </span>
+    );
+  }
+  return (
+    <span className="text-[11px] font-medium text-red-500">
+      *required
+    </span>
+  );
+}
+
 /* ---------- component ---------- */
 export default function ManualReportForm() {
   const router = useRouter();
@@ -205,6 +222,17 @@ export default function ManualReportForm() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /* --- validation states --- */
+  const isLocationValid = addressText.trim().length > 0 || mapFlyTarget !== null;
+  const isImageValid = imageFile !== null;
+  const isCategoryValid = selectedCategoryId !== null;
+  const isTitleValid = title.trim().length > 0;
+  const isDescValid = description.trim().length >= 10;
+  const isSeverityValid = true;
+
+  const isFormValid = isLocationValid && isImageValid && isCategoryValid && isTitleValid && isDescValid && isSeverityValid;
+
+
   /* --- auto-detect browser location on mount --- */
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -247,7 +275,9 @@ export default function ManualReportForm() {
   const handlePinMove = useCallback((newLat: number, newLng: number) => {
     setLat(newLat);
     setLng(newLng);
+    setMapFlyTarget({ lat: newLat, lng: newLng });
   }, []);
+
 
   /* --- Nominatim location search (debounced) --- */
   const searchLocation = useCallback((query: string) => {
@@ -403,22 +433,12 @@ export default function ManualReportForm() {
       e.preventDefault();
       setError(null);
 
-      if (selectedCategoryId == null) {
-        setError("Please select an issue category.");
-        return;
-      }
-
-      /* basic validation */
-      if (!title.trim()) {
-        setError("Please enter an issue title.");
-        return;
-      }
-      if (!description.trim()) {
-        setError("Please describe the issue.");
+      if (!isFormValid) {
         return;
       }
 
       setSubmitting(true);
+
 
       try {
         /* 1. auth */
@@ -505,13 +525,14 @@ export default function ManualReportForm() {
         setSubmitting(false);
       }
     },
-    [title, description, lat, lng, addressText, selectedCategoryId, severityIdx, imageFile]
+    [title, description, lat, lng, addressText, selectedCategoryId, severityIdx, imageFile, isFormValid]
   );
+
 
   /* ===================== SUCCESS STATE ===================== */
   if (success) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      <div className="mx-auto w-full max-w-2xl px-4 py-16 text-center lg:max-w-5xl">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
           <CheckCircle2 size={32} className="text-green-600 dark:text-green-400" />
         </div>
@@ -539,14 +560,18 @@ export default function ManualReportForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-6"
+      className="mx-auto w-full max-w-2xl space-y-6 px-4 py-6 sm:px-6 lg:max-w-none xl:max-w-[90%] 2xl:max-w-6xl"
     >
       {/* ---------- SECTION 1 — Location ---------- */}
       <fieldset className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
-        <legend className="flex items-center gap-2 px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-          <MapPin size={16} className="text-[#C9A84C]" />
-          Location
+        <legend className="flex w-full items-center justify-between px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+          <div className="flex items-center gap-2">
+            <MapPin size={16} className="text-[#C9A84C]" />
+            Location
+          </div>
+          <ValidationBadge isValid={isLocationValid} />
         </legend>
+
 
         {/* search bar + current location button */}
         <div className="mb-3 flex gap-2">
@@ -635,10 +660,14 @@ export default function ManualReportForm() {
 
       {/* ---------- SECTION 2 — Upload Evidence ---------- */}
       <fieldset className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
-        <legend className="flex items-center gap-2 px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-          <Upload size={16} className="text-[#C9A84C]" />
-          Upload Evidence
+        <legend className="flex w-full items-center justify-between px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+          <div className="flex items-center gap-2">
+            <Upload size={16} className="text-[#C9A84C]" />
+            Upload Evidence
+          </div>
+          <ValidationBadge isValid={isImageValid} />
         </legend>
+
 
         <input
           ref={fileRef}
@@ -680,9 +709,11 @@ export default function ManualReportForm() {
 
       {/* ---------- SECTION 3 — Category (searchable) ---------- */}
       <fieldset className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
-        <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-          Issue Category
+        <legend className="flex w-full items-center justify-between px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+          <span>Issue Category</span>
+          <ValidationBadge isValid={isCategoryValid} />
         </legend>
+
 
         <div ref={catWrapperRef} className="relative">
           {/* search input */}
@@ -782,34 +813,50 @@ export default function ManualReportForm() {
       </fieldset>
 
       {/* ---------- SECTION 4 — Complaint Details ---------- */}
-      <fieldset className="space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
+      <fieldset className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
         <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
           Complaint Details
         </legend>
 
-        <input
-          type="text"
-          placeholder="Issue Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={120}
-          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition-colors focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C]/40 dark:border-[#2a2a2a] dark:bg-[#252525] dark:text-gray-100 dark:placeholder-gray-500"
-        />
+        <div>
+          <div className="flex w-full items-center justify-between mb-1">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Title</label>
+            <ValidationBadge isValid={isTitleValid} />
+          </div>
+          <input
+            type="text"
+            placeholder="Issue Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={120}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition-colors focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C]/40 dark:border-[#2a2a2a] dark:bg-[#252525] dark:text-gray-100 dark:placeholder-gray-500"
+          />
+        </div>
 
-        <textarea
-          placeholder="Describe the issue in detail..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={5}
-          className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm leading-relaxed text-gray-800 placeholder-gray-400 outline-none transition-colors focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C]/40 dark:border-[#2a2a2a] dark:bg-[#252525] dark:text-gray-100 dark:placeholder-gray-500"
-        />
+        <div>
+          <div className="flex w-full items-center justify-between mb-1">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Description</label>
+            <ValidationBadge isValid={isDescValid} />
+          </div>
+          <textarea
+            placeholder="Describe the issue in detail (minimum 10 characters)..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={5}
+            minLength={10}
+            className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm leading-relaxed text-gray-800 placeholder-gray-400 outline-none transition-colors focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C]/40 dark:border-[#2a2a2a] dark:bg-[#252525] dark:text-gray-100 dark:placeholder-gray-500"
+          />
+        </div>
       </fieldset>
+
 
       {/* ---------- SECTION 5 — Severity ---------- */}
       <fieldset className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
-        <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-          Severity
+        <legend className="flex w-full items-center justify-between px-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+          <span>Severity</span>
+          <ValidationBadge isValid={isSeverityValid} />
         </legend>
+
 
         <div className="relative">
           <select
@@ -839,8 +886,8 @@ export default function ManualReportForm() {
 
       <button
         type="submit"
-        disabled={submitting}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#C9A84C] px-6 py-3.5 text-sm font-semibold text-black shadow-md transition-colors hover:bg-[#b8993f] disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!isFormValid || submitting}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#C9A84C] px-6 py-3.5 text-sm font-semibold text-black shadow-md transition-colors hover:bg-[#b8993f] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? (
           <>
