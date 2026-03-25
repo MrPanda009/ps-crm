@@ -1,8 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
-  Bell,
   CheckCircle2,
   Clock3,
   Flag,
@@ -63,7 +62,6 @@ export default function AdminStatsOverview() {
   const [stats, setStats] = useState<DashboardStats>(initialStats)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [now, setNow] = useState(() => new Date())
 
   const fetchStats = useCallback(async () => {
     setError(null)
@@ -140,48 +138,8 @@ export default function AdminStatsOverview() {
     }
   }, [fetchStats])
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(new Date())
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [])
-
-  const dateTimeText = useMemo(() => {
-    return now.toLocaleString("en-IN", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    })
-  }, [now])
-
   return (
     <section className="space-y-5">
-      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-              <Clock3 size={16} className="text-gray-600" />
-              <span>{dateTimeText}</span>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-              <Bell size={16} />
-              <span>waiting for notification</span>
-            </div>
-          </div>
-
-          <h1 className="text-base font-semibold text-gray-900 md:text-lg">
-            National Admin Dashboard | Operational Overview
-          </h1>
-        </div>
-      </div>
-
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
