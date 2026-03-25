@@ -1,8 +1,10 @@
 // apps/web/app/authority/_components/ComplaintDetailPanel.tsx
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useRef } from "react"
 import { CheckCheck, ChevronDown, Loader2, MapPin, UserCheck, X } from "lucide-react"
+import { useGSAP } from "@gsap/react"
+import gsap from "gsap"
 import { supabase } from "@/src/lib/supabase"
 import {
   getSeverityConfig,
@@ -37,6 +39,18 @@ export function AssignDropdown({
   const [saving, setSaving] = useState(false)
   // Pre-select current worker so reassign is one click
   const [chosen, setChosen] = useState(currentWorkerId ?? "")
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useGSAP(() => {
+    if (open && dropdownRef.current) {
+      gsap.from(dropdownRef.current, {
+        y: -10,
+        opacity: 0,
+        duration: 0.2,
+        ease: "power2.out"
+      })
+    }
+  }, [open])
 
   // Reset chosen when dropdown opens so it reflects fresh state
   function handleOpen() {
@@ -110,7 +124,7 @@ export function AssignDropdown({
           {/* Click-away backdrop */}
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
 
-          <div className="absolute right-0 top-full z-40 mt-1 w-60 rounded-xl border border-gray-100 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+          <div ref={dropdownRef} className={`${compact ? "absolute right-0 top-full mt-1 w-60" : "relative mt-3 w-full"} z-40 rounded-xl border border-gray-100 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900`}>
 
             {/* Header */}
             <div className="border-b border-gray-50 px-3 py-2.5 dark:border-gray-800">
@@ -125,7 +139,7 @@ export function AssignDropdown({
             </div>
 
             {/* Worker list */}
-            <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5">
+            <div className={`${compact ? "max-h-52 overflow-y-auto" : "max-h-[60vh] overflow-y-auto"} p-1.5 space-y-0.5`}>
               {workers.length === 0 ? (
                 <p className="px-3 py-3 text-center text-xs text-gray-400">No workers in department</p>
               ) : (
@@ -533,12 +547,14 @@ export function ComplaintDetailPanel({
           />
         </>
       )}
-      <a
-        href="/authority/track"
-        className="flex w-full items-center justify-center rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-900"
-      >
-        Open in Track Complaints →
-      </a>
+      {!inline && (
+        <a
+          href="/authority/track"
+          className="flex w-full items-center justify-center rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-900"
+        >
+          Open in Track Complaints →
+        </a>
+      )}
     </div>
   )
 
@@ -554,8 +570,8 @@ export function ComplaintDetailPanel({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-gray-100 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
+      <div className="fixed inset-0 z-[2150] bg-black/40" onClick={onClose} />
+      <div className="fixed right-0 top-0 z-[2200] flex h-full w-full max-w-md flex-col border-l border-gray-100 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950">
         {header}
         {body}
         {footer}
