@@ -97,6 +97,7 @@ export interface SidebarConfig {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onLogout?: () => void;
+  disableInternalScroll?: boolean;
 }
 
 // 2. Default Configuration (matches your Taskify UI design)
@@ -160,7 +161,8 @@ const Sidebar: React.FC<SidebarConfig> = ({
   onClose,
   isCollapsed = false,
   onToggleCollapse,
-  onLogout
+  onLogout,
+  disableInternalScroll = false,
 }) => {
   const sidebarRef = useRef<HTMLElement>(null);
   const { theme, toggleTheme } = useTheme();
@@ -219,7 +221,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
         </button>
 
         {/* make top part scrollable so bottom nav stays visible */}
-        <div className="flex min-h-0 flex-col flex-1 overflow-y-auto">
+        <div className={`flex min-h-0 flex-col flex-1 ${disableInternalScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}>
           {/* Logo & Mobile Close Button */}
           <div className={`flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-8"} mb-10 menu-item transition-all duration-300`}>
             <div className={`flex items-center ${isCollapsed ? "justify-center gap-0" : "gap-3"} transition-all duration-300`}>

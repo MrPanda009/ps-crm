@@ -104,7 +104,7 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
 
       <Sidebar
         {...sidebarConfig}
@@ -112,9 +112,10 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
         onClose={() => setIsSidebarOpen(false)}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(c => !c)}
+        disableInternalScroll
       />
 
-      <div className="flex flex-1 flex-col min-h-0 min-w-0 max-w-full overflow-x-hidden">
+      <div className="flex flex-1 flex-col min-h-0 min-w-0 max-w-full overflow-hidden">
 
         {/* Topbar — from incoming: taller, with title + subtitle, higher z-index */}
         <header className="sticky top-0 z-[2100] border-b border-gray-200 bg-white shadow-sm
@@ -192,7 +193,7 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden
+        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto overflow-x-hidden
                          px-4 py-6 sm:px-6">
           {children}
         </main>

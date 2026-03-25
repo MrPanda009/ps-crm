@@ -27,6 +27,21 @@ type MapComplaint = {
 const DEFAULT_CENTER: [number, number] = [28.6139, 77.209];
 const DEFAULT_ZOOM = 12;
 
+const SEVERITY_COLOR: Record<string, string> = {
+  L1: "#38bdf8",
+  L2: "#f59e0b",
+  L3: "#f97316",
+  L4: "#ef4444",
+};
+
+function normalizeSeverityLevel(severity: string): "L1" | "L2" | "L3" | "L4" {
+  const s = (severity ?? "").toLowerCase().trim();
+  if (s === "l4" || s === "critical" || s === "crit") return "L4";
+  if (s === "l3" || s === "high") return "L3";
+  if (s === "l2" || s === "medium" || s === "med") return "L2";
+  return "L1";
+}
+
 function parseEwkbHexPoint(hex: string): { lat: number; lng: number } | null {
   const normalized = hex.trim();
   if (!/^[0-9a-fA-F]+$/.test(normalized) || normalized.length < 42) {
@@ -238,17 +253,13 @@ export default function MapComponent({
   if (!mounted) return null;
 
   const getSeverityIcon = (severity: string, L: any) => {
-    const colors: Record<string, string> = {
-      low: "green",
-      medium: "gold",
-      high: "orange",
-      critical: "red",
-    };
+    const level = normalizeSeverityLevel(severity);
+    const color = SEVERITY_COLOR[level];
 
     return new L.DivIcon({
       html: `
         <div style="
-          background-color: ${colors[severity] || "blue"};
+          background-color: ${color};
           width: 16px;
           height: 16px;
           border-radius: 50%;
@@ -402,14 +413,14 @@ function HeatmapLayer({ complaints }: { complaints: any[] }) {
 }
 
 function getIntensity(severity: string) {
-  switch (severity) {
-    case "critical":
+  switch (normalizeSeverityLevel(severity)) {
+    case "L4":
       return 1.0;
-    case "high":
+    case "L3":
       return 0.75;
-    case "medium":
+    case "L2":
       return 0.5;
-    case "low":
+    case "L1":
       return 0.25;
     default:
       return 0.3;

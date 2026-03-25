@@ -356,7 +356,7 @@ export default function TrackPage() {
             <table className="w-full text-xs">
               <thead className="sticky top-0 z-10 bg-gradient-to-r from-[#5b3a2e] to-[#8b5e49] text-white">
                 <tr>
-                  {["Ticket","Title","Sev","Status","↑","SLA","Worker",""].map(h => (
+                  {["Ticket","Title","Severity","Status","↑","SLA","Worker",""] .map(h => (
                     <th key={h} className="px-2.5 py-2 text-left text-[10px] font-semibold tracking-wide">{h}</th>
                   ))}
                 </tr>
