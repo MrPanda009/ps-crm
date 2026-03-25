@@ -74,6 +74,26 @@ export default function NearbyTicketsPage() {
 
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
   const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number } | null>(null);
+
+  const [activeHighlight, setActiveHighlight] = useState<string | null>(null);
+  const highlightedRef = useRef<HTMLLIElement>(null);
+
+  useEffect(() => {
+    if (selectedComplaintId) {
+      setActiveHighlight(selectedComplaintId);
+      const timer = setTimeout(() => {
+        setActiveHighlight(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedComplaintId]);
+
+  useEffect(() => {
+    if (activeHighlight && highlightedRef.current) {
+      highlightedRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [activeHighlight, visibleComplaints.length]);
+
   const [radiusMeters, setRadiusMeters] = useState(1000);
   const [departmentFilter, setDepartmentFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -408,12 +428,17 @@ export default function NearbyTicketsPage() {
 
                       return (
                         <li
-                          key={complaint.id}
-                          onClick={() => handleSelectComplaint(complaint)}
-                          className={`grid cursor-pointer grid-cols-[150px_2.2fr_1.2fr_1fr_1fr_100px_120px] gap-3 px-4 py-4 text-sm transition-colors ${
-                            isSelected ? "bg-blue-50 dark:bg-blue-900/20" : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-[#1e1e1e]"
-                          }`}
-                        >
+                        key={complaint.id}
+                        ref={complaint.id === activeHighlight ? highlightedRef : null}
+                        onClick={() => handleSelectComplaint(complaint)}
+                        className={`grid cursor-pointer grid-cols-[150px_2.2fr_1.2fr_1fr_1fr_100px_120px] gap-3 px-4 py-4 text-sm transition-all duration-1000 ${
+                          complaint.id === activeHighlight
+                            ? "bg-purple-100/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] z-10 relative dark:bg-purple-900/40"
+                            : isSelected
+                              ? "bg-blue-50 dark:bg-blue-900/20"
+                              : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-[#1e1e1e]"
+                        }`}
+                      >
                           <span className="truncate font-mono text-xs font-medium text-gray-900 sm:text-sm dark:text-gray-200">
                             {complaint.ticket_id || complaint.id.slice(0, 8).toUpperCase()}
                           </span>
