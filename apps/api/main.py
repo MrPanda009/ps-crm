@@ -20,6 +20,8 @@ from supabase import create_client, Client
 from google import genai
 from PIL import Image
 from dotenv import load_dotenv
+from whatsapp_webhook import router as whatsapp_router
+
 
 
 # =========================================================
@@ -984,3 +986,4 @@ def home():
         "Welcome to the Civic Issue Reporting Assistant. "
         "POST /analyze to preview a ticket. POST /confirm to submit it."
     }
+app.include_router(whatsapp_router)
