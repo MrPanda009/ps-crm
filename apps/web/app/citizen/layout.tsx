@@ -233,6 +233,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       textMain: "text-white dark:text-white",
     },
     navigation: citizenNavigation,
+    bottomNavigation: [],
   };
 
   return (

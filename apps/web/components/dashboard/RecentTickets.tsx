@@ -11,6 +11,8 @@ import {
   statusClasses,
 } from "@/lib/ticket-formatters";
 
+import Link from "next/link";
+
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
 
 interface TicketCardProps {
@@ -19,46 +21,48 @@ interface TicketCardProps {
 
 function TicketCard({ ticket }: TicketCardProps) {
   return (
-    <article className="flex flex-col p-5 rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-gray-300 transition-all duration-200 ease-out cursor-pointer dark:bg-[#1e1e1e] dark:border-[#2a2a2a] dark:hover:border-[#3a3a3a] dark:shadow-none">
-      <div className="space-y-2">
-        {/* Header: Ticket ID with Severity Dot and Status Badge */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${getSeverityDotColor(ticket.severity || "L1")}`} />
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {ticket.ticket_id || "N/A"}
+    <Link href={`/citizen/tickets?highlight=${ticket.id}`} className="block focus:outline-none">
+      <article className="flex flex-col p-5 rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-gray-300 transition-all duration-200 ease-out cursor-pointer dark:bg-[#1e1e1e] dark:border-[#2a2a2a] dark:hover:border-[#3a3a3a] dark:shadow-none">
+        <div className="space-y-2">
+          {/* Header: Ticket ID with Severity Dot and Status Badge */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${getSeverityDotColor(ticket.severity || "L1")}`} />
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {ticket.ticket_id || "N/A"}
+              </span>
+            </div>
+            <span className={`px-2 py-1 rounded-md text-xs font-medium ${statusClasses(ticket.status || "")}`}>
+              {formatStatus(ticket.status || "Unknown")}
             </span>
           </div>
-          <span className={`px-2 py-1 rounded-md text-xs font-medium ${statusClasses(ticket.status || "")}`}>
-            {formatStatus(ticket.status || "Unknown")}
-          </span>
-        </div>
 
-        {/* Issue Title - Primary Focus */}
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-snug line-clamp-2">
-          {ticket.title}
-        </h3>
+          {/* Issue Title - Primary Focus */}
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-snug line-clamp-2">
+            {ticket.title}
+          </h3>
 
-        {/* Locality - Secondary with Icon */}
-        <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-          <MapPin size={14} className="flex-shrink-0" />
-          <span className="line-clamp-1">{ticket.address_text || "Location not available"}</span>
-        </div>
+          {/* Locality - Secondary with Icon */}
+          <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <MapPin size={14} className="flex-shrink-0" />
+            <span className="line-clamp-1">{ticket.address_text || "Location not available"}</span>
+          </div>
 
-        {/* Assigned Department - Secondary with Icon */}
-        <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-          <Building2 size={14} className="flex-shrink-0" />
-          <span>{ticket.assigned_department || "Unassigned"}</span>
-        </div>
+          {/* Assigned Department - Secondary with Icon */}
+          <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <Building2 size={14} className="flex-shrink-0" />
+            <span>{ticket.assigned_department || "Unassigned"}</span>
+          </div>
 
-        {/* Timestamp - Bottom */}
-        <div className="pt-1 mt-2 border-t border-gray-100 dark:border-[#2a2a2a]">
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            {formatTimestamp(ticket.created_at)}
-          </span>
+          {/* Timestamp - Bottom */}
+          <div className="pt-1 mt-2 border-t border-gray-100 dark:border-[#2a2a2a]">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {formatTimestamp(ticket.created_at)}
+            </span>
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }
 

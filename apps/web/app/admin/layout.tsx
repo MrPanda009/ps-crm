@@ -89,14 +89,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       textMain: "text-white dark:text-white",
     },
     navigation: adminNavigation,
-    bottomNavigation: [
-      {
-        id: "support",
-        name: "Support",
-        icon: <MessageSquare size={20} strokeWidth={2} />,
-        href: "#",
-      },
-    ],
+    bottomNavigation: [],
   };
 
   // Resolve page title & subtitle based on current route

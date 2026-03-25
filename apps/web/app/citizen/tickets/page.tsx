@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowUp, Search, X, ChevronDown } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
@@ -121,7 +122,13 @@ function filterAndSortTickets(
   return filtered;
 }
 
-export default function CitizenTicketsPage() {
+function CitizenTicketsPageContent() {
+  const searchParams = useSearchParams();
+  const highlightedTicketId = searchParams.get("highlight");
+
+  const [activeHighlight, setActiveHighlight] = useState<string | null>(null);
+  const highlightedRef = useRef<HTMLLIElement>(null);
+
   const [tickets, setTickets] = useState<TicketListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +142,22 @@ export default function CitizenTicketsPage() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (highlightedTicketId && !loading) {
+      setActiveHighlight(highlightedTicketId);
+      const timer = setTimeout(() => {
+        setActiveHighlight(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedTicketId, loading]);
+
+  useEffect(() => {
+    if (activeHighlight && highlightedRef.current) {
+      highlightedRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [activeHighlight, tickets.length]);
 
   useEffect(() => {
     const bootstrapCitizen = async () => {
@@ -481,7 +504,12 @@ export default function CitizenTicketsPage() {
                   {filteredTickets.map((ticket) => (
                     <li
                       key={ticket.id}
-                      className="grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px] gap-3 px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-gray-300 dark:hover:bg-[#1e1e1e]"
+                      ref={ticket.id === activeHighlight ? highlightedRef : null}
+                      className={`grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px] gap-3 px-5 py-4 text-sm text-gray-700 transition-all duration-1000 dark:text-gray-300 dark:hover:bg-[#1e1e1e] ${
+                        ticket.id === activeHighlight
+                          ? "bg-purple-100/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] z-10 relative dark:bg-purple-900/40"
+                          : "hover:bg-gray-50"
+                      }`}
                     >
                       <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate dark:text-gray-200">
                         {ticket.ticket_id || "N/A"}
@@ -522,5 +550,13 @@ export default function CitizenTicketsPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function CitizenTicketsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading tickets...</div>}>
+      <CitizenTicketsPageContent />
+    </Suspense>
   );
 }

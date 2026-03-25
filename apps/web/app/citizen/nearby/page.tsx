@@ -196,7 +196,7 @@ export default function NearbyTicketsPage() {
   const lowAccuracy = typeof accuracyMeters === "number" && accuracyMeters > 50;
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
+    <div className="flex min-w-0 max-w-full flex-col bg-gray-50 dark:bg-gray-950 min-h-full">
       <div className="shrink-0 border-b border-gray-200 bg-white dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
         <NearbyTicketsMap
           complaints={filteredComplaints}
@@ -209,8 +209,8 @@ export default function NearbyTicketsPage() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden p-3">
-        <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-14rem)] lg:max-h-[calc(100vh-12rem)] dark:border-[#2a2a2a] dark:bg-[#161616]">
+      <div className="min-w-0 max-w-full p-3">
+        <section className="rounded-2xl border border-gray-200 bg-white shadow-sm flex flex-col dark:border-[#2a2a2a] dark:bg-[#161616]">
           {(gpsSignalStale || lowAccuracy) && (
             <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/50 dark:text-amber-200">
               {gpsSignalStale ? "Searching for GPS signal... live updates are temporarily delayed." : ""}
@@ -366,8 +366,8 @@ export default function NearbyTicketsPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
-            <div className="min-w-[940px] flex flex-col flex-1 min-h-0">
+          <div className="overflow-x-auto flex flex-col">
+            <div className="min-w-[940px] flex flex-col">
               <div className="sticky top-0 z-10 grid grid-cols-[150px_2.2fr_1.2fr_1fr_1fr_100px_120px] gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400">
                 <span>Ticket ID</span>
                 <span>Issue Title</span>
@@ -378,7 +378,7 @@ export default function NearbyTicketsPage() {
                 <span>Severity</span>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="max-h-[60vh] overflow-y-auto">
                 {loading && (
                   <div className="px-4 py-8 text-sm text-gray-500 dark:text-gray-400">Loading nearby tickets...</div>
                 )}

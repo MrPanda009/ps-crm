@@ -26,8 +26,11 @@ from dotenv import load_dotenv
 # 1. CONFIGURATION
 # =========================================================
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+try:
+    ROOT_DIR = Path(__file__).resolve().parents[2]
+except IndexError:
+    ROOT_DIR = Path(__file__).resolve().parent  # Docker: /app
+load_dotenv(ROOT_DIR / ".env", override=False)
 load_dotenv(ROOT_DIR / "apps" / "web" / ".env.local", override=False)
 
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY")
