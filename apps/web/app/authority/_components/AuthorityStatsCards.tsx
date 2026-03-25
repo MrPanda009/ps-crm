@@ -12,14 +12,14 @@ import type { DashboardStats } from "./dashboard-types"
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 animate-pulse">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-[#2a2a2a] dark:bg-[#161616] animate-pulse">
       <div className="flex items-start justify-between">
         <div className="space-y-3 flex-1">
-          <div className="h-2.5 w-24 rounded bg-gray-200 dark:bg-gray-800" />
-          <div className="h-8 w-14 rounded bg-gray-200 dark:bg-gray-800" />
-          <div className="h-2 w-20 rounded bg-gray-100 dark:bg-gray-900" />
+          <div className="h-2.5 w-24 rounded bg-gray-200 dark:bg-[#2a2a2a]" />
+          <div className="h-8 w-14 rounded bg-gray-200 dark:bg-[#2a2a2a]" />
+          <div className="h-2 w-20 rounded bg-gray-100 dark:bg-[#1e1e1e]" />
         </div>
-        <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-800" />
+        <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-[#2a2a2a]" />
       </div>
     </div>
   )
@@ -35,7 +35,7 @@ type StatCardProps = {
 
 function StatCard({ icon: Icon, label, value, sub, iconClass }: StatCardProps) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-950">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-[#2a2a2a] dark:bg-[#161616]">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
@@ -109,7 +109,7 @@ export default function AuthorityStatsCards({ stats, loading, error }: Props) {
         iconClass={
           stats.slaBreached > 0
             ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-            : "bg-gray-50 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+            : "bg-gray-50 text-gray-400 dark:bg-[#1e1e1e] dark:text-gray-400"
         }
       />
     </div>

@@ -237,13 +237,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-[#161616]">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-[#161616]">
       <Sidebar
         {...sidebarConfig}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        disableInternalScroll
         onLogout={handleLogout}
       />
 
@@ -368,7 +369,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content - edge to edge, no padding */}
-        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden">
+        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>

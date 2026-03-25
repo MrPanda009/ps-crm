@@ -22,18 +22,19 @@ const LINES: { key: keyof Omit<TrendPoint, "label">; label: string; color: strin
   { key: "resolved",    label: "Resolved",    color: "#10b981" },
 ]
 
-type ViewMode = "day" | "week" | "month"
+type ViewMode = "day" | "week" | "last30" | "month"
 
 const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
-  { value: "day",   label: "Today"      },
-  { value: "week",  label: "7 Days"     },
-  { value: "month", label: "6 Months"   },
+  { value: "day",    label: "Today"         },
+  { value: "week",   label: "7 Days"        },
+  { value: "last30", label: "Last 30 Days"  },
+  { value: "month",  label: "6 Months"      },
 ]
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
       <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
       {payload.map((p: any) => (
         <div key={p.name} className="flex items-center justify-between gap-6 py-0.5">
@@ -41,7 +42,7 @@ function ChartTooltip({ active, payload, label }: any) {
             <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
             {p.name}
           </span>
-          <span className="text-xs font-bold text-gray-800 dark:text-gray-200">{p.value}</span>
+          <span className="text-xs font-bold text-gray-800 dark:text-gray-300">{p.value}</span>
         </div>
       ))}
     </div>
@@ -53,8 +54,8 @@ function ChartSkeleton() {
     <div className="flex h-52 items-end gap-3 px-2 animate-pulse">
       {Array.from({ length: 7 }).map((_, i) => (
         <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-          <div className="w-full rounded-t bg-gray-100 dark:bg-gray-800" style={{ height: `${30 + i * 15}px` }} />
-          <div className="h-2 w-8 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="w-full rounded-t bg-gray-100 dark:bg-[#2a2a2a]" style={{ height: `${30 + i * 15}px` }} />
+          <div className="h-2 w-8 rounded bg-gray-100 dark:bg-[#2a2a2a]" />
         </div>
       ))}
     </div>
@@ -62,7 +63,7 @@ function ChartSkeleton() {
 }
 
 type Props = {
-  allTrend: { day: TrendPoint[]; week: TrendPoint[]; month: TrendPoint[] }
+  allTrend: { day: TrendPoint[]; week: TrendPoint[]; last30: TrendPoint[]; month: TrendPoint[] }
   department: string
   loading: boolean
 }
@@ -92,10 +93,11 @@ export default function AuthorityTrendChart({ allTrend, department, loading }: P
     : chartData
 
   const xInterval = view === "day" ? 1 :
-                    view === "week" ? 0 : "preserveStartEnd"
+                    view === "week" ? 0 :
+                    view === "last30" ? 2 : "preserveStartEnd"
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-950">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-[#2a2a2a] dark:bg-[#161616]">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Complaint Trend</h2>
@@ -106,17 +108,17 @@ export default function AuthorityTrendChart({ allTrend, department, loading }: P
         <div className="relative">
           <button
             onClick={() => setDropOpen(o => !o)}
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300"
           >
             {activeOption.label}
             <ChevronDown size={12} className={`transition-transform ${dropOpen ? "rotate-180" : ""}`} />
           </button>
-          <div className={`absolute right-0 top-full z-50 mt-1 w-32 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 transition-all duration-150 ${dropOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
+          <div className={`absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e] transition-all duration-150 ${dropOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
             {VIEW_OPTIONS.map(o => (
               <button
                 key={o.value}
                 onClick={() => { setView(o.value); setDropOpen(false) }}
-                className={`block w-full px-4 py-2.5 text-left text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${view === o.value ? "font-bold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}
+                className={`block w-full px-4 py-2.5 text-left text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-[#2a2a2a] ${view === o.value ? "font-bold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}
               >
                 {o.label}
               </button>

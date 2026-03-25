@@ -71,7 +71,29 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
 
   const sidebarConfig = {
     ...defaultSidebarConfig,
-    branding: { ...defaultSidebarConfig.branding, title: "Authority" },
+    branding: {
+      ...defaultSidebarConfig.branding,
+      title: "Authority",
+      icon: (
+        <div
+          className="w-10 h-10 lg:w-[42px] lg:h-[42px] bg-[#C9A84C]"
+          style={{
+            WebkitMaskImage: 'url(/Emblem.svg)',
+            WebkitMaskSize: 'contain',
+            WebkitMaskRepeat: 'no-repeat',
+            WebkitMaskPosition: 'center',
+            maskImage: 'url(/Emblem.svg)',
+            maskSize: 'contain',
+            maskRepeat: 'no-repeat',
+            maskPosition: 'center',
+          }}
+        />
+      ),
+    },
+    colors: {
+      ...defaultSidebarConfig.colors,
+      textMain: "text-white dark:text-white",
+    },
     navigation: [
       { id: "dashboard", name: "Dashboard",        icon: <LayoutGrid    size={20} strokeWidth={2} />, href: "/authority",         isActive: pathname === "/authority" },
       { id: "track",     name: "Track Complaints", icon: <ClipboardList size={20} strokeWidth={2} />, href: "/authority/track",   isActive: pathname.startsWith("/authority/track") },
@@ -82,7 +104,7 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-[#161616]">
 
       <Sidebar
         {...sidebarConfig}
@@ -90,13 +112,14 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
         onClose={() => setIsSidebarOpen(false)}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(c => !c)}
+        disableInternalScroll
       />
 
-      <div className="flex flex-1 flex-col min-h-0 min-w-0 max-w-full overflow-x-hidden">
+      <div className="flex flex-1 flex-col min-h-0 min-w-0 max-w-full overflow-hidden">
 
         {/* Topbar — from incoming: taller, with title + subtitle, higher z-index */}
         <header className="sticky top-0 z-[2100] border-b border-gray-200 bg-white shadow-sm
-                           dark:border-gray-800 dark:bg-gray-950">
+               dark:border-[#2a2a2a] dark:bg-[#161616]">
           <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6
                           min-w-0 max-w-full">
 
@@ -135,8 +158,8 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
                   onClick={() => setProfileOpen(o => !o)}
                   className="flex h-10 items-center gap-2 rounded-full border border-gray-200
                              bg-white px-3 shadow-sm transition-colors
-                             hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900
-                             dark:hover:bg-gray-800"
+                             hover:bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]
+                             dark:hover:bg-[#2a2a2a]"
                 >
                   <UserCircle2 size={18} className="text-gray-700 dark:text-gray-300" />
                   <ChevronDown size={16} className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
@@ -145,8 +168,8 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
                 {profileOpen && (
                   <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden
                                   rounded-xl border border-gray-200 bg-white shadow-xl
-                                  dark:border-gray-700 dark:bg-gray-900">
-                    <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+                                  dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                    <div className="border-b border-gray-100 px-4 py-3 dark:border-[#2a2a2a]">
                       <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                         {userName}
                       </p>
@@ -170,7 +193,7 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden
+        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto overflow-x-hidden
                          px-4 py-6 sm:px-6">
           {children}
         </main>

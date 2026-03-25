@@ -40,8 +40,9 @@ export default function AuthorityDashboardPage() {
   const [allTrend,    setAllTrend]    = useState<{                   // all pre-built buckets
     day:   TrendPoint[]
     week:  TrendPoint[]
+    last30: TrendPoint[]
     month: TrendPoint[]
-  }>({ day: [], week: [], month: [] })
+  }>({ day: [], week: [], last30: [], month: [] })
   const [stats,       setStats]       = useState<DashboardStats>({
     total: 0, pendingAction: 0, inProgress: 0, resolvedThisMonth: 0, slaBreached: 0,
   })
@@ -67,6 +68,10 @@ export default function AuthorityDashboardPage() {
     const weekCutoff = new Date()
     weekCutoff.setDate(weekCutoff.getDate() - 6)
     weekCutoff.setHours(0, 0, 0, 0)
+
+    const last30Cutoff = new Date()
+    last30Cutoff.setDate(last30Cutoff.getDate() - 29)
+    last30Cutoff.setHours(0, 0, 0, 0)
 
     const dayCutoff = new Date()
     dayCutoff.setHours(0, 0, 0, 0)
@@ -150,6 +155,30 @@ export default function AuthorityDashboardPage() {
     })
     const weekPoints: TrendPoint[] = Object.entries(dBuckets).map(([label, v]) => ({ label, ...v }))
 
+    // ── Last 30 days trend (day-wise) ─────────────────────────────────────────
+    const last30Buckets: Record<string, Omit<TrendPoint, "label">> = {}
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const lbl = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+      last30Buckets[lbl] = { submitted: 0, resolved: 0, in_progress: 0, assigned: 0 }
+    }
+
+    mappedComplaints.forEach(c => {
+      const d = new Date(c.created_at)
+      if (d >= last30Cutoff) {
+        const lbl = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+        if (last30Buckets[lbl]) {
+          last30Buckets[lbl].submitted++
+          if (c.status === "assigned")    last30Buckets[lbl].assigned++
+          if (c.status === "in_progress") last30Buckets[lbl].in_progress++
+          if (c.status === "resolved")    last30Buckets[lbl].resolved++
+        }
+      }
+    })
+
+    const last30Points: TrendPoint[] = Object.entries(last30Buckets).map(([label, v]) => ({ label, ...v }))
+
     // ── Month trend (6 months) ────────────────────────────────────────────────
     const mBuckets = buildSixMonthBuckets()
     ;(trendRows ?? []).forEach((r: any) => {
@@ -166,7 +195,7 @@ export default function AuthorityDashboardPage() {
     })
     const monthPoints: TrendPoint[] = Object.entries(mBuckets).map(([label, v]) => ({ label, ...v }))
 
-    const built = { day: dayPoints, week: weekPoints, month: monthPoints }
+    const built = { day: dayPoints, week: weekPoints, last30: last30Points, month: monthPoints }
 
     setComplaints(mappedComplaints)
     setWorkers(mappedWorkers)

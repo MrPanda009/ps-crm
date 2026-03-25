@@ -27,7 +27,7 @@ export default function TicketCard({
     <div
       onClick={onClick}
       className="relative flex gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border
-        bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10"
+        bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]"
       style={{
         borderColor: isSelected ? sev.color : "transparent",
         backgroundColor: isSelected ? sev.color + "0d" : undefined,
@@ -70,7 +70,7 @@ export default function TicketCard({
         className={`shrink-0 flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg transition-all
           ${upvoted
             ? "bg-blue-500 text-white"
-            : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 hover:bg-blue-500/20 hover:text-blue-500"
+            : "bg-gray-100 dark:bg-[#2a2a2a] text-gray-500 dark:text-gray-400 hover:bg-blue-500/20 hover:text-blue-500"
           }`}
       >
         <ThumbsUp size={13} />

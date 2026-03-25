@@ -57,7 +57,7 @@ export default function TicketDetail({
             >
               {sev.label}
             </span>
-            <span className="text-xs text-gray-400 dark:text-gray-500 capitalize px-2 py-1 rounded-full bg-gray-100 dark:bg-white/5">
+            <span className="text-xs text-gray-400 dark:text-gray-500 capitalize px-2 py-1 rounded-full bg-gray-100 dark:bg-[#2a2a2a]">
               {complaint.status.replace(/_/g, " ")}
             </span>
           </div>
@@ -79,7 +79,7 @@ export default function TicketDetail({
             transition-all font-bold text-sm
             ${upvoted
               ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-              : "bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 hover:bg-blue-500/20 hover:text-blue-500"
+              : "bg-gray-100 dark:bg-[#2a2a2a] text-gray-500 dark:text-gray-400 hover:bg-blue-500/20 hover:text-blue-500"
             }`}
         >
           <ThumbsUp size={16} />
@@ -88,7 +88,7 @@ export default function TicketDetail({
       </div>
 
       {/* Description */}
-      <div className="rounded-xl bg-gray-50 dark:bg-white/5 p-4 mb-4">
+      <div className="rounded-xl bg-gray-50 dark:bg-[#1e1e1e] p-4 mb-4">
         <p className="break-words text-sm leading-relaxed text-gray-700 dark:text-gray-300">
           {complaint.description}
         </p>

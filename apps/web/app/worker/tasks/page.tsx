@@ -190,10 +190,10 @@ export default function WorkerTasksPage() {
 
   return (
     <div className="w-full flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-4">
-      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-8rem)]">
+      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-8rem)] dark:border-[#2a2a2a] dark:bg-[#161616]">
         <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
           <div className="min-w-[980px] flex flex-col flex-1 min-h-0">
-            <div className="sticky top-0 z-10 grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="sticky top-0 z-10 grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400">
               <span>Ticket ID</span>
               <span>Issue Title</span>
               <span>Locality / Address</span>
@@ -203,35 +203,35 @@ export default function WorkerTasksPage() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto">
-              {loading && <div className="px-5 py-8 text-sm text-gray-500">Loading tasks...</div>}
-              {!loading && error && <div className="px-5 py-8 text-sm text-red-600">{error}</div>}
+              {loading && <div className="px-5 py-8 text-sm text-gray-500 dark:text-gray-400">Loading tasks...</div>}
+              {!loading && error && <div className="px-5 py-8 text-sm text-red-600 dark:text-red-400">{error}</div>}
               {!loading && !error && tasks.length === 0 && (
-                <div className="px-5 py-8 text-sm text-gray-500">No tasks assigned yet.</div>
+                <div className="px-5 py-8 text-sm text-gray-500 dark:text-gray-400">No tasks assigned yet.</div>
               )}
 
               {!loading && !error && tasks.length > 0 && (
-                <ul className="divide-y divide-gray-100">
+                <ul className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                   {tasks.map((task) => (
                     <li
                       key={task.id}
-                      className="grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr] gap-3 px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr] gap-3 px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-gray-300 dark:hover:bg-[#1e1e1e]"
                     >
-                      <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate">
+                      <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate dark:text-gray-200">
                         {task.ticket_id || "N/A"}
                       </span>
 
-                      <span className="text-gray-900 font-medium line-clamp-2 leading-snug">
+                      <span className="text-gray-900 font-medium line-clamp-2 leading-snug dark:text-gray-200">
                         {task.title || "Untitled issue"}
                       </span>
 
                       <span
-                        className="text-gray-600 line-clamp-1 leading-snug cursor-pointer"
+                        className="text-gray-600 line-clamp-1 leading-snug cursor-pointer dark:text-gray-400"
                         title={task.address_text || "Address unavailable"}
                       >
                         {extractRelevantAddress(task.address_text) || "Address unavailable"}
                       </span>
 
-                      <span className="text-gray-700 line-clamp-2 leading-snug">
+                      <span className="text-gray-700 line-clamp-2 leading-snug dark:text-gray-300">
                         {task.severity || "Unknown"}
                       </span>
 
@@ -245,7 +245,7 @@ export default function WorkerTasksPage() {
                         </span>
                       </span>
 
-                      <span className="text-gray-500 text-xs sm:text-sm">
+                      <span className="text-gray-500 text-xs sm:text-sm dark:text-gray-400">
                         {formatReportedTime(task.created_at)}
                       </span>
                     </li>

@@ -18,12 +18,12 @@ function SkeletonBreakdown() {
     <div className="space-y-3 animate-pulse">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-xl bg-gray-100 dark:bg-gray-800" />
+          <div className="h-8 w-8 rounded-xl bg-gray-100 dark:bg-[#2a2a2a]" />
           <div className="flex-1 space-y-1.5">
-            <div className="h-2.5 w-20 rounded bg-gray-100 dark:bg-gray-800" />
-            <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800" />
+            <div className="h-2.5 w-20 rounded bg-gray-100 dark:bg-[#2a2a2a]" />
+            <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-[#2a2a2a]" />
           </div>
-          <div className="h-5 w-7 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="h-5 w-7 rounded bg-gray-100 dark:bg-[#2a2a2a]" />
         </div>
       ))}
     </div>
@@ -37,11 +37,11 @@ export default function AuthorityStatusBreakdown({ complaints, loading }: Props)
   const total     = breakdown.reduce((s, b) => s + b.count, 0)
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-950">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-[#2a2a2a] dark:bg-[#161616]">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Status Breakdown</h2>
         {total > 0 && (
-          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500 dark:bg-[#1e1e1e] dark:text-gray-400">
             {total} total
           </span>
         )}

@@ -47,7 +47,7 @@ function SkeletonRow() {
     <tr className="border-b border-gray-50 dark:border-gray-800/60 animate-pulse">
       {[200, 60, 80, 50, 120, 90].map((w, i) => (
         <td key={i} className="px-3 py-2">
-          <div className="h-3 rounded bg-gray-100 dark:bg-gray-800" style={{ width: w }} />
+          <div className="h-3 rounded bg-gray-100 dark:bg-[#2a2a2a]" style={{ width: w }} />
         </td>
       ))}
     </tr>
@@ -65,19 +65,19 @@ type Props = {
 export default function AuthorityRecentTickets({ complaints, workers, loading, error, onRefresh }: Props) {
   const [selected, setSelected] = useState<AuthorityComplaintRow | null>(null)
 
-  // ── Only show 5 most recent active tickets ─────────────────────────────────
+  // ── Show 6 most recent active tickets to better fill the aligned panel ─────
   const rows = complaints
     .filter(c => c.status !== "resolved" && c.status !== "rejected")
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5)
+    .slice(0, 6)
 
   const hasWorkers = workers.length > 0
 
   return (
     <>
-      <div className="rounded-2xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-950">
+      <div className="flex h-[420px] flex-col rounded-2xl border border-gray-100 bg-white dark:border-[#2a2a2a] dark:bg-[#161616]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 dark:border-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 dark:border-[#2a2a2a]">
           <div>
             <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Recent Tickets</h2>
             {!loading && !hasWorkers && (
@@ -89,10 +89,10 @@ export default function AuthorityRecentTickets({ complaints, workers, loading, e
           </a>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-50 dark:border-gray-800/60">
+              <tr className="border-b border-gray-50 dark:border-[#2a2a2a]">
                 {["Title / Location", "Severity", "Status", "Age", "Stage", "Actions"].map(h => (
                   <th key={h} className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 whitespace-nowrap">
                     {h}
@@ -102,7 +102,7 @@ export default function AuthorityRecentTickets({ complaints, workers, loading, e
             </thead>
             <tbody>
               {loading ? (
-                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+                Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
               ) : error ? (
                 <tr><td colSpan={6} className="px-3 py-5 text-center text-sm text-red-500">{error}</td></tr>
               ) : rows.length === 0 ? (
@@ -124,7 +124,7 @@ export default function AuthorityRecentTickets({ complaints, workers, loading, e
                   (c.status === "submitted" || c.status === "under_review")
 
                 return (
-                  <tr key={c.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/60 dark:hover:bg-gray-900/40 transition-colors">
+                  <tr key={c.id} className="border-b border-gray-50 dark:border-[#2a2a2a] hover:bg-gray-50/60 dark:hover:bg-[#1e1e1e] transition-colors">
                     {/* Title + category */}
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1.5">
@@ -175,7 +175,7 @@ export default function AuthorityRecentTickets({ complaints, workers, loading, e
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => setSelected(c)}
-                          className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[10px] font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 transition-colors"
+                          className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[10px] font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 transition-colors"
                         >
                           <Eye size={10} /> View
                         </button>

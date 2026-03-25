@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Bell, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { supabase } from '@/src/lib/supabase';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 
 type NotifKind = 'sla_breach' | 'escalation' | 'new_complaint' | 'resolved' | 'status_change';
 
@@ -15,11 +17,11 @@ type Notif = {
 };
 
 const KIND_CONFIG: Record<NotifKind, { icon: React.ReactNode; pill: string; label: string }> = {
-  sla_breach:    { icon: <XCircle       size={14} className="text-red-500"     />, pill: 'bg-red-50 text-red-700 ring-1 ring-red-200',             label: 'SLA Breach' },
-  escalation:    { icon: <AlertTriangle size={14} className="text-orange-500"  />, pill: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200',    label: 'Escalated'  },
-  new_complaint: { icon: <Bell          size={14} className="text-blue-500"    />, pill: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',          label: 'New'        },
-  resolved:      { icon: <CheckCircle2  size={14} className="text-emerald-500" />, pill: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', label: 'Resolved'   },
-  status_change: { icon: <Clock         size={14} className="text-amber-500"   />, pill: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',       label: 'Updated'    },
+  sla_breach:    { icon: <XCircle       size={14} className="text-red-500"     />, pill: 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-red-950/50 dark:text-red-400 dark:ring-red-900/50',             label: 'SLA Breach' },
+  escalation:    { icon: <AlertTriangle size={14} className="text-orange-500"  />, pill: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-950/50 dark:text-orange-400 dark:ring-orange-900/50',    label: 'Escalated'  },
+  new_complaint: { icon: <Bell          size={14} className="text-blue-500"    />, pill: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:ring-blue-900/50',          label: 'New'        },
+  resolved:      { icon: <CheckCircle2  size={14} className="text-emerald-500" />, pill: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:ring-emerald-900/50', label: 'Resolved'   },
+  status_change: { icon: <Clock         size={14} className="text-amber-500"   />, pill: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:ring-amber-900/50',       label: 'Updated'    },
 };
 
 function timeAgo(d: string) {
@@ -46,6 +48,21 @@ export default function AuthorityNotificationBell() {
   const [loading, setLoading] = useState(false);
   const [filter,  setFilter]  = useState<'all' | NotifKind>('all');
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const panelRef   = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (open) {
+      gsap.fromTo(panelRef.current,
+        { opacity: 0, scale: 0.95, y: -10 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.3, ease: 'power2.out' }
+      );
+
+      gsap.fromTo('.notif-item',
+        { opacity: 0, x: 15 },
+        { opacity: 1, x: 0, duration: 0.4, stagger: 0.04, ease: 'power2.out', delay: 0.1 }
+      );
+    }
+  }, { dependencies: [open], scope: wrapperRef });
 
   // Close on outside click
   useEffect(() => {
@@ -56,7 +73,7 @@ export default function AuthorityNotificationBell() {
     return () => document.removeEventListener('mousedown', onDocumentClick);
   }, []);
 
-  async function buildFeed() {
+  const buildFeed = useCallback(async () => {
     setLoading(true);
     const { data: auth } = await supabase.auth.getUser();
     const uid = auth?.user?.id;
@@ -135,15 +152,15 @@ export default function AuthorityNotificationBell() {
     setReadSet(loadReadSet());
     setNotifs(deduped);
     setLoading(false);
-  }
+  }, []);
 
   // Fetch on mount so badge count is live immediately (not just on open)
-  useEffect(() => { void buildFeed(); }, []);
+  useEffect(() => { void buildFeed(); }, [buildFeed]);
 
   // Re-fetch when dropdown opens (refresh stale data)
   useEffect(() => {
     if (open) void buildFeed();
-  }, [open]);
+  }, [open, buildFeed]);
 
   // Always-on realtime: SLA breaches + new complaints update badge even when closed
   useEffect(() => {
@@ -152,7 +169,7 @@ export default function AuthorityNotificationBell() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_history' }, () => void buildFeed())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [buildFeed]);
 
   function markRead(id: string) {
     setReadSet(prev => { const next = new Set(prev); next.add(id); saveReadSet(next); return next; });
@@ -185,7 +202,7 @@ export default function AuthorityNotificationBell() {
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute right-0 z-[60] mt-2 w-96 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+        <div ref={panelRef} className="absolute right-0 z-[60] mt-2 w-[400px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 origin-top-right">
 
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
@@ -238,14 +255,14 @@ export default function AuthorityNotificationBell() {
                 const isRead = readSet.has(n.id);
                 return (
                   <div key={n.id} onClick={() => { if (!isRead) markRead(n.id); }}
-                    className={`flex cursor-pointer gap-3 p-3 transition-colors hover:bg-gray-50/60 dark:hover:bg-gray-800/50
+                    className={`notif-item flex cursor-pointer gap-3 p-3 transition-colors hover:bg-gray-50/60 dark:hover:bg-gray-800/50
                       ${idx > 0 ? 'border-t border-gray-50 dark:border-gray-800' : ''}
                       ${!isRead
-                        ? n.kind === 'sla_breach'  ? 'bg-red-50/40'
-                        : n.kind === 'escalation'  ? 'bg-orange-50/30'
-                        : 'bg-[#fdf8f6]'
+                        ? n.kind === 'sla_breach'  ? 'bg-red-50/40 dark:bg-red-950/20'
+                        : n.kind === 'escalation'  ? 'bg-orange-50/30 dark:bg-orange-950/20'
+                        : 'bg-[#fdf8f6] dark:bg-gray-800/40'
                         : ''}`}>
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${cfg.pill.split(' ')[0]}`}>
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform duration-300 hover:scale-110 ${cfg.pill.split(' ')[0]}`}>
                       {cfg.icon}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -253,12 +270,12 @@ export default function AuthorityNotificationBell() {
                         <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${cfg.pill}`}>{cfg.label}</span>
                         {!isRead && <span className="h-1.5 w-1.5 rounded-full bg-[#b4725a]" />}
                       </div>
-                      <p className={`text-xs leading-snug ${isRead ? 'font-medium text-gray-600 dark:text-gray-400' : 'font-semibold text-gray-900 dark:text-white'}`}>
+                      <p className={`text-xs leading-snug ${isRead ? 'font-medium text-gray-600 dark:text-gray-300' : 'font-semibold text-gray-900 dark:text-white'}`}>
                         {n.title}
                       </p>
-                      <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-400">{n.body}</p>
+                      <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-400 dark:text-gray-500">{n.body}</p>
                     </div>
-                    <span className="shrink-0 pt-0.5 text-[10px] tabular-nums text-gray-400">{timeAgo(n.created_at)}</span>
+                    <span className="shrink-0 pt-0.5 text-[10px] tabular-nums text-gray-400 dark:text-gray-500">{timeAgo(n.created_at)}</span>
                   </div>
                 );
               })

@@ -197,7 +197,7 @@ export default function NearbyTicketsPage() {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
-      <div className="shrink-0 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <div className="shrink-0 border-b border-gray-200 bg-white dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
         <NearbyTicketsMap
           complaints={filteredComplaints}
           selectedId={selectedComplaintId}
@@ -210,7 +210,7 @@ export default function NearbyTicketsPage() {
       </div>
 
       <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden p-3">
-        <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-14rem)] lg:max-h-[calc(100vh-12rem)]">
+        <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-14rem)] lg:max-h-[calc(100vh-12rem)] dark:border-[#2a2a2a] dark:bg-[#161616]">
           {(gpsSignalStale || lowAccuracy) && (
             <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/50 dark:text-amber-200">
               {gpsSignalStale ? "Searching for GPS signal... live updates are temporarily delayed." : ""}
@@ -218,7 +218,7 @@ export default function NearbyTicketsPage() {
               {lowAccuracy ? `Low GPS accuracy detected (±${Math.round(accuracyMeters ?? 0)}m).` : ""}
             </div>
           )}
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
             <div className="relative">
               <button
                 onClick={() => {
@@ -226,20 +226,20 @@ export default function NearbyTicketsPage() {
                   setStatusDropdownOpen(false);
                   setSeverityDropdownOpen(false);
                 }}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
               >
                 Department: {departmentFilter ?? "All"}
                 <ChevronDown size={16} className={`transition-transform ${departmentDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {departmentDropdownOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-gray-300 bg-white shadow-lg">
+                <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-gray-300 bg-white shadow-lg dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <button
                     onClick={() => {
                       setDepartmentFilter(null);
                       closeAllDropdowns();
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 ${
-                      departmentFilter === null ? "bg-purple-50 font-medium text-purple-700" : ""
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      departmentFilter === null ? "bg-purple-50 font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     All Departments
@@ -251,8 +251,8 @@ export default function NearbyTicketsPage() {
                         setDepartmentFilter(department);
                         closeAllDropdowns();
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 ${
-                        departmentFilter === department ? "bg-purple-50 font-medium text-purple-700" : ""
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                        departmentFilter === department ? "bg-purple-50 font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : ""
                       }`}
                     >
                       {department}
@@ -269,20 +269,20 @@ export default function NearbyTicketsPage() {
                   setDepartmentDropdownOpen(false);
                   setSeverityDropdownOpen(false);
                 }}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
               >
                 Status: {statusFilter ? formatStatus(statusFilter) : "All"}
                 <ChevronDown size={16} className={`transition-transform ${statusDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {statusDropdownOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-gray-300 bg-white shadow-lg">
+                <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-gray-300 bg-white shadow-lg dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <button
                     onClick={() => {
                       setStatusFilter(null);
                       closeAllDropdowns();
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 ${
-                      statusFilter === null ? "bg-purple-50 font-medium text-purple-700" : ""
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      statusFilter === null ? "bg-purple-50 font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     All Statuses
@@ -294,8 +294,8 @@ export default function NearbyTicketsPage() {
                         setStatusFilter(status);
                         closeAllDropdowns();
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 ${
-                        statusFilter === status ? "bg-purple-50 font-medium text-purple-700" : ""
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                        statusFilter === status ? "bg-purple-50 font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : ""
                       }`}
                     >
                       {formatStatus(status)}
@@ -312,20 +312,20 @@ export default function NearbyTicketsPage() {
                   setDepartmentDropdownOpen(false);
                   setStatusDropdownOpen(false);
                 }}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
               >
                 Severity: {severityFilter ? getSeverityConfig(severityFilter).label : "All"}
                 <ChevronDown size={16} className={`transition-transform ${severityDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {severityDropdownOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-40 rounded-lg border border-gray-300 bg-white shadow-lg">
+                <div className="absolute left-0 top-full z-20 mt-1 w-40 rounded-lg border border-gray-300 bg-white shadow-lg dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <button
                     onClick={() => {
                       setSeverityFilter(null);
                       closeAllDropdowns();
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 ${
-                      severityFilter === null ? "bg-purple-50 font-medium text-purple-700" : ""
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      severityFilter === null ? "bg-purple-50 font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     All Levels
@@ -337,8 +337,8 @@ export default function NearbyTicketsPage() {
                         setSeverityFilter(severity);
                         closeAllDropdowns();
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 ${
-                        severityFilter === severity ? "bg-purple-50 font-medium text-purple-700" : ""
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                        severityFilter === severity ? "bg-purple-50 font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : ""
                       }`}
                     >
                       {getSeverityConfig(severity).label}
@@ -351,14 +351,14 @@ export default function NearbyTicketsPage() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#2a2a2a] dark:hover:text-gray-100"
               >
                 <X size={16} />
                 Clear Filters
               </button>
             )}
 
-            <div className="ml-auto text-xs text-gray-500">
+            <div className="ml-auto text-xs text-gray-500 dark:text-gray-400">
               {filteredComplaints.length} ticket{filteredComplaints.length !== 1 ? "s" : ""} in view
               {" · "}{formatDistance(radiusMeters)} radius
               {accuracyMeters ? ` · ±${Math.round(accuracyMeters)}m GPS` : ""}
@@ -368,7 +368,7 @@ export default function NearbyTicketsPage() {
 
           <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
             <div className="min-w-[940px] flex flex-col flex-1 min-h-0">
-              <div className="sticky top-0 z-10 grid grid-cols-[150px_2.2fr_1.2fr_1fr_1fr_100px_120px] gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <div className="sticky top-0 z-10 grid grid-cols-[150px_2.2fr_1.2fr_1fr_1fr_100px_120px] gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400">
                 <span>Ticket ID</span>
                 <span>Issue Title</span>
                 <span>Department</span>
@@ -380,28 +380,28 @@ export default function NearbyTicketsPage() {
 
               <div className="flex-1 min-h-0 overflow-y-auto">
                 {loading && (
-                  <div className="px-4 py-8 text-sm text-gray-500">Loading nearby tickets...</div>
+                  <div className="px-4 py-8 text-sm text-gray-500 dark:text-gray-400">Loading nearby tickets...</div>
                 )}
 
                 {!loading && error && (
-                  <div className="flex items-center gap-2 px-4 py-8 text-sm text-red-600">
+                  <div className="flex items-center gap-2 px-4 py-8 text-sm text-red-600 dark:text-red-400">
                     <AlertTriangle size={16} />
                     {error}
                   </div>
                 )}
 
                 {!loading && !error && visibleComplaints.length === 0 && (
-                  <div className="px-4 py-8 text-sm text-gray-500">
+                  <div className="px-4 py-8 text-sm text-gray-500 dark:text-gray-400">
                     No tickets found within {formatDistance(radiusMeters)} of your current location.
                   </div>
                 )}
 
                 {!loading && !error && visibleComplaints.length > 0 && filteredComplaints.length === 0 && (
-                  <div className="px-4 py-8 text-sm text-gray-500">No tickets match your selected filters.</div>
+                  <div className="px-4 py-8 text-sm text-gray-500 dark:text-gray-400">No tickets match your selected filters.</div>
                 )}
 
                 {!loading && !error && filteredComplaints.length > 0 && (
-                  <ul className="divide-y divide-gray-100">
+                  <ul className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                     {filteredComplaints.map((complaint) => {
                       const severity = getSeverityConfig(complaint.effective_severity || complaint.severity);
                       const isSelected = selectedComplaintId === complaint.id;
@@ -411,18 +411,18 @@ export default function NearbyTicketsPage() {
                           key={complaint.id}
                           onClick={() => handleSelectComplaint(complaint)}
                           className={`grid cursor-pointer grid-cols-[150px_2.2fr_1.2fr_1fr_1fr_100px_120px] gap-3 px-4 py-4 text-sm transition-colors ${
-                            isSelected ? "bg-blue-50" : "text-gray-700 hover:bg-gray-50"
+                            isSelected ? "bg-blue-50 dark:bg-blue-900/20" : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-[#1e1e1e]"
                           }`}
                         >
-                          <span className="truncate font-mono text-xs font-medium text-gray-900 sm:text-sm">
+                          <span className="truncate font-mono text-xs font-medium text-gray-900 sm:text-sm dark:text-gray-200">
                             {complaint.ticket_id || complaint.id.slice(0, 8).toUpperCase()}
                           </span>
 
-                          <span className="line-clamp-2 font-medium leading-snug text-gray-900">
+                          <span className="line-clamp-2 font-medium leading-snug text-gray-900 dark:text-gray-200">
                             {complaint.title || "Untitled issue"}
                           </span>
 
-                          <span className="line-clamp-2 leading-snug text-gray-700">
+                          <span className="line-clamp-2 leading-snug text-gray-700 dark:text-gray-300">
                             {complaint.assigned_department || "Unassigned"}
                           </span>
 
@@ -432,7 +432,7 @@ export default function NearbyTicketsPage() {
                             </span>
                           </span>
 
-                          <span className="text-xs text-gray-500 sm:text-sm">
+                          <span className="text-xs text-gray-500 sm:text-sm dark:text-gray-400">
                             {formatReportedTime(complaint.created_at)}
                           </span>
 
@@ -442,9 +442,9 @@ export default function NearbyTicketsPage() {
                                 e.stopPropagation();
                                 handleUpvote(complaint.id);
                               }}
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
                             >
-                              <ArrowUp size={14} className="text-gray-400" />
+                              <ArrowUp size={14} className="text-gray-400 dark:text-gray-500" />
                               {complaint.upvote_count ?? 0}
                             </button>
                           </span>

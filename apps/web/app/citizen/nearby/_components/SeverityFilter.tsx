@@ -17,8 +17,8 @@ const LEVELS: Array<{ level: number; key: "L1" | "L2" | "L3" | "L4" }> = [
 export default function SeverityFilter({ maxLevel, onChange }: SeveritySliderProps) {
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-2 overflow-x-hidden px-3 py-3
-      bg-white dark:bg-gray-900
-      border-b border-gray-200 dark:border-gray-800">
+      bg-white dark:bg-[#1e1e1e]
+      border-b border-gray-200 dark:border-[#2a2a2a]">
 
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">

@@ -289,18 +289,18 @@ export default function CitizenTicketsPage() {
 
   return (
     <div className="w-full flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-4">
-      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-8rem)]">
+      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-8rem)] dark:border-[#2a2a2a] dark:bg-[#161616]">
         {/* Search and Filter Controls */}
-        <div className="flex flex-col gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4">
+        <div className="flex flex-col gap-3 border-b border-gray-200 bg-gray-50 px-5 py-4 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
             <input
               type="text"
               placeholder="Search by ticket id, title, or address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder:text-gray-500"
             />
           </div>
 
@@ -310,20 +310,20 @@ export default function CitizenTicketsPage() {
             <div className="relative">
               <button
                 onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
               >
                 Sort: {sortBy === "latest" ? "Latest" : sortBy === "upvotes" ? "Highest Upvote" : "Oldest"}
                 <ChevronDown size={16} className={`transition-transform ${sortDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {sortDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 z-20 w-40 rounded-lg border border-gray-300 bg-white shadow-lg">
+                <div className="absolute top-full left-0 mt-1 z-20 w-40 rounded-lg border border-gray-300 bg-white shadow-lg dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <button
                     onClick={() => {
                       setSortBy("latest");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      sortBy === "latest" ? "bg-purple-50 text-purple-700 font-medium" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      sortBy === "latest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     Latest
@@ -333,8 +333,8 @@ export default function CitizenTicketsPage() {
                       setSortBy("upvotes");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      sortBy === "upvotes" ? "bg-purple-50 text-purple-700 font-medium" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      sortBy === "upvotes" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     Highest Upvote
@@ -344,8 +344,8 @@ export default function CitizenTicketsPage() {
                       setSortBy("oldest");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      sortBy === "oldest" ? "bg-purple-50 text-purple-700 font-medium" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      sortBy === "oldest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     Oldest
@@ -358,20 +358,20 @@ export default function CitizenTicketsPage() {
             <div className="relative">
               <button
                 onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
               >
                 Status: {statusFilter ? formatStatus(statusFilter) : "All"}
                 <ChevronDown size={16} className={`transition-transform ${statusDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {statusDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 z-20 w-48 rounded-lg border border-gray-300 bg-white shadow-lg">
+                <div className="absolute top-full left-0 mt-1 z-20 w-48 rounded-lg border border-gray-300 bg-white shadow-lg dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <button
                     onClick={() => {
                       setStatusFilter(null);
                       setStatusDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      statusFilter === null ? "bg-purple-50 text-purple-700 font-medium" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      statusFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     All
@@ -383,8 +383,8 @@ export default function CitizenTicketsPage() {
                         setStatusFilter(status);
                         setStatusDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                        statusFilter === status ? "bg-purple-50 text-purple-700 font-medium" : ""
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                        statusFilter === status ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
                       }`}
                     >
                       {formatStatus(status)}
@@ -398,20 +398,20 @@ export default function CitizenTicketsPage() {
             <div className="relative">
               <button
                 onClick={() => setDepartmentDropdownOpen(!departmentDropdownOpen)}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
               >
                 Department: {departmentFilter ? departmentFilter : "All"}
                 <ChevronDown size={16} className={`transition-transform ${departmentDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {departmentDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 z-20 w-48 rounded-lg border border-gray-300 bg-white shadow-lg">
+                <div className="absolute top-full left-0 mt-1 z-20 w-48 rounded-lg border border-gray-300 bg-white shadow-lg dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <button
                     onClick={() => {
                       setDepartmentFilter(null);
                       setDepartmentDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      departmentFilter === null ? "bg-purple-50 text-purple-700 font-medium" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                      departmentFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
                     }`}
                   >
                     All Departments
@@ -423,8 +423,8 @@ export default function CitizenTicketsPage() {
                         setDepartmentFilter(dept);
                         setDepartmentDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                        departmentFilter === dept ? "bg-purple-50 text-purple-700 font-medium" : ""
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
+                        departmentFilter === dept ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
                       }`}
                     >
                       {dept}
@@ -438,7 +438,7 @@ export default function CitizenTicketsPage() {
             {hasActiveFilters && (
               <button
                 onClick={handleClearFilters}
-                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] dark:hover:text-gray-100"
               >
                 <X size={16} />
                 Clear Filters
@@ -449,7 +449,7 @@ export default function CitizenTicketsPage() {
 
         <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
           <div className="min-w-[980px] flex flex-col flex-1 min-h-0">
-            <div className="sticky top-0 z-10 grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="sticky top-0 z-10 grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400">
               <span>Ticket ID</span>
               <span>Issue Title</span>
               <span>Locality / Address</span>
@@ -461,41 +461,41 @@ export default function CitizenTicketsPage() {
 
             <div className="flex-1 min-h-0 overflow-y-auto">
               {loading && (
-                <div className="px-5 py-8 text-sm text-gray-500">Loading tickets...</div>
+                <div className="px-5 py-8 text-sm text-gray-500 dark:text-gray-400">Loading tickets...</div>
               )}
 
               {!loading && error && (
-                <div className="px-5 py-8 text-sm text-red-600">{error}</div>
+                <div className="px-5 py-8 text-sm text-red-600 dark:text-red-400">{error}</div>
               )}
 
               {!loading && !error && tickets.length === 0 && !searchQuery && statusFilter === null && departmentFilter === null && (
-                <div className="px-5 py-8 text-sm text-gray-500">No tickets reported yet.</div>
+                <div className="px-5 py-8 text-sm text-gray-500 dark:text-gray-400">No tickets reported yet.</div>
               )}
 
               {!loading && !error && tickets.length > 0 && filteredTickets.length === 0 && (
-                <div className="px-5 py-8 text-sm text-gray-500">No tickets match your filters.</div>
+                <div className="px-5 py-8 text-sm text-gray-500 dark:text-gray-400">No tickets match your filters.</div>
               )}
 
               {!loading && !error && filteredTickets.length > 0 && (
-                <ul className="divide-y divide-gray-100">
+                <ul className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                   {filteredTickets.map((ticket) => (
                     <li
                       key={ticket.id}
-                      className="grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px] gap-3 px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px] gap-3 px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-gray-300 dark:hover:bg-[#1e1e1e]"
                     >
-                      <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate">
+                      <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate dark:text-gray-200">
                         {ticket.ticket_id || "N/A"}
                       </span>
 
-                      <span className="text-gray-900 font-medium line-clamp-2 leading-snug">
+                      <span className="text-gray-900 font-medium line-clamp-2 leading-snug dark:text-gray-200">
                         {ticket.title || "Untitled issue"}
                       </span>
 
-                      <span className="text-gray-600 line-clamp-1 leading-snug cursor-pointer" title={ticket.address_text || "Address unavailable"}>
+                      <span className="text-gray-600 line-clamp-1 leading-snug cursor-pointer dark:text-gray-400" title={ticket.address_text || "Address unavailable"}>
                         {extractRelevantAddress(ticket.address_text) || "Address unavailable"}
                       </span>
 
-                      <span className="text-gray-700 line-clamp-2 leading-snug">
+                      <span className="text-gray-700 line-clamp-2 leading-snug dark:text-gray-300">
                         {ticket.assigned_department || "Unassigned"}
                       </span>
 
@@ -505,12 +505,12 @@ export default function CitizenTicketsPage() {
                         </span>
                       </span>
 
-                      <span className="text-gray-500 text-xs sm:text-sm">
+                      <span className="text-gray-500 text-xs sm:text-sm dark:text-gray-400">
                         {formatReportedTime(ticket.created_at)}
                       </span>
 
-                      <span className="inline-flex items-center justify-end gap-1 text-gray-700 font-medium">
-                        <ArrowUp size={14} className="text-gray-400" />
+                      <span className="inline-flex items-center justify-end gap-1 text-gray-700 font-medium dark:text-gray-300">
+                        <ArrowUp size={14} className="text-gray-400 dark:text-gray-500" />
                         {ticket.upvote_count ?? 0}
                       </span>
                     </li>

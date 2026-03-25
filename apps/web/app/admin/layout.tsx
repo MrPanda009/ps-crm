@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ChevronDown,
   ClipboardList,
   FileBarChart2,
   FolderTree,
@@ -11,17 +12,41 @@ import {
   MessageSquare,
   Settings,
   Shield,
+  UserCircle2,
   Users,
 } from "lucide-react";
 import Sidebar, { defaultSidebarConfig, SidebarNavigationItem } from "@/components/Sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import AuthorityNotificationBell from "@/app/authority/_components/AuthorityNotificationBell";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [userName, setUserName] = useState("");
+  const profileRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const name = data?.user?.user_metadata?.full_name
+        ?? data?.user?.email?.split("@")[0]
+        ?? "Admin";
+      setUserName(name);
+    });
+  }, []);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -71,12 +96,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         icon: <MessageSquare size={20} strokeWidth={2} />,
         href: "#",
       },
-      {
-        id: "logout",
-        name: "Logout",
-        icon: <LogOut size={20} strokeWidth={2} />,
-        onClick: handleLogout,
-      },
     ],
   };
 
@@ -93,13 +112,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const currentPage = pageTitles[pathname] ?? { title: "Admin", subtitle: "" };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-[#161616]">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-[#161616]">
       <Sidebar
         {...sidebarConfig}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        disableInternalScroll
       />
 
       {/* Main content area — flex-1 fills remaining space naturally */}
@@ -127,11 +147,53 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             </div>
+
+            {/* Right side — Notifications + Profile */}
+            <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
+              <AuthorityNotificationBell />
+
+              <div ref={profileRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen((o) => !o)}
+                  className="flex h-10 items-center gap-2 rounded-full border border-gray-200
+                             bg-white px-3 shadow-sm transition-colors
+                             hover:bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]
+                             dark:hover:bg-[#2a2a2a]"
+                >
+                  <UserCircle2 size={18} className="text-gray-700 dark:text-gray-300" />
+                  <ChevronDown size={16} className={`text-gray-500 dark:text-gray-400 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden
+                                  rounded-xl border border-gray-200 bg-white shadow-xl
+                                  dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                    <div className="border-b border-gray-100 px-4 py-3 dark:border-[#2a2a2a]">
+                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        {userName}
+                      </p>
+                      <p className="text-[11px] text-gray-400">Admin</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium
+                                 text-red-600 transition-colors hover:bg-red-50
+                                 dark:hover:bg-red-900/20"
+                    >
+                      <LogOut size={15} />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </header>
 
         {/* Page Content — edge to edge, no padding */}
-        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-x-hidden">
+        <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>

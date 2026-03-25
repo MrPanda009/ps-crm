@@ -8,11 +8,6 @@ import {
   Popup,
   useMap,
 } from "react-leaflet";
-import dynamic from "next/dynamic";
-const MarkerClusterGroup = dynamic(
-  () => import("react-leaflet-markercluster").then((mod) => mod.default ?? mod),
-  { ssr: false }
-) as React.ComponentType<{ children: React.ReactNode }>;
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
@@ -28,6 +23,24 @@ type MapComplaint = {
   lat: number;
   lng: number;
 };
+
+const DEFAULT_CENTER: [number, number] = [28.6139, 77.209];
+const DEFAULT_ZOOM = 12;
+
+const SEVERITY_COLOR: Record<string, string> = {
+  L1: "#38bdf8",
+  L2: "#f59e0b",
+  L3: "#f97316",
+  L4: "#ef4444",
+};
+
+function normalizeSeverityLevel(severity: string): "L1" | "L2" | "L3" | "L4" {
+  const s = (severity ?? "").toLowerCase().trim();
+  if (s === "l4" || s === "critical" || s === "crit") return "L4";
+  if (s === "l3" || s === "high") return "L3";
+  if (s === "l2" || s === "medium" || s === "med") return "L2";
+  return "L1";
+}
 
 function parseEwkbHexPoint(hex: string): { lat: number; lng: number } | null {
   const normalized = hex.trim();
@@ -154,8 +167,12 @@ function parseLocationToLatLng(location: unknown): { lat: number; lng: number } 
 
 export default function MapComponent({
   selectedComplaintId,
+  recenterTrigger,
+  highQuality,
 }: {
   selectedComplaintId?: string | null;
+  recenterTrigger?: number;
+  highQuality?: boolean;
 }) {
   const [complaints, setComplaints] = useState<MapComplaint[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -213,8 +230,6 @@ export default function MapComponent({
 
   useEffect(() => {
     setMounted(true);
-    import("react-leaflet-markercluster/styles");
-
     import("leaflet").then((L) => {
       delete (L.Icon.Default.prototype as any)._getIconUrl;
 
@@ -240,17 +255,13 @@ export default function MapComponent({
   if (!mounted) return null;
 
   const getSeverityIcon = (severity: string, L: any) => {
-    const colors: Record<string, string> = {
-      low: "green",
-      medium: "gold",
-      high: "orange",
-      critical: "red",
-    };
+    const level = normalizeSeverityLevel(severity);
+    const color = SEVERITY_COLOR[level];
 
     return new L.DivIcon({
       html: `
         <div style="
-          background-color: ${colors[severity] || "blue"};
+          background-color: ${color};
           width: 16px;
           height: 16px;
           border-radius: 50%;
@@ -263,7 +274,7 @@ export default function MapComponent({
   };
 
   return (
-    <div style={{ position: "relative", height: "500px", width: "100%" }}>
+    <div style={{ position: "relative", height: "100%", width: "100%" }}>
       <div className="absolute right-4 top-4 z-[1000] flex items-center gap-3 pointer-events-none">
         <button
           onClick={() => setShowHeatmap(!showHeatmap)}
@@ -274,41 +285,54 @@ export default function MapComponent({
       </div>
 
       <MapContainer
-        center={[28.6139, 77.209]}
-        zoom={12}
+        center={DEFAULT_CENTER}
+        zoom={DEFAULT_ZOOM}
+        maxZoom={highQuality ? 20 : 19}
+        zoomSnap={highQuality ? 0.25 : 1}
+        zoomDelta={highQuality ? 0.25 : 1}
+        zoomControl={false}
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
-          attribution="© OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={
+            highQuality
+              ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              : "© OpenStreetMap contributors"
+          }
+          url={
+            highQuality
+              ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          }
+          detectRetina={Boolean(highQuality)}
+          maxNativeZoom={highQuality ? 20 : 19}
+          subdomains={highQuality ? "abcd" : "abc"}
         />
         <ZoomToComplaint
           complaints={complaints}
           selectedComplaintId={selectedComplaintId}
         />
-        {!showHeatmap && (
-          <MarkerClusterGroup>
-            {complaints.map((c) => (
-              <Marker
-                key={c.id}
-                position={[c.lat, c.lng]}
-                icon={
-                  leaflet
-                    ? getSeverityIcon(c.severity, leaflet)
-                    : undefined
-                }
-              >
-                <Popup>
-                  <strong>{c.title}</strong>
-                  <br />
-                  {c.description}
-                  <br />
-                  <b>Severity:</b> {c.severity}
-                </Popup>
-              </Marker>
-            ))}
-          </MarkerClusterGroup>
-        )}
+        <ResetToDefaultView recenterTrigger={recenterTrigger} />
+        {!showHeatmap &&
+          complaints.map((c) => (
+            <Marker
+              key={c.id}
+              position={[c.lat, c.lng]}
+              icon={
+                leaflet
+                  ? getSeverityIcon(c.severity, leaflet)
+                  : undefined
+              }
+            >
+              <Popup>
+                <strong>{c.title}</strong>
+                <br />
+                {c.description}
+                <br />
+                <b>Severity:</b> {c.severity}
+              </Popup>
+            </Marker>
+          ))}
 
         {showHeatmap && <HeatmapLayer complaints={complaints} />}
       </MapContainer>
@@ -354,6 +378,17 @@ export default function MapComponent({
   );
 }
 
+function ResetToDefaultView({ recenterTrigger }: { recenterTrigger?: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!recenterTrigger) return;
+    map.setView(DEFAULT_CENTER, DEFAULT_ZOOM, { animate: true });
+  }, [recenterTrigger, map]);
+
+  return null;
+}
+
 function HeatmapLayer({ complaints }: { complaints: any[] }) {
   const map = useMap();
 
@@ -394,14 +429,14 @@ function HeatmapLayer({ complaints }: { complaints: any[] }) {
 }
 
 function getIntensity(severity: string) {
-  switch (severity) {
-    case "critical":
+  switch (normalizeSeverityLevel(severity)) {
+    case "L4":
       return 1.0;
-    case "high":
+    case "L3":
       return 0.75;
-    case "medium":
+    case "L2":
       return 0.5;
-    case "low":
+    case "L1":
       return 0.25;
     default:
       return 0.3;

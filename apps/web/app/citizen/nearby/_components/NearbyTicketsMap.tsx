@@ -337,7 +337,7 @@ export default function NearbyTicketsMap({
               className={`absolute left-3 top-3 z-[1000] flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-lg transition-all ${
                 showHeatmap
                   ? "border-orange-600 bg-orange-500 text-white"
-                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
               }`}
               title="Toggle heatmap overlay"
             >
@@ -346,7 +346,7 @@ export default function NearbyTicketsMap({
             </button>
 
             {/* Bottom left: Radius slider */}
-            <div className="absolute bottom-3 left-3 z-[1000] flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur dark:border-gray-700 dark:bg-gray-900/95">
+            <div className="absolute bottom-3 left-3 z-[1000] flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur dark:border-[#2a2a2a] dark:bg-[#1e1e1e]/95">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Radius</span>
               <input
                 type="range"
@@ -366,7 +366,7 @@ export default function NearbyTicketsMap({
             {/* Bottom right: Recenter button */}
             <button
               onClick={handleRecenter}
-              className="absolute bottom-3 right-3 z-[1000] inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-lg transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+              className="absolute bottom-3 right-3 z-[1000] inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-lg transition-colors hover:bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
               title="Center on my current location"
               aria-label="Center on my current location"
             >
@@ -379,7 +379,7 @@ export default function NearbyTicketsMap({
 
 
       {!hideCollapse && (
-        <div className="group relative flex h-7 shrink-0 select-none items-center justify-center border-y border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-900">
+        <div className="group relative flex h-7 shrink-0 select-none items-center justify-center border-y border-gray-200 bg-gray-100 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
           <button
             onClick={toggleCollapsed}
             className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-[10px] font-semibold text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"

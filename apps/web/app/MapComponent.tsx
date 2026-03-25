@@ -8,9 +8,17 @@ const MapComponent = dynamic(() => import("@/components/MapComponent"), {
 
 export default function MapPage({
   selectedComplaintId,
+  recenterTrigger,
 }: {
   selectedComplaintId?: string | null;
+  recenterTrigger?: number;
 }) {
-  return <MapComponent selectedComplaintId={selectedComplaintId} />;
+  return (
+    <MapComponent
+      selectedComplaintId={selectedComplaintId}
+      recenterTrigger={recenterTrigger}
+      highQuality
+    />
+  );
 }
 

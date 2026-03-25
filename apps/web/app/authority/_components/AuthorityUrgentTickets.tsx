@@ -19,11 +19,11 @@ function SkeletonRow() {
   return (
     <div className="px-5 py-3 animate-pulse space-y-2">
       <div className="flex gap-2">
-        <div className="h-4 w-14 rounded-full bg-gray-100 dark:bg-gray-800" />
-        <div className="h-4 w-10 rounded-full bg-gray-100 dark:bg-gray-800" />
+        <div className="h-4 w-14 rounded-full bg-gray-100 dark:bg-[#2a2a2a]" />
+        <div className="h-4 w-10 rounded-full bg-gray-100 dark:bg-[#2a2a2a]" />
       </div>
-      <div className="h-3.5 w-4/5 rounded bg-gray-100 dark:bg-gray-800" />
-      <div className="h-2.5 w-3/5 rounded bg-gray-50 dark:bg-gray-900" />
+      <div className="h-3.5 w-4/5 rounded bg-gray-100 dark:bg-[#2a2a2a]" />
+      <div className="h-2.5 w-3/5 rounded bg-gray-50 dark:bg-[#1e1e1e]" />
     </div>
   )
 }
@@ -43,7 +43,7 @@ function UrgentRow({
   return (
     <button
       onClick={() => onSelect(c)}
-      className="w-full px-5 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+      className="w-full px-5 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors"
     >
       <div className="flex flex-wrap items-center gap-1.5 mb-1">
         <span 
@@ -99,10 +99,10 @@ export default function AuthorityUrgentTickets({ tickets, loading, error }: Prop
 
   return (
     <>
-      <div className="flex flex-col rounded-2xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-950">
+      <div className="flex h-[420px] flex-col rounded-2xl border border-gray-100 bg-white dark:border-[#2a2a2a] dark:bg-[#161616]">
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-[#2a2a2a]">
           <div className="flex items-center gap-2">
             <AlertTriangle size={15} className="text-orange-500" />
             <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
@@ -111,14 +111,14 @@ export default function AuthorityUrgentTickets({ tickets, loading, error }: Prop
           </div>
           <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tickets.length > 0
               ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-              : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+              : "bg-gray-100 text-gray-400 dark:bg-[#1e1e1e] dark:text-gray-400"
             }`}>
             {tickets.length}
           </span>
         </div>
 
         {/* List */}
-        <div className="flex-1 divide-y divide-gray-50 overflow-y-auto dark:divide-gray-800/60">
+        <div className="min-h-0 flex-1 divide-y divide-gray-50 overflow-y-auto dark:divide-[#2a2a2a]">
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
           ) : error ? (
@@ -136,7 +136,7 @@ export default function AuthorityUrgentTickets({ tickets, loading, error }: Prop
 
         {/* Footer */}
         {!loading && tickets.length > 0 && (
-          <div className="border-t border-gray-100 px-5 py-3 dark:border-gray-800">
+          <div className="border-t border-gray-100 px-5 py-3 dark:border-[#2a2a2a]">
             <a
               href="/authority/track"
               className="text-xs font-semibold text-[#b4725a] hover:underline"

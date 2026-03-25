@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, Menu, UserCircle2 } from "lucide-react";
 import Sidebar, { defaultSidebarConfig } from "@/components/Sidebar";
-import { ClipboardList, LayoutGrid, LogOut, User } from "lucide-react";
+import { ClipboardList, LayoutGrid, LogOut } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -70,20 +70,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         isActive: pathname === "/worker/tasks",
       },
     ],
-    bottomNavigation: [
-      {
-        id: "profile",
-        name: "Profile",
-        icon: <User size={20} strokeWidth={2} />,
-        href: "/worker?view=profile",
-      },
-      {
-        id: "logout",
-        name: "Logout",
-        icon: <LogOut size={20} strokeWidth={2} />,
-        onClick: handleLogout,
-      },
-    ],
+    bottomNavigation: [],
   };
 
   return (
@@ -94,6 +81,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onClose={() => setIsSidebarOpen(false)}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        disableInternalScroll
       />
 
       <div className="flex-1 flex min-h-0 min-w-0 flex-col max-w-full overflow-x-hidden">

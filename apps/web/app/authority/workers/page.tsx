@@ -143,13 +143,13 @@ export default function WorkersPage() {
           placeholder="Search by name or email…"
           className="flex-1 min-w-52 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#b4725a]
-                     dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                     dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-200"
         />
-        <div className="flex overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
           {(["all","available","busy","inactive"] as const).map(f => (
             <button key={f} onClick={() => setAvailFilter(f)}
               className={`px-4 py-2 text-sm font-medium capitalize transition-colors
-                ${availFilter===f ? "bg-[#b4725a] text-white" : "text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700"}`}>
+                ${availFilter===f ? "bg-[#b4725a] text-white" : "text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-[#2a2a2a]"}`}>
               {f}
             </button>
           ))}
@@ -160,15 +160,15 @@ export default function WorkersPage() {
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[...Array(6)].map((_,i) => (
-            <div key={i} className="animate-pulse rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <div key={i} className="animate-pulse rounded-2xl border border-gray-100 bg-white p-5 dark:border-[#2a2a2a] dark:bg-[#161616]">
               <div className="mb-3 flex items-start justify-between gap-2">
                 <div className="space-y-2">
-                  <div className="h-4 w-36 rounded-lg bg-gray-100 dark:bg-gray-800"/>
-                  <div className="h-3 w-24 rounded-lg bg-gray-100 dark:bg-gray-800"/>
+                  <div className="h-4 w-36 rounded-lg bg-gray-100 dark:bg-[#2a2a2a]"/>
+                  <div className="h-3 w-24 rounded-lg bg-gray-100 dark:bg-[#2a2a2a]"/>
                 </div>
-                <div className="h-5 w-16 rounded-full bg-gray-100 dark:bg-gray-800"/>
+                <div className="h-5 w-16 rounded-full bg-gray-100 dark:bg-[#2a2a2a]"/>
               </div>
-              <div className="mt-4 h-14 rounded-xl bg-gray-50 dark:bg-gray-800"/>
+              <div className="mt-4 h-14 rounded-xl bg-gray-50 dark:bg-[#1e1e1e]"/>
             </div>
           ))}
         </div>
@@ -177,13 +177,13 @@ export default function WorkersPage() {
           {error}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 p-8 text-center dark:border-gray-700">
+        <div className="rounded-2xl border border-dashed border-gray-200 p-8 text-center dark:border-[#2a2a2a]">
           {workers.length === 0 ? (
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No workers found</p>
               <p className="mt-1 text-xs text-gray-400">
                 {dept
-                  ? <>No worker profiles in the <span className="font-semibold">{dept}</span> department. Workers need a <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">worker_profiles</code> row with matching department.</>
+                  ? <>No worker profiles in the <span className="font-semibold">{dept}</span> department. Workers need a <code className="rounded bg-gray-100 px-1 dark:bg-[#1e1e1e]">worker_profiles</code> row with matching department.</>
                   : "Your profile has no department set — workers are filtered by department."}
               </p>
             </div>
@@ -200,7 +200,7 @@ export default function WorkersPage() {
 
             return (
               <div key={w.worker_id}
-                className="group rounded-2xl border border-gray-100 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+                className="group rounded-2xl border border-gray-100 bg-white p-5 transition-shadow hover:shadow-md dark:border-[#2a2a2a] dark:bg-[#161616]">
 
                 {/* Header row */}
                 <div className="mb-4 flex items-start justify-between gap-2">
@@ -222,7 +222,7 @@ export default function WorkersPage() {
                 </div>
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 divide-x divide-gray-100 rounded-xl bg-gray-50 py-3 text-center dark:divide-gray-800 dark:bg-gray-800/60">
+                <div className="grid grid-cols-2 divide-x divide-gray-100 rounded-xl bg-gray-50 py-3 text-center dark:divide-[#2a2a2a] dark:bg-[#1e1e1e]">
                   <div>
                     <p className="text-lg font-bold text-gray-900 dark:text-white">{w.active_complaints}</p>
                     <p className="text-[10px] font-medium text-gray-400">Active</p>

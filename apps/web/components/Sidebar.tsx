@@ -97,6 +97,7 @@ export interface SidebarConfig {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onLogout?: () => void;
+  disableInternalScroll?: boolean;
 }
 
 // 2. Default Configuration (matches your Taskify UI design)
@@ -160,7 +161,8 @@ const Sidebar: React.FC<SidebarConfig> = ({
   onClose,
   isCollapsed = false,
   onToggleCollapse,
-  onLogout
+  onLogout,
+  disableInternalScroll = false,
 }) => {
   const sidebarRef = useRef<HTMLElement>(null);
   const { theme, toggleTheme } = useTheme();
@@ -204,7 +206,8 @@ const Sidebar: React.FC<SidebarConfig> = ({
       <aside
         ref={sidebarRef}
         className={`
-          fixed lg:relative top-0 left-0 z-[3001] min-h-screen flex flex-col py-8 overflow-x-visible font-sans transition-all duration-300 ease-in-out
+          fixed lg:relative top-0 left-0 z-[3001] flex flex-col overflow-x-visible font-sans transition-all duration-300 ease-in-out
+          ${disableInternalScroll ? "h-screen py-4" : "min-h-screen py-8"}
           ${colors.background} ${colors.border} lg:border-r lg:relative lg:translate-x-0
           ${isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
           ${isCollapsed ? "w-20" : "w-64"}
@@ -219,9 +222,9 @@ const Sidebar: React.FC<SidebarConfig> = ({
         </button>
 
         {/* make top part scrollable so bottom nav stays visible */}
-        <div className="flex min-h-0 flex-col flex-1 overflow-y-auto">
+        <div className={`flex min-h-0 flex-col flex-1 ${disableInternalScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}>
           {/* Logo & Mobile Close Button */}
-          <div className={`flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-8"} mb-10 menu-item transition-all duration-300`}>
+          <div className={`flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-8"} ${disableInternalScroll ? "mb-6" : "mb-10"} menu-item transition-all duration-300`}>
             <div className={`flex items-center ${isCollapsed ? "justify-center gap-0" : "gap-3"} transition-all duration-300`}>
               <div className="shrink-0 flex items-center justify-center">
                 {branding.icon}

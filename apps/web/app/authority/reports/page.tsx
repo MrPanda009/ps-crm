@@ -106,14 +106,14 @@ function avgDays(complaints: Complaint[]): string {
 // ── Compact card wrapper ───────────────────────────────────────────────────────
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900 ${className}`}>
+    <div className={`rounded-xl border border-gray-100 bg-white dark:border-[#2a2a2a] dark:bg-[#161616] ${className}`}>
       {children}
     </div>
   )
 }
 function CardHead({ title, sub, action }: { title: string; sub?: string; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between border-b border-gray-50 px-4 py-3 dark:border-gray-800">
+    <div className="flex items-center justify-between border-b border-gray-50 px-4 py-3 dark:border-[#2a2a2a]">
       <div>
         <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{title}</p>
         {sub && <p className="mt-0.5 text-[10px] text-gray-400">{sub}</p>}
@@ -126,7 +126,7 @@ function CardHead({ title, sub, action }: { title: string; sub?: string; action?
 function ChartTip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+    <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
       <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
       {payload.map((p: any) => (
         <div key={p.name} className="flex items-center justify-between gap-4 py-0.5">
@@ -141,11 +141,20 @@ function ChartTip({ active, payload, label }: any) {
 }
 
 function Skel() {
-  return <div className="h-36 animate-pulse rounded-lg bg-gray-50 dark:bg-gray-800" />
+  return <div className="h-36 animate-pulse rounded-lg bg-gray-50 dark:bg-[#1e1e1e]" />
 }
 
 function Delta({ now, prev, invert = false }: { now: number; prev: number; invert?: boolean }) {
-  if (!prev) return null
+  if (prev === 0) {
+    if (now === 0) {
+      return <span className="flex items-center gap-0.5 text-[10px] text-gray-400"><Minus size={8} />same</span>
+    }
+    return (
+      <span className={`flex items-center gap-0.5 text-[10px] font-semibold ${invert ? "text-red-500" : "text-emerald-600"}`}>
+        <ArrowUp size={8} />new vs prev
+      </span>
+    )
+  }
   const d = now - prev
   const p = Math.abs(Math.round((d / prev) * 100))
   const good = invert ? d < 0 : d > 0
@@ -164,17 +173,17 @@ function GranDropdown({ value, onChange }: { value: Granularity; onChange: (v: G
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300"
       >
         {active.label}
         <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      <div className={`absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 transition-all duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
+      <div className={`absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e] transition-all duration-150 ${open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}>
         {GRAN_OPTIONS.map(o => (
           <button
             key={o.value}
             onClick={() => { onChange(o.value); setOpen(false) }}
-            className={`block w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${value === o.value ? "font-bold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}
+            className={`block w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-[#2a2a2a] ${value === o.value ? "font-bold text-[#b4725a]" : "text-gray-700 dark:text-gray-300"}`}
           >
             {o.label}
           </button>
