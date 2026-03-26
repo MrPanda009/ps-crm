@@ -117,10 +117,10 @@ export default function WorkerTaskMapPanel({
   )
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 sm:text-base">Task Map</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
           <span className="text-xs text-gray-500 dark:text-gray-400">Live ticket locations</span>
           <button
             type="button"
@@ -140,7 +140,7 @@ export default function WorkerTaskMapPanel({
 
       {loading ? <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">Loading map...</p> : null}
 
-      <div className="relative h-[360px] overflow-hidden rounded-lg border border-gray-100 dark:border-[#2a2a2a] sm:h-[420px]">
+      <div className="relative h-[280px] overflow-hidden rounded-lg border border-gray-100 dark:border-[#2a2a2a] sm:h-[360px] lg:h-[420px]">
         {isClientReady ? (
           <MapContainer key={mapSessionKey} center={[28.6139, 77.209]} zoom={11} scrollWheelZoom className="h-full w-full">
             <TileLayer
@@ -168,17 +168,6 @@ export default function WorkerTaskMapPanel({
                     <span className={`inline-block rounded-full border px-2 py-1 text-xs ${severityClass(task.severity)}`}>
                       {task.severity}
                     </span>
-                    {onSelectTask ? (
-                      <div>
-                        <button
-                          type="button"
-                          className="inline-block rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                          onClick={() => onSelectTask(task.id)}
-                        >
-                          Use this ticket
-                        </button>
-                      </div>
-                    ) : null}
                   </div>
                 </Popup>
               </Marker>

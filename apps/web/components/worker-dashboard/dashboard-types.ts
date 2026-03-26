@@ -6,6 +6,7 @@ export type ComplaintStatus = Database["public"]["Enums"]["complaint_status"]
 export type DashboardTask = {
   id: string
   ticketId: string
+  assignedWorkerId: string | null
   description: string
   category: string
   location: string

@@ -207,7 +207,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
         ref={sidebarRef}
         className={`
           fixed lg:relative top-0 left-0 z-[3001] flex flex-col overflow-x-visible font-sans transition-all duration-300 ease-in-out
-          ${disableInternalScroll ? "h-screen py-4" : "min-h-screen py-8"}
+          ${disableInternalScroll ? "h-dvh overflow-y-hidden py-4" : "min-h-screen py-8"}
           ${colors.background} ${colors.border} lg:border-r lg:relative lg:translate-x-0
           ${isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
           ${isCollapsed ? "w-20" : "w-64"}
@@ -216,7 +216,9 @@ const Sidebar: React.FC<SidebarConfig> = ({
         {/* Desktop Collapse Toggle */}
         <button
           onClick={onToggleCollapse}
-          className={`absolute -right-3 top-10 z-[3002] hidden lg:flex h-6 w-6 items-center justify-center rounded-full border text-gray-500 shadow-md hover:text-gray-900 dark:border-[#C9A84C]/40 dark:text-gray-400 dark:hover:text-[#C9A84C] transition-all duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-[#B48470] dark:focus:ring-[#C9A84C] focus:outline-none ${colors.toggleButtonBg}`}
+          className={`absolute -right-3 top-10 z-[3002] hidden lg:flex h-6 w-6 items-center justify-center rounded-full border text-gray-500 shadow-md hover:text-gray-900 dark:border-[#C9A84C]/40 dark:text-gray-400 dark:hover:text-[#C9A84C] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B48470] dark:focus-visible:ring-[#C9A84C] ${colors.toggleButtonBg}`}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>

@@ -90,23 +90,24 @@ export default function WorkerTasksPage() {
       }
 
       if (isActive) {
-        setTasks(complaintRows || []);
+        setTasks((complaintRows || []).filter((task) => task.assigned_worker_id === currentWorkerId));
         setLoading(false);
       }
     }
 
-    const upsertTask = (prev: ComplaintRow[], incoming: ComplaintRow): ComplaintRow[] => {
+    const upsertTask = (prev: ComplaintRow[], incoming: ComplaintRow, currentWorkerId: string): ComplaintRow[] => {
       // Only keep assigned, in_progress, or resolved tickets in this view
       const isValidStatus = ["assigned", "in_progress", "resolved"].includes(incoming.status || "");
+      const isAssignedToCurrentWorker = incoming.assigned_worker_id === currentWorkerId;
       
       const existingIndex = prev.findIndex((item) => item.id === incoming.id);
       
       if (existingIndex === -1) {
-        if (!isValidStatus) return prev; // Don't add if status is not valid
+        if (!isValidStatus || !isAssignedToCurrentWorker) return prev;
         return [incoming, ...prev].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       }
 
-      if (!isValidStatus) {
+      if (!isValidStatus || !isAssignedToCurrentWorker) {
         // Ticket changed to a status not visible on this board (e.g. escalated), remove it
         return prev.filter(item => item.id !== incoming.id);
       }
@@ -136,7 +137,7 @@ export default function WorkerTasksPage() {
           },
           (payload) => {
             const incoming = payload.new as ComplaintRow;
-            setTasks((prev) => upsertTask(prev, incoming));
+            setTasks((prev) => upsertTask(prev, incoming, currentWorkerId));
           }
         )
         .on(
@@ -149,7 +150,7 @@ export default function WorkerTasksPage() {
           },
           (payload) => {
             const incoming = payload.new as ComplaintRow;
-            setTasks((prev) => upsertTask(prev, incoming));
+            setTasks((prev) => upsertTask(prev, incoming, currentWorkerId));
           }
         )
         .on(
@@ -189,10 +190,10 @@ export default function WorkerTasksPage() {
   }, []);
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-4">
-      <section className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-8rem)] dark:border-[#2a2a2a] dark:bg-[#161616]">
-        <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
-          <div className="min-w-[980px] flex flex-col flex-1 min-h-0">
+    <div className="w-full px-4 py-4 sm:px-6">
+      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#161616]">
+        <div className="overflow-x-auto">
+          <div className="min-w-[980px]">
             <div className="sticky top-0 z-10 grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400">
               <span>Ticket ID</span>
               <span>Issue Title</span>
@@ -202,7 +203,7 @@ export default function WorkerTasksPage() {
               <span>Reported Time</span>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div>
               {loading && <div className="px-5 py-8 text-sm text-gray-500 dark:text-gray-400">Loading tasks...</div>}
               {!loading && error && <div className="px-5 py-8 text-sm text-red-600 dark:text-red-400">{error}</div>}
               {!loading && !error && tasks.length === 0 && (
