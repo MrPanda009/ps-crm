@@ -5,7 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/src/types/database.types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY ?? supabaseAnonKey;
 const mapplsApiKey = process.env.MAPPLS_API_KEY ?? process.env.NEXT_PUBLIC_MAPPLS_API_KEY ?? "";
 const reverseGeocodeCache = new Map<string, ReverseGeo>();
 const ALLOWED_STATUSES = ["submitted", "verified", "assigned", "in_progress", "resolved", "closed"] as const;
@@ -36,6 +37,12 @@ const ndmcLocalityHints = ["connaught", "cp", "lutyens", "chanakyapuri", "janpat
 
 // Use a server-side Supabase client
 const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
+
+function getAuthClient() {
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
 
 interface ComplaintPayload {
   citizen_id: string;
@@ -490,6 +497,27 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "complaint_id is required" }, { status: 400 });
   }
 
+  const authorization = req.headers.get("authorization") ?? "";
+  const bearerPrefix = "Bearer ";
+  const token = authorization.startsWith(bearerPrefix)
+    ? authorization.slice(bearerPrefix.length).trim()
+    : "";
+
+  let voterCitizenId: string | null = null;
+  if (token) {
+    const authClient = getAuthClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser(token);
+
+    if (authError || !user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    voterCitizenId = user.id;
+  }
+
   const { data: current, error: fetchError } = await supabase
     .from("complaints")
     .select("id, upvote_count, ticket_id, status")
@@ -498,6 +526,31 @@ export async function PATCH(req: NextRequest) {
 
   if (fetchError || !current) {
     return NextResponse.json({ error: "Complaint not found" }, { status: 404 });
+  }
+
+  if (voterCitizenId) {
+    const { data: existingVote, error: existingVoteError } = await supabase
+      .from("upvotes")
+      .select("id")
+      .eq("citizen_id", voterCitizenId)
+      .eq("complaint_id", body.complaint_id)
+      .maybeSingle();
+
+    if (existingVoteError) {
+      return NextResponse.json({ error: existingVoteError.message }, { status: 500 });
+    }
+
+    if (existingVote) {
+      return NextResponse.json({ success: true, complaint: current, duplicate: true }, { status: 200 });
+    }
+
+    const { error: insertVoteError } = await supabase
+      .from("upvotes")
+      .insert({ citizen_id: voterCitizenId, complaint_id: body.complaint_id });
+
+    if (insertVoteError) {
+      return NextResponse.json({ error: insertVoteError.message }, { status: 500 });
+    }
   }
 
   const nextCount = (current.upvote_count ?? 0) + 1;
@@ -510,6 +563,26 @@ export async function PATCH(req: NextRequest) {
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  if (voterCitizenId) {
+    const { count: voteCount, error: countError } = await supabase
+      .from("upvotes")
+      .select("id", { count: "exact", head: true })
+      .eq("complaint_id", body.complaint_id);
+
+    if (!countError && typeof voteCount === "number" && voteCount !== (updated.upvote_count ?? 0)) {
+      const { data: corrected, error: correctedError } = await supabase
+        .from("complaints")
+        .update({ upvote_count: voteCount })
+        .eq("id", body.complaint_id)
+        .select("id, ticket_id, upvote_count, status")
+        .single();
+
+      if (!correctedError && corrected) {
+        return NextResponse.json({ success: true, complaint: corrected }, { status: 200 });
+      }
+    }
   }
 
   return NextResponse.json({ success: true, complaint: updated }, { status: 200 });

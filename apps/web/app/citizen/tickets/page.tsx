@@ -272,6 +272,17 @@ function CitizenTicketsPageContent() {
           setTickets((prev) => prev.filter((item) => item.id !== deletedId));
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "upvotes",
+        },
+        () => {
+          void fetchTickets();
+        }
+      )
       .subscribe((status) => {
         // Recover quickly from transient realtime channel issues to avoid stale upvote counts.
         if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && isActive) {

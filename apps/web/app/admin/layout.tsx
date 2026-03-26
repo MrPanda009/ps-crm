@@ -18,7 +18,7 @@ import {
 import Sidebar, { defaultSidebarConfig, SidebarNavigationItem } from "@/components/Sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
-import AuthorityNotificationBell from "@/app/authority/_components/AuthorityNotificationBell";
+import AdminNotificationBell from "@/app/admin/_components/AdminNotificationBell";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -143,7 +143,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Right side — Notifications + Profile */}
             <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
-              <AuthorityNotificationBell />
+              <AdminNotificationBell />
 
               <div ref={profileRef} className="relative">
                 <button

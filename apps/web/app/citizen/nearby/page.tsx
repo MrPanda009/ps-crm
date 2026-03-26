@@ -58,6 +58,7 @@ function uniqueSorted(items: Array<string | null | undefined>): string[] {
 export default function NearbyTicketsPage() {
   const {
     visibleComplaints,
+    hasUpvoted,
     loading,
     error,
     updateRadius,
@@ -425,6 +426,7 @@ export default function NearbyTicketsPage() {
                     {filteredComplaints.map((complaint) => {
                       const severity = getSeverityConfig(complaint.effective_severity || complaint.severity);
                       const isSelected = selectedComplaintId === complaint.id;
+                      const isUpvoted = hasUpvoted.has(complaint.id);
 
                       return (
                         <li
@@ -467,9 +469,14 @@ export default function NearbyTicketsPage() {
                                 e.stopPropagation();
                                 handleUpvote(complaint.id);
                               }}
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
+                              disabled={isUpvoted}
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium transition-colors ${
+                                isUpvoted
+                                  ? "cursor-not-allowed bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
+                              }`}
                             >
-                              <ArrowUp size={14} className="text-gray-400 dark:text-gray-500" />
+                              <ArrowUp size={14} className={isUpvoted ? "text-purple-600 dark:text-purple-300" : "text-gray-400 dark:text-gray-500"} />
                               {complaint.upvote_count ?? 0}
                             </button>
                           </span>

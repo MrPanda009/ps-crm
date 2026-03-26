@@ -17,12 +17,15 @@ type WorkerTaskMapPanelProps = {
   onSelectTask?: (taskId: string) => void
 }
 
-function createMarkerIcon(color: string): L.DivIcon {
+function createMarkerIcon(color: string, highlighted = false): L.DivIcon {
+  const size = highlighted ? 22 : 18
+  const border = highlighted ? 4 : 3
+  const shadow = highlighted ? "0 0 0 3px rgba(180,114,90,0.25), 0 0 8px rgba(0,0,0,0.3)" : "0 0 6px rgba(0,0,0,0.25)"
   return new L.DivIcon({
     className: "",
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.25);"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border}px solid #fff;box-shadow:${shadow};"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   })
 }
 
@@ -38,6 +41,39 @@ function FitMapToMarkers({ points }: { points: Array<{ lat: number; lng: number 
   return null
 }
 
+function ZoomToHighlightedTask({
+  task,
+}: {
+  task: { lat: number; lng: number } | null
+}) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!task) return
+    map.setView([task.lat, task.lng], 15, { animate: true })
+  }, [map, task])
+
+  return null
+}
+
+function ResetToTaskBounds({
+  points,
+  recenterTrigger,
+}: {
+  points: Array<{ lat: number; lng: number }>
+  recenterTrigger: number
+}) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (recenterTrigger === 0 || points.length === 0) return
+    const bounds = L.latLngBounds(points.map((point) => [point.lat, point.lng]))
+    map.fitBounds(bounds, { padding: [20, 20], maxZoom: 15 })
+  }, [map, points, recenterTrigger])
+
+  return null
+}
+
 export default function WorkerTaskMapPanel({
   tasks,
   highlightedTaskId,
@@ -46,6 +82,7 @@ export default function WorkerTaskMapPanel({
   onSelectTask,
 }: WorkerTaskMapPanelProps) {
   const [isClientReady, setIsClientReady] = useState(false)
+  const [recenterTrigger, setRecenterTrigger] = useState(0)
   // Ensure each component mount gets a fresh Leaflet container identity.
   const mapSessionKey = useId()
 
@@ -59,14 +96,40 @@ export default function WorkerTaskMapPanel({
   )
 
   const markerIcons = useMemo(() => {
-    return new Map(mappableTasks.map((task) => [task.id, createMarkerIcon(markerColor(task.severity))]))
-  }, [mappableTasks])
+    return new Map(
+      mappableTasks.map((task) => [
+        task.id,
+        createMarkerIcon(markerColor(task.severity), task.id === highlightedTaskId),
+      ]),
+    )
+  }, [highlightedTaskId, mappableTasks])
+
+  const highlightedPoint = useMemo(() => {
+    if (!highlightedTaskId) return null
+    const task = mappableTasks.find((item) => item.id === highlightedTaskId)
+    if (!task || task.latitude == null || task.longitude == null) return null
+    return { lat: task.latitude, lng: task.longitude }
+  }, [highlightedTaskId, mappableTasks])
+
+  const mapPoints = useMemo(
+    () => mappableTasks.map((task) => ({ lat: task.latitude as number, lng: task.longitude as number })),
+    [mappableTasks],
+  )
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 sm:text-base">Task Map</h2>
-        <span className="text-xs text-gray-500 dark:text-gray-400">Live ticket locations</span>
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <span className="text-xs text-gray-500 dark:text-gray-400">Live ticket locations</span>
+          <button
+            type="button"
+            onClick={() => setRecenterTrigger((prev) => prev + 1)}
+            className="rounded-md bg-gray-900 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-gray-700"
+          >
+            Reset View
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -77,7 +140,7 @@ export default function WorkerTaskMapPanel({
 
       {loading ? <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">Loading map...</p> : null}
 
-      <div className="relative h-[360px] overflow-hidden rounded-lg border border-gray-100 dark:border-[#2a2a2a] sm:h-[420px]">
+      <div className="relative h-[280px] overflow-hidden rounded-lg border border-gray-100 dark:border-[#2a2a2a] sm:h-[360px] lg:h-[420px]">
         {isClientReady ? (
           <MapContainer key={mapSessionKey} center={[28.6139, 77.209]} zoom={11} scrollWheelZoom className="h-full w-full">
             <TileLayer
@@ -90,6 +153,13 @@ export default function WorkerTaskMapPanel({
                 key={task.id}
                 position={[task.latitude as number, task.longitude as number]}
                 icon={markerIcons.get(task.id) ?? createMarkerIcon(markerColor(task.severity))}
+                eventHandlers={
+                  onSelectTask
+                    ? {
+                        click: () => onSelectTask(task.id),
+                      }
+                    : undefined
+                }
               >
                 <Popup>
                   <div className="space-y-2 text-sm">
@@ -98,25 +168,16 @@ export default function WorkerTaskMapPanel({
                     <span className={`inline-block rounded-full border px-2 py-1 text-xs ${severityClass(task.severity)}`}>
                       {task.severity}
                     </span>
-                    {onSelectTask ? (
-                      <div>
-                        <button
-                          type="button"
-                          className="inline-block rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                          onClick={() => onSelectTask(task.id)}
-                        >
-                          Use this ticket
-                        </button>
-                      </div>
-                    ) : null}
                   </div>
                 </Popup>
               </Marker>
             ))}
 
             <FitMapToMarkers
-              points={mappableTasks.map((task) => ({ lat: task.latitude as number, lng: task.longitude as number }))}
+              points={mapPoints}
             />
+            <ResetToTaskBounds points={mapPoints} recenterTrigger={recenterTrigger} />
+            <ZoomToHighlightedTask task={highlightedPoint} />
           </MapContainer>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
