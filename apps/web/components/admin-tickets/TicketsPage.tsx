@@ -374,7 +374,7 @@ export default function TicketsPage() {
   }, [totalCount])
 
   return (
-    <section className="space-y-4 rounded-2xl border border-[#d8cfbe] bg-[#f4efe5] p-4 text-[#27221d] shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-[#d8cfbe] bg-[#f4efe5] p-4 text-[#27221d] shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-100 dark:shadow-none">
       <TicketsHeader now={now} />
       <TicketSearch
         value={search}
@@ -394,7 +394,7 @@ export default function TicketsPage() {
       />
 
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</div>
       ) : null}
 
       <TicketsTable
@@ -419,19 +419,19 @@ export default function TicketsPage() {
 
       {isViewOpen && selectedTicket ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-xl rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl dark:border-[#3a3a3a] dark:bg-[#1f1f1f]">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#27211d]">Ticket Details</h2>
+              <h2 className="text-lg font-semibold text-[#27211d] dark:text-gray-100">Ticket Details</h2>
               <button
                 type="button"
                 onClick={() => setIsViewOpen(false)}
-                className="rounded-lg border border-[#d8d0c5] px-2 py-1 text-sm text-[#3f3832]"
+                className="rounded-lg border border-[#d8d0c5] px-2 py-1 text-sm text-[#3f3832] dark:border-[#3a3a3a] dark:text-gray-300"
               >
                 Close
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 text-sm text-[#3a342f] sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 text-sm text-[#3a342f] dark:text-gray-300 sm:grid-cols-2">
               <p><span className="font-semibold">Ticket ID:</span> {selectedTicket.ticketId}</p>
               <p><span className="font-semibold">Status:</span> {selectedTicket.status}</p>
               <p><span className="font-semibold">Title:</span> {selectedTicket.title}</p>
@@ -448,16 +448,16 @@ export default function TicketsPage() {
 
       {isAssignOpen && selectedTicket ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl">
-            <h2 className="mb-2 text-lg font-semibold text-[#27211d]">Assign Worker</h2>
-            <p className="mb-4 text-sm text-[#4f463f]">Ticket: {selectedTicket.ticketId}</p>
+          <div className="w-full max-w-lg rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl dark:border-[#3a3a3a] dark:bg-[#1f1f1f]">
+            <h2 className="mb-2 text-lg font-semibold text-[#27211d] dark:text-gray-100">Assign Worker</h2>
+            <p className="mb-4 text-sm text-[#4f463f] dark:text-gray-400">Ticket: {selectedTicket.ticketId}</p>
 
             <label className="mb-4 block">
-              <span className="mb-1 block text-sm font-medium text-[#2f2924]">Select worker</span>
+              <span className="mb-1 block text-sm font-medium text-[#2f2924] dark:text-gray-200">Select worker</span>
               <select
                 value={assignWorkerId}
                 onChange={(event) => setAssignWorkerId(event.target.value)}
-                className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm text-[#312b26]"
+                className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm text-[#312b26] dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
               >
                 <option value="">Choose a worker</option>
                 {workers.map((worker) => (
@@ -472,7 +472,7 @@ export default function TicketsPage() {
               <button
                 type="button"
                 onClick={() => setIsAssignOpen(false)}
-                className="rounded-lg border border-[#d8d0c5] px-3 py-2 text-sm text-[#3f3832]"
+                className="rounded-lg border border-[#d8d0c5] px-3 py-2 text-sm text-[#3f3832] dark:border-[#3a3a3a] dark:text-gray-300"
               >
                 Cancel
               </button>
@@ -480,7 +480,7 @@ export default function TicketsPage() {
                 type="button"
                 onClick={() => void handleAssignWorker()}
                 disabled={!assignWorkerId || actionLoading}
-                className="rounded-lg bg-[#5c4438] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-[#5c4438] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#6a5042] disabled:opacity-50 dark:bg-[#C9A84C] dark:text-[#1a1a1a] dark:hover:bg-[#d8b65c]"
               >
                 {actionLoading ? "Assigning..." : "Assign Worker"}
               </button>

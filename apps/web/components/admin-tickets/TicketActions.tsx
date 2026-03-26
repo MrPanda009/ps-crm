@@ -10,7 +10,7 @@ type TicketActionsProps = {
 
 export default function TicketActions({ ticketId, disabled = false, onView, onAssign, onEscalate }: TicketActionsProps) {
   const baseClass =
-    "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d6cec3] bg-[#faf8f4] text-[#5c544c] transition hover:bg-white"
+    "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d6cec3] bg-[#faf8f4] text-[#5c544c] transition hover:bg-white dark:border-[#3a3a3a] dark:bg-[#2a2a2a] dark:text-gray-200 dark:hover:bg-[#3a3a3a]"
 
   return (
     <div className="flex items-center gap-2">

@@ -40,12 +40,12 @@ function FilterSelect({
   onSelect: (value: string) => void
 }) {
   return (
-    <label className="rounded-xl border border-[#d4cdc2] bg-white px-3 py-2 shadow-sm">
-      <span className="mb-1 block text-sm font-semibold text-[#2d2824]">{label}</span>
+    <label className="rounded-xl border border-[#d4cdc2] bg-white px-3 py-2 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+      <span className="mb-1 block text-sm font-semibold text-[#2d2824] dark:text-gray-100">{label}</span>
       <select
         value={value}
         onChange={(event) => onSelect(event.target.value)}
-        className="w-full bg-transparent text-sm text-[#38322d] outline-none"
+        className="w-full bg-transparent text-sm text-[#38322d] outline-none dark:text-gray-300"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

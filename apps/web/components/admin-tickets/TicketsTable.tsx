@@ -43,7 +43,7 @@ export default function TicketsTable({
   onEscalate,
 }: TicketsTableProps) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[#d4cdc2] bg-white shadow-sm">
+    <div className="overflow-x-auto rounded-2xl border border-[#d4cdc2] bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
       <table className="w-full min-w-[1130px] table-fixed border-collapse">
         <colgroup>
           {columnWidths.map((width, idx) => (
@@ -51,9 +51,9 @@ export default function TicketsTable({
           ))}
         </colgroup>
         <thead>
-          <tr className="bg-[#ece5db] text-left">
+          <tr className="bg-[#ece5db] text-left dark:bg-[#161616]">
             {headers.map((header) => (
-              <th key={header} className="border-b border-r border-[#d9d1c5] px-3 py-3 text-lg font-semibold text-[#2d2824] last:border-r-0">
+              <th key={header} className="border-b border-r border-[#d9d1c5] px-3 py-3 text-lg font-semibold text-[#2d2824] last:border-r-0 dark:border-[#2a2a2a] dark:text-gray-100">
                 {header}
               </th>
             ))}
@@ -62,7 +62,7 @@ export default function TicketsTable({
         <tbody>
           {tickets.length === 0 ? (
             <tr>
-              <td colSpan={10} className="px-4 py-8 text-center text-sm text-[#5b544d]">
+              <td colSpan={10} className="px-4 py-8 text-center text-sm text-[#5b544d] dark:text-gray-400">
                 No tickets matched your current filters.
               </td>
             </tr>

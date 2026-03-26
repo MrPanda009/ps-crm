@@ -381,20 +381,20 @@ export default function WorkersPage() {
   ])
 
   return (
-    <section className="space-y-4 rounded-2xl border border-[#d8cfbe] bg-[#f4efe5] p-4 text-[#27221d] shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-[#d8cfbe] bg-[#f4efe5] p-4 text-[#27221d] shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-100 dark:shadow-none">
       <AuthoritiesHeader now={now} {...headerStats} />
 
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={openCreateWorker}
-          className="rounded-xl bg-[#102d57] px-4 py-2 text-sm font-medium text-white"
+          className="rounded-xl bg-[#102d57] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1a3b6a] dark:bg-[#C9A84C] dark:text-[#1a1a1a] dark:hover:bg-[#d8b65c]"
         >
           + Add New Worker
         </button>
         <button
           type="button"
-          className="rounded-xl border border-[#d7cebf] bg-white px-4 py-2 text-sm font-medium text-[#2d2722]"
+          className="rounded-xl border border-[#d7cebf] bg-white px-4 py-2 text-sm font-medium text-[#2d2722] dark:border-[#3a3a3a] dark:bg-[#2a2a2a] dark:text-gray-100"
         >
           View Reports
         </button>
@@ -405,7 +405,7 @@ export default function WorkersPage() {
         <AuthorityFilters value={departmentFilter} options={departmentOptions} onChange={setDepartmentFilter} />
       </div>
 
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</div> : null}
 
       <AuthoritiesGrid
         authorities={filteredWorkers}
@@ -413,27 +413,27 @@ export default function WorkersPage() {
         onAssignDepartment={openAssignDepartment}
       />
 
-      <div className="flex justify-end pt-2 text-sm text-[#4b433b]">
+      <div className="flex justify-end pt-2 text-sm text-[#4b433b] dark:text-gray-400">
         <p>Platform Version 3.1 - National Deployment - Government of India</p>
       </div>
 
-      {loading ? <p className="text-sm text-[#5f554c]">Loading worker profiles from Supabase...</p> : null}
+      {loading ? <p className="text-sm text-[#5f554c] dark:text-gray-400">Loading worker profiles from Supabase...</p> : null}
 
       {viewWorker ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-xl rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl dark:border-[#3a3a3a] dark:bg-[#1f1f1f]">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#27211d]">Worker Profile</h2>
+              <h2 className="text-lg font-semibold text-[#27211d] dark:text-gray-100">Worker Profile</h2>
               <button
                 type="button"
                 onClick={() => setViewWorker(null)}
-                className="rounded-lg border border-[#d8d0c5] px-2 py-1 text-sm text-[#3f3832]"
+                className="rounded-lg border border-[#d8d0c5] px-2 py-1 text-sm text-[#3f3832] dark:border-[#3a3a3a] dark:text-gray-300"
               >
                 Close
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 text-sm text-[#3a342f] sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 text-sm text-[#3a342f] dark:text-gray-300 sm:grid-cols-2">
               <p><span className="font-semibold">Name:</span> {viewWorker.fullName}</p>
               <p><span className="font-semibold">Email:</span> {viewWorker.email}</p>
               <p><span className="font-semibold">Department:</span> {viewWorker.department ?? "Unassigned"}</p>
@@ -451,18 +451,18 @@ export default function WorkersPage() {
 
       {assignWorker ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl">
-            <h2 className="mb-2 text-lg font-semibold text-[#27211d]">Assign Department</h2>
-            <p className="mb-4 text-sm text-[#4f463f]">
+          <div className="w-full max-w-lg rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl dark:border-[#3a3a3a] dark:bg-[#1f1f1f]">
+            <h2 className="mb-2 text-lg font-semibold text-[#27211d] dark:text-gray-100">Assign Department</h2>
+            <p className="mb-4 text-sm text-[#4f463f] dark:text-gray-400">
               Worker: {assignWorker.fullName}
             </p>
 
             <label className="mb-4 block">
-              <span className="mb-1 block text-sm font-medium text-[#2f2924]">Select department</span>
+              <span className="mb-1 block text-sm font-medium text-[#2f2924] dark:text-gray-200">Select department</span>
               <select
                 value={departmentDraft}
                 onChange={(event) => setDepartmentDraft(event.target.value)}
-                className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm text-[#312b26]"
+                className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm text-[#312b26] dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
               >
                 <option value="">Choose a department</option>
                 {departmentOptions.map((department) => (
@@ -477,7 +477,7 @@ export default function WorkersPage() {
               <button
                 type="button"
                 onClick={() => setAssignWorker(null)}
-                className="rounded-lg border border-[#d8d0c5] px-3 py-2 text-sm text-[#3f3832]"
+                className="rounded-lg border border-[#d8d0c5] px-3 py-2 text-sm text-[#3f3832] dark:border-[#3a3a3a] dark:text-gray-300"
               >
                 Cancel
               </button>
@@ -485,7 +485,7 @@ export default function WorkersPage() {
                 type="button"
                 onClick={() => void submitDepartmentAssignment()}
                 disabled={!departmentDraft || saving}
-                className="rounded-lg bg-[#5c4438] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-[#5c4438] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#6a5042] disabled:opacity-50 dark:bg-[#C9A84C] dark:text-[#1a1a1a] dark:hover:bg-[#d8b65c]"
               >
                 {saving ? "Saving..." : "Assign Department"}
               </button>
@@ -496,77 +496,77 @@ export default function WorkersPage() {
 
       {isCreateOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-xl rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl border border-[#d6cec3] bg-white p-5 shadow-xl dark:border-[#3a3a3a] dark:bg-[#1f1f1f]">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#27211d]">Add New Worker</h2>
+              <h2 className="text-lg font-semibold text-[#27211d] dark:text-gray-100">Add New Worker</h2>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="rounded-lg border border-[#d8d0c5] px-2 py-1 text-sm text-[#3f3832]"
+                className="rounded-lg border border-[#d8d0c5] px-2 py-1 text-sm text-[#3f3832] dark:border-[#3a3a3a] dark:text-gray-300"
               >
                 Close
               </button>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block text-sm text-[#2f2924]">
+              <label className="block text-sm text-[#2f2924] dark:text-gray-300">
                 <span className="mb-1 block font-medium">Full name</span>
                 <input
                   value={newWorkerName}
                   onChange={(event) => setNewWorkerName(event.target.value)}
                   placeholder="Ramesh Patel"
-                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
                 />
               </label>
 
-              <label className="block text-sm text-[#2f2924]">
+              <label className="block text-sm text-[#2f2924] dark:text-gray-300">
                 <span className="mb-1 block font-medium">Email</span>
                 <input
                   type="email"
                   value={newWorkerEmail}
                   onChange={(event) => setNewWorkerEmail(event.target.value)}
                   placeholder="worker@jansamadhan.in"
-                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
                 />
               </label>
 
-              <label className="block text-sm text-[#2f2924]">
+              <label className="block text-sm text-[#2f2924] dark:text-gray-300">
                 <span className="mb-1 block font-medium">Phone</span>
                 <input
                   value={newWorkerPhone}
                   onChange={(event) => setNewWorkerPhone(event.target.value)}
                   placeholder="+91 98xxxxxx"
-                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
                 />
               </label>
 
-              <label className="block text-sm text-[#2f2924]">
+              <label className="block text-sm text-[#2f2924] dark:text-gray-300">
                 <span className="mb-1 block font-medium">City</span>
                 <input
                   value={newWorkerCity}
                   onChange={(event) => setNewWorkerCity(event.target.value)}
                   placeholder="Jaipur"
-                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
                 />
               </label>
 
-              <label className="block text-sm text-[#2f2924]">
+              <label className="block text-sm text-[#2f2924] dark:text-gray-300">
                 <span className="mb-1 block font-medium">Default password</span>
                 <input
                   type="password"
                   value={newWorkerPassword}
                   onChange={(event) => setNewWorkerPassword(event.target.value)}
                   placeholder="At least 8 characters"
-                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
                 />
               </label>
 
-              <label className="block text-sm text-[#2f2924]">
+              <label className="block text-sm text-[#2f2924] dark:text-gray-300">
                 <span className="mb-1 block font-medium">Department</span>
                 <select
                   value={newWorkerDepartment}
                   onChange={(event) => setNewWorkerDepartment(event.target.value)}
-                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-[#d8d0c5] bg-white px-3 py-2 text-sm dark:border-[#3a3a3a] dark:bg-[#161616] dark:text-gray-100"
                 >
                   <option value="">Choose a department</option>
                   {departmentOptions.map((department) => (
@@ -582,7 +582,7 @@ export default function WorkersPage() {
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="rounded-lg border border-[#d8d0c5] px-3 py-2 text-sm text-[#3f3832]"
+                className="rounded-lg border border-[#d8d0c5] px-3 py-2 text-sm text-[#3f3832] dark:border-[#3a3a3a] dark:text-gray-300"
               >
                 Cancel
               </button>
@@ -590,7 +590,7 @@ export default function WorkersPage() {
                 type="button"
                 onClick={() => void submitCreateWorker()}
                 disabled={creating}
-                className="rounded-lg bg-[#5c4438] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-[#5c4438] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#6a5042] disabled:opacity-50 dark:bg-[#C9A84C] dark:text-[#1a1a1a] dark:hover:bg-[#d8b65c]"
               >
                 {creating ? "Creating..." : "Create Worker"}
               </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Loader2, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Send, Loader2, Plus, ChevronDown, ChevronUp, Mic, MicOff } from "lucide-react";
 import gsap from "gsap";
 import { sendToGemini } from "@/lib/gemini";
 import type { ChatMessage, ExtractedComplaint, GeminiResponse } from "@/lib/gemini";
@@ -152,12 +152,19 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   const [initialized, setInitialized] = useState(false);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [expandedImagePreview, setExpandedImagePreview] = useState<Record<string, boolean>>({});
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   /* ----- refs ----- */
   const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const micBtnRef = useRef<HTMLButtonElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const micPulseRef = useRef<gsap.core.Tween | null>(null);
 
   /* ----- conversation history for Gemini (role: user | model) ----- */
   const historyRef = useRef<ChatMessage[]>([]);
@@ -606,6 +613,175 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   /* ----- auto-scroll on new messages ----- */
   useEffect(() => scrollToBottom(), [messages, scrollToBottom]);
 
+  /* ----- cleanup MediaRecorder on unmount ----- */
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+      if (micPulseRef.current) micPulseRef.current.kill();
+      mediaRecorderRef.current?.stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  /* ----- voice recording helpers ----- */
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+
+        // Stop GSAP pulse
+        if (micPulseRef.current) { micPulseRef.current.kill(); micPulseRef.current = null; }
+        if (micBtnRef.current) gsap.to(micBtnRef.current, { scale: 1, boxShadow: "none", duration: 0.25, ease: "power2.out" });
+
+        if (blob.size < 1000) {
+          addBotMessage("⚠️ Recording was too short. Please hold the mic button and speak clearly.");
+          setIsRecording(false);
+          return;
+        }
+
+        setIsRecording(false);
+        setIsTranscribing(true);
+
+        // Animate mic button to "transcribing" state
+        if (micBtnRef.current) gsap.to(micBtnRef.current, { scale: 0.9, opacity: 0.6, duration: 0.2, ease: "power2.out" });
+
+        try {
+          const formData = new FormData();
+          formData.append("file", blob, "recording.webm");
+
+          const res = await fetch("/api/stt", { method: "POST", body: formData });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: "STT failed" }));
+            throw new Error(err.error || "Speech-to-text failed");
+          }
+
+          const { transcript } = await res.json();
+          if (!transcript || !transcript.trim()) {
+            addBotMessage("⚠️ Could not recognize any speech. Please try again.");
+            return;
+          }
+
+          // Auto-fill and send
+          setInput(transcript.trim());
+          // We need a small delay so React processes the setInput before handleSend reads it
+          setTimeout(() => {
+            // Manually push the message through since handleSend reads from state
+            const text = transcript.trim();
+            setMessages((prev) => [...prev, { id: Math.random().toString(36).slice(2, 10), role: "user", text: `🎤 ${text}` }]);
+            scrollToBottom();
+            historyRef.current.push({ role: "user", text });
+            setInput("");
+            setIsLoading(true);
+
+            sendToGemini(historyRef.current)
+              .then((geminiRes) => {
+                historyRef.current.push({ role: "model", text: geminiRes.reply });
+                if (geminiRes.extracted) {
+                  if (geminiRes.extracted.confidence < 0.6) {
+                    setPendingComplaint(null);
+                    setPendingImagePreview(null);
+                    setPendingImageDataUrl(null);
+                    setPendingLocation(null);
+                    setLocationConfirmed(false);
+                    setDuplicateContext(null);
+                    addBotMessage("⚠️ I am not confident enough in the issue extraction (confidence below 0.6). Please describe the issue manually with key details (what, where, urgency).");
+                    return;
+                  }
+                  setPendingComplaint(geminiRes.extracted);
+                  setPendingImagePreview(null);
+                  setPendingImageDataUrl(null);
+                  setDuplicateContext(null);
+                  getLocation().then((currentLocation) => {
+                    setPendingLocation(currentLocation);
+                    setLocationConfirmed(false);
+                    fetch(`${API_URL}/geocode?lat=${currentLocation.lat}&lng=${currentLocation.lng}`)
+                      .then((r) => r.ok ? r.json() : null)
+                      .catch(() => null)
+                      .then((geoDetails) => addBotMessage(geminiRes.reply, { extracted: geminiRes.extracted, geoDetails }));
+                  });
+                } else {
+                  addBotMessage(geminiRes.reply);
+                }
+              })
+              .catch((err) => {
+                const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+                addBotMessage(`⚠️ ${msg}`);
+              })
+              .finally(() => setIsLoading(false));
+          }, 50);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Speech recognition failed";
+          addBotMessage(`⚠️ ${msg}`);
+        } finally {
+          setIsTranscribing(false);
+          if (micBtnRef.current) gsap.to(micBtnRef.current, { scale: 1, opacity: 1, duration: 0.25, ease: "power2.out" });
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+
+      // GSAP pulse animation on the mic button
+      if (micBtnRef.current) {
+        gsap.fromTo(micBtnRef.current, { scale: 1 }, { scale: 1.1, duration: 0.15, ease: "power2.out" });
+        micPulseRef.current = gsap.to(micBtnRef.current, {
+          boxShadow: "0 0 0 8px rgba(239,68,68,0.25)",
+          duration: 0.8,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut",
+          delay: 0.15,
+        });
+      }
+
+      // 30-second safety timeout
+      recordingTimerRef.current = setTimeout(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      }, 30000);
+    } catch (err) {
+      console.error("Microphone access error:", err);
+      addBotMessage("⚠️ Microphone access denied. Please allow microphone permission in your browser and try again.");
+    }
+  }, [addBotMessage, scrollToBottom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stopRecording = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
+  const handleMicClick = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
   /* ----- keyboard enter ----- */
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -842,11 +1018,18 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
             </div>
           </div>
         )}
+        {/* Transcribing indicator */}
+        {isTranscribing && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+            <Loader2 size={14} className="animate-spin" />
+            Transcribing your voice…
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {/* + button for image upload */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || submitting}
+            disabled={isLoading || submitting || isRecording || isTranscribing}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
             aria-label="Upload photo"
             title="Upload a photo of the issue"
@@ -862,6 +1045,22 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
             onChange={handleImageSelect}
             className="hidden"
           />
+
+          {/* 🎤 Mic button for voice input */}
+          <button
+            ref={micBtnRef}
+            onClick={handleMicClick}
+            disabled={isLoading || submitting || isTranscribing}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-40 ${
+              isRecording
+                ? "border-red-400 bg-red-500 text-white hover:bg-red-600 dark:border-red-500 dark:bg-red-600 dark:hover:bg-red-700 focus:ring-red-400 dark:focus:ring-red-500 dark:focus:ring-offset-[#161616]"
+                : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] focus:ring-[#b4725a] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
+            }`}
+            aria-label={isRecording ? "Stop recording" : "Start voice input"}
+            title={isRecording ? "Tap to stop recording" : "Tap to speak your complaint"}
+          >
+            {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+          </button>
 
           <input
             ref={inputRef}
