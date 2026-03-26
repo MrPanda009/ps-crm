@@ -374,7 +374,7 @@ export default function TicketsPage() {
   }, [totalCount])
 
   return (
-    <section className="flex h-[calc(100vh-10rem)] min-h-[620px] flex-col rounded-2xl border border-[#d8cfbe] bg-[#f4efe5] p-4 text-[#27221d] shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-[#d8cfbe] bg-[#f4efe5] p-4 text-[#27221d] shadow-sm">
       <TicketsHeader now={now} />
       <TicketSearch
         value={search}
@@ -397,26 +397,25 @@ export default function TicketsPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <TicketsTable
-          tickets={tickets}
-          actionLoading={actionLoading}
-          onView={handleView}
-          onAssign={handleOpenAssign}
-          onEscalate={handleEscalate}
-        />
+      <TicketsTable
+        tickets={tickets}
+        actionLoading={actionLoading}
+        onView={handleView}
+        onAssign={handleOpenAssign}
+        onEscalate={handleEscalate}
+      />
+
+      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} pageSize={PAGE_SIZE} onPageChange={setPage} />
+
+      <div className="flex justify-end pt-2 text-sm text-[#4b433b]">
+        <p>Platform Version 3.1 - National Deployment - Government of India</p>
       </div>
 
-      <div className="mt-3 shrink-0 border-t border-[#d8cfbe] pt-3">
-        <Pagination page={page} totalPages={totalPages} totalCount={totalCount} pageSize={PAGE_SIZE} onPageChange={setPage} />
-      </div>
-
-      <footer className="mt-3 shrink-0 border-t border-[#d8cfbe] pt-3 text-sm text-[#5f554c]">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p>{loading ? "Loading tickets..." : "Data synced from Supabase."}</p>
-          <p className="text-[#4b433b]">Platform Version 3.1 - National Deployment - Government of India</p>
-        </div>
-      </footer>
+      {loading ? (
+        <p className="text-sm text-[#5f554c]">Loading tickets...</p>
+      ) : (
+        <p className="text-sm text-[#5f554c]">Data synced from Supabase.</p>
+      )}
 
       {isViewOpen && selectedTicket ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

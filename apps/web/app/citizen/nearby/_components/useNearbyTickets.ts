@@ -125,6 +125,28 @@ export function useNearbyTickets() {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  async function loadCitizenUpvotes(complaintIds: string[]) {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    const userId = session?.user?.id ?? null;
+    if (sessionError || !userId || complaintIds.length === 0) {
+      setHasUpvoted(new Set());
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("upvotes")
+      .select("complaint_id")
+      .eq("citizen_id", userId)
+      .in("complaint_id", complaintIds);
+
+    if (error) return;
+    setHasUpvoted(new Set((data ?? []).map((row) => row.complaint_id)));
+  }
+
   async function fetchComplaints() {
     setLoading(true);
     try {
@@ -189,6 +211,7 @@ export function useNearbyTickets() {
       setAllComplaints(mapped);
       // Re-apply filter now that data is loaded
       setVisibleComplaints(applyFilter(mapped, lastCenterRef.current, lastRadiusRef.current));
+      await loadCitizenUpvotes(mapped.map((item) => item.id));
       setError(null);
       setLoading(false);
     } catch (err) {
@@ -251,6 +274,17 @@ export function useNearbyTickets() {
           },
           (payload: RealtimePostgresChangesPayload<Tables<"complaints">>) => {
             handleRealtimeEvent(payload);
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "upvotes",
+          },
+          () => {
+            void fetchComplaints();
           }
         )
         .subscribe((status) => {
@@ -343,6 +377,18 @@ export function useNearbyTickets() {
 
   async function handleUpvote(id: string) {
     if (hasUpvoted.has(id)) return;
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    const token = session?.access_token ?? null;
+    if (sessionError || !token) {
+      setError("Please sign in to upvote tickets");
+      return;
+    }
+
     setHasUpvoted((prev) => new Set([...prev, id]));
     setAllComplaints((prev) =>
       prev.map((c) => (c.id === id ? { ...c, upvote_count: c.upvote_count + 1 } : c))
@@ -350,7 +396,50 @@ export function useNearbyTickets() {
     setVisibleComplaints((prev) =>
       prev.map((c) => (c.id === id ? { ...c, upvote_count: c.upvote_count + 1 } : c))
     );
-    await supabase.rpc("increment_upvote_count", { p_complaint_id: id });
+
+    try {
+      const res = await fetch("/api/complaints", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ complaint_id: id }),
+      });
+
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        complaint?: { upvote_count?: number };
+      };
+
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to upvote complaint");
+      }
+
+      const serverCount = payload.complaint?.upvote_count;
+      if (typeof serverCount === "number") {
+        setAllComplaints((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, upvote_count: serverCount } : c))
+        );
+        setVisibleComplaints((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, upvote_count: serverCount } : c))
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to upvote complaint";
+      setError(msg);
+      setHasUpvoted((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setAllComplaints((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, c.upvote_count - 1) } : c))
+      );
+      setVisibleComplaints((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, c.upvote_count - 1) } : c))
+      );
+    }
   }
 
   return {
