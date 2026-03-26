@@ -1086,7 +1086,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
           const formData = new FormData();
           formData.append("file", blob, "recording.webm");
 
-          const res = await fetch("/api/stt", { method: "POST", body: formData, headers: { "X-Language": selectedLanguage || "unknown" } });
+          const res = await fetch("/api/stt", { method: "POST", body: formData, headers: { "X-Language": selectedLanguage! } });
           if (!res.ok) {
             const err = await res.json().catch(() => ({ error: "STT failed" }));
             throw new Error(err.error || "Speech-to-text failed");
@@ -1104,7 +1104,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
           setTimeout(() => {
             // Manually push the message through since handleSend reads from state
             const text = transcript.trim();
-            setMessages((prev) => [...prev, { id: Math.random().toString(36).slice(2, 10), role: "user", text: `🎤 ${text}` }]);
+            setMessages((prev) => [...prev, { id: Math.random().toString(36).slice(2, 10), role: "user", text: `${text}` }]);
             scrollToBottom();
             historyRef.current.push({ role: "user", text });
             setInput("");
@@ -1182,7 +1182,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       console.error("Microphone access error:", err);
       addBotMessage(t(selectedLanguage, "mic_denied"));
     }
-  }, [addBotMessage, scrollToBottom]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addBotMessage, scrollToBottom, selectedLanguage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stopRecording = useCallback(() => {
     if (recordingTimerRef.current) {
