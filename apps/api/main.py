@@ -762,6 +762,54 @@ async def get_admin_authorities_list(
 
 
 # =========================================================
+# 8e. ADMIN WORKERS LIST (Consolidated + Redis)
+# =========================================================
+
+@app.get("/api/admin/workers")
+async def get_admin_workers_list(
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Consolidates worker profiles, complaints, worker_profiles table, and categories
+    into one payload. Matches the exact schema of Next.js /api/admin/workers route.
+    """
+    cache_key = "admin:workers:list"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return { "source": "cache", **json.loads(cached) }
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    try:
+        [profiles_res, complaints_res, worker_profiles_res, categories_res] = await asyncio.gather(
+            asyncio.to_thread(lambda: supabase.table("profiles").select("id, full_name, email, phone, city, department, is_blocked, created_at").eq("role", "worker").order("created_at", desc=True).execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id, assigned_worker_id, assigned_department, status, created_at, resolved_at").execute()),
+            asyncio.to_thread(lambda: supabase.table("worker_profiles").select("worker_id, department, availability, total_resolved").execute()),
+            asyncio.to_thread(lambda: supabase.table("categories").select("name, department").eq("is_active", True).execute())
+        )
+
+        payload = {
+            "profiles":       profiles_res.data or [],
+            "complaints":     complaints_res.data or [],
+            "workerProfiles": worker_profiles_res.data or [],
+            "categories":     categories_res.data or [],
+        }
+
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 600, json.dumps(payload))
+            except Exception as e:
+                print(f"Redis write error: {e}")
+
+        return { "source": "database", **payload }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workers data fetch failed: {str(e)}")
+
+
+# =========================================================
 # 9. ROOT MESSAGE
 # =========================================================
 
