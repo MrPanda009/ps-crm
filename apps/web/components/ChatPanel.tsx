@@ -650,7 +650,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         if (micPulseRef.current) { micPulseRef.current.kill(); micPulseRef.current = null; }
         if (micBtnRef.current) gsap.to(micBtnRef.current, { scale: 1, boxShadow: "none", duration: 0.25, ease: "power2.out" });
 
-        if (blob.size < 1000) {
+        if (blob.size < 500) {
           addBotMessage("⚠️ Recording was too short. Please hold the mic button and speak clearly.");
           setIsRecording(false);
           return;
