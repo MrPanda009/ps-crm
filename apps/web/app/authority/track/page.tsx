@@ -90,6 +90,7 @@ export default function TrackPage() {
   const [isSevOpen,    setIsSevOpen]    = useState(false)
   const [selectedId,   setSelectedId]   = useState<string | null>(null)
   const [expandedId,   setExpandedId]   = useState<string | null>(null)
+  const [dept,         setDept]         = useState("")
   const [recenterTrigger, setRecenterTrigger] = useState(0)
   const detailRef = useRef<HTMLDivElement>(null)
 
@@ -174,19 +175,29 @@ export default function TrackPage() {
 
     setComplaints(rows)
     setWorkers(workerRows)
+    setDept(department)
     setError(null)
     setLoading(false)
   }
 
   useEffect(() => { void fetchData() }, [])
   useEffect(() => {
+    if (!dept) return
     const ch = supabase.channel("track-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "complaints" },      () => void fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "upvotes" },         () => void fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "worker_profiles" },() => void fetchData())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "complaints",
+        filter: `assigned_department=eq.${dept}`
+      }, () => void fetchData())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "upvotes"
+      }, () => void fetchData())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "worker_profiles",
+        filter: `department=eq.${dept}`
+      }, () => void fetchData())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [dept])
 
   useEffect(() => {
     if (expandedId && detailRef.current) {

@@ -123,7 +123,6 @@ export function useNearbyTickets() {
   const lastRadiusRef = useRef<number>(1000);
   const userIdRef = useRef<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   async function loadCitizenUpvotes(complaintIds: string[]) {
     const {
@@ -225,36 +224,11 @@ export function useNearbyTickets() {
     fetchComplaints();
     setupRealtimeSubscription();
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        startPolling();
-      } else {
-        stopPolling();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      stopPolling();
       unsubscribeFromRealtime();
     };
   }, []);
 
-  function startPolling() {
-    if (pollingIntervalRef.current) return;
-    pollingIntervalRef.current = setInterval(() => {
-      fetchComplaints();
-    }, 20000); // 20 seconds
-  }
-
-  function stopPolling() {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-  }
 
   function setupRealtimeSubscription() {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -289,8 +263,8 @@ export function useNearbyTickets() {
         )
         .subscribe((status) => {
           if (status === "CHANNEL_ERROR") {
-            console.log("Realtime channel error, falling back to polling");
-            startPolling();
+            console.log("Realtime channel error - retrying in 5s");
+            setTimeout(setupRealtimeSubscription, 5000);
           }
         });
 

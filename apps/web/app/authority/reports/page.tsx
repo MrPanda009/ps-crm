@@ -244,11 +244,15 @@ export default function ReportsPage() {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
+    if (!dept) return
     const ch = supabase.channel("reports-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "complaints" }, () => void load())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "complaints",
+        filter: `assigned_department=eq.${dept}`
+      }, () => void load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [load])
+  }, [load, dept])
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
   const total     = complaints.length

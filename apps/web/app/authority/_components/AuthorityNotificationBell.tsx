@@ -5,6 +5,7 @@ import { AlertTriangle, Bell, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { supabase } from '@/src/lib/supabase';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { isBreached } from './dashboard-types';
 
 type NotifKind = 'sla_breach' | 'escalation' | 'new_complaint' | 'resolved' | 'status_change';
 
@@ -47,6 +48,7 @@ export default function AuthorityNotificationBell() {
   const [readSet, setReadSet] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [filter,  setFilter]  = useState<'all' | NotifKind>('all');
+  const [department, setDepartment] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const panelRef   = useRef<HTMLDivElement>(null);
   const buildFeedRef = useRef<() => Promise<void>>(async () => {});
@@ -82,7 +84,8 @@ export default function AuthorityNotificationBell() {
 
     const { data: profile } = await supabase
       .from('profiles').select('department').eq('id', uid).maybeSingle();
-    const department = profile?.department ?? '';
+    const dept = profile?.department ?? '';
+    if (department !== dept) setDepartment(dept);
 
     let complaints: any[] = [];
     const { data: d1 } = await supabase
@@ -122,9 +125,13 @@ export default function AuthorityNotificationBell() {
       if (new Date(c.created_at).getTime() > cutoff30) {
         events.push({ id: `new-${c.id}`, kind: 'new_complaint', title: `New: ${c.title}`, body: `Ticket ${c.ticket_id} assigned to your department.`, created_at: c.created_at });
       }
-      if (c.sla_breached) {
+
+      // Consistent with Dashboard: Check breach manually as DB column is stale
+      const breached = isBreached(c.sla_deadline, c.status);
+      if (breached) {
         events.push({ id: `sla-${c.id}`, kind: 'sla_breach', title: `SLA breached: ${c.title}`, body: `Ticket ${c.ticket_id} exceeded its SLA deadline.`, created_at: c.created_at });
       }
+
       if (c.escalation_level && c.escalation_level > 0) {
         events.push({ id: `esc-${c.id}`, kind: 'escalation', title: `Escalated: ${c.title}`, body: `Ticket ${c.ticket_id} escalated (level ${c.escalation_level}).`, created_at: c.created_at });
       }
@@ -169,12 +176,18 @@ export default function AuthorityNotificationBell() {
 
   // Always-on realtime: SLA breaches + new complaints update badge even when closed
   useEffect(() => {
+    if (!department) return;
     const ch = supabase.channel('authority-notif-bell')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints'     }, () => void buildFeedRef.current())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_history' }, () => void buildFeedRef.current())
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'complaints',
+        filter: `assigned_department=eq.${department}`
+      }, () => void buildFeedRef.current())
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'ticket_history'
+      }, () => void buildFeedRef.current())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [department]);
 
   function markRead(id: string) {
     setReadSet(prev => { const next = new Set(prev); next.add(id); saveReadSet(next); return next; });
