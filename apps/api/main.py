@@ -549,10 +549,13 @@ async def confirm(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database insert failed: {str(e)}")
 
-    # Clear Redis Cache for this user
+    # Clear Redis Cache for this user + admin complaints
     if redis_client:
         try:
             redis_client.delete(f"user:tickets:{citizen_id}")
+            # Invalidate all admin complaint cache keys so dashboard reflects new ticket
+            for key in redis_client.scan_iter("admin:complaints:*"):
+                redis_client.delete(key)
         except Exception as e:
             print(f"Redis cache invalidation failed: {e}")
 
@@ -807,6 +810,163 @@ async def get_admin_workers_list(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Workers data fetch failed: {str(e)}")
+
+
+# =========================================================
+# 8f. ADMIN COMPLAINTS LIST (Consolidated + Redis)
+# =========================================================
+
+def _parse_priority_to_severity(priority: str) -> Optional[str]:
+    mapping = {"low": "L1", "medium": "L2", "high": "L3", "emergency": "L4"}
+    return mapping.get(priority)
+
+
+@app.get("/api/admin/complaints")
+async def get_admin_complaints_list(
+    page: int = 1,
+    pageSize: int = 20,
+    status: str = "all",
+    priority: str = "all",
+    authority: str = "all",
+    category: str = "all",
+    search: str = "",
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Consolidated complaints endpoint with pagination, filters, Redis caching,
+    and batch profile + worker + category fetching in a single response.
+    Replaces the Next.js /api/admin/complaints API route.
+    """
+    page = max(1, page)
+    pageSize = min(100, max(1, pageSize))
+    search = search.strip()
+
+    # Build a cache key from all query params
+    cache_key = f"admin:complaints:p={page}&ps={pageSize}&st={status}&pr={priority}&au={authority}&ca={category}&q={search}"
+
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return {"source": "cache", **json.loads(cached)}
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    range_from = (page - 1) * pageSize
+    range_to = range_from + pageSize - 1
+
+    # --- Step 1: Resolve category filter to IDs (if needed) ---
+    category_ids: Optional[List[int]] = None
+    if category != "all":
+        try:
+            cat_res = await asyncio.to_thread(
+                lambda: supabase.table("categories").select("id").eq("name", category).execute()
+            )
+            category_ids = [row["id"] for row in (cat_res.data or [])]
+            if not category_ids:
+                empty_payload = {"items": [], "profiles": [], "workers": [], "categories": [], "totalCount": 0}
+                return {"source": "database", **empty_payload}
+        except Exception:
+            category_ids = None
+
+    # --- Step 2: Build and execute the complaints query ---
+    def _build_complaints_query():
+        q = supabase.table("complaints").select(
+            "id, ticket_id, title, category_id, address_text, ward_name, city, "
+            "status, severity, escalation_level, created_at, "
+            "assigned_department, assigned_worker_id, assigned_officer_id, "
+            "categories(name)",
+            count="exact",
+        ).order("created_at", desc=True)
+
+        if status == "pending":
+            q = q.in_("status", ["submitted", "under_review", "assigned"])
+        elif status != "all":
+            q = q.eq("status", status)
+
+        severity_val = _parse_priority_to_severity(priority)
+        if severity_val:
+            q = q.eq("severity", severity_val)
+
+        if authority != "all":
+            q = q.eq("assigned_department", authority)
+
+        if category_ids is not None:
+            q = q.in_("category_id", category_ids)
+
+        if search:
+            safe = search.replace(",", " ")
+            q = q.or_(
+                f"ticket_id.ilike.%{safe}%,"
+                f"title.ilike.%{safe}%,"
+                f"address_text.ilike.%{safe}%,"
+                f"ward_name.ilike.%{safe}%,"
+                f"city.ilike.%{safe}%"
+            )
+
+        return q.range(range_from, range_to).execute()
+
+    # --- Step 3: Run complaints + static data in parallel ---
+    try:
+        [complaints_res, workers_res, categories_res] = await asyncio.gather(
+            asyncio.to_thread(_build_complaints_query),
+            asyncio.to_thread(
+                lambda: supabase.table("worker_profiles")
+                .select("worker_id, department, availability, worker:profiles!worker_profiles_worker_id_fkey(id, full_name, department)")
+                .order("joined_at", desc=True)
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("categories")
+                .select("id, name, department")
+                .eq("is_active", True)
+                .order("name")
+                .execute()
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Admin complaints fetch failed: {str(e)}")
+
+    complaint_rows = complaints_res.data or []
+    total_count = complaints_res.count or 0
+
+    # --- Step 4: Batch fetch profiles for assigned workers/officers ---
+    profile_ids = list(set(
+        pid
+        for row in complaint_rows
+        for pid in [row.get("assigned_worker_id"), row.get("assigned_officer_id")]
+        if pid
+    ))
+
+    profiles: List[Dict[str, Any]] = []
+    if profile_ids:
+        try:
+            profiles_res = await asyncio.to_thread(
+                lambda: supabase.table("profiles")
+                .select("id, full_name, department")
+                .in_("id", profile_ids)
+                .execute()
+            )
+            profiles = profiles_res.data or []
+        except Exception:
+            profiles = []
+
+    payload = {
+        "items": complaint_rows,
+        "profiles": profiles,
+        "workers": workers_res.data or [],
+        "categories": categories_res.data or [],
+        "totalCount": total_count,
+    }
+
+    # Cache for 2 minutes (short TTL since complaints change frequently)
+    if redis_client:
+        try:
+            redis_client.setex(cache_key, 120, json.dumps(payload))
+        except Exception as e:
+            print(f"Redis write error: {e}")
+
+    return {"source": "database", **payload}
 
 
 # =========================================================
