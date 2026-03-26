@@ -61,6 +61,7 @@ origins = [
     "http://10.176.53.15:3000",
     "https://jansamadhan.perkkk.dev",
     "https://api.jansamadhan.perkkk.dev",
+    "https://ps-crmdev1-production.up.railway.app",
 ]
 
 app.add_middleware(
