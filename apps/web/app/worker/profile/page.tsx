@@ -6,15 +6,16 @@ import { supabase } from "@/src/lib/supabase"
 import type { Database } from "@/src/types/database.types"
 import { User, Activity, Terminal } from "lucide-react"
 import gsap from "gsap"
+import Rating from "@/components/Rating"
 
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"]
 
 export default function ProfilePage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  const [tickets, setTickets] = useState<ComplaintRow[]>([])
-  const [loadingTickets, setLoadingTickets] = useState(true)
-  const [ticketCount, setTicketCount] = useState(0)
+  const [workerData, setWorkerData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Edit Profile States
   const [isEditingProfile, setIsEditingProfile] = useState(false)
@@ -28,61 +29,35 @@ export default function ProfilePage() {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const currentUser = data?.user
-      setUser(currentUser)
-
-      if (currentUser) {
-        // Fetch Tickets on load
-        supabase
-          .from("complaints")
-          .select("*", { count: 'exact' })
-          .eq("citizen_id", currentUser.id)
-          .order("created_at", { ascending: false })
-          .limit(3)
-          .then(({ data, count }) => {
-            if (data) setTickets(data)
-            if (count !== null) setTicketCount(count)
-            setLoadingTickets(false)
-          })
-
-        // Real-time subscription to auto-update on new tickets
-        const channel = supabase
-          .channel(`profile-complaints-${currentUser.id}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "INSERT",
-              schema: "public",
-              table: "complaints",
-              filter: `citizen_id=eq.${currentUser.id}`,
-            },
-            (payload) => {
-              setTickets((prev) => [payload.new as ComplaintRow, ...prev].slice(0, 3));
-              setTicketCount((prev) => prev + 1);
-            }
-          )
-          .on(
-            "postgres_changes",
-            {
-              event: "UPDATE",
-              schema: "public",
-              table: "complaints",
-              filter: `citizen_id=eq.${currentUser.id}`,
-            },
-            (payload) => {
-              setTickets((prev) =>
-                prev.map((t) => (t.id === payload.new.id ? (payload.new as ComplaintRow) : t))
-              );
-            }
-          )
-          .subscribe();
-
-        return () => {
-          supabase.removeChannel(channel)
-        }
+    const fetchData = async () => {
+      setLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setLoading(false)
+        return
       }
-    })
+      setUser(session.user)
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+        const res = await fetch(`${apiUrl}/api/worker/profile`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setWorkerData(data)
+        } else {
+          setError("Failed to load profile data")
+        }
+      } catch (err) {
+        console.error("Fetch error:", err)
+        setError("Network error")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
   }, [])
 
   useEffect(() => {
@@ -131,7 +106,7 @@ export default function ProfilePage() {
       }
 
       // 5. Bottom terminal lines stagger
-      if (bottomRef.current && !loadingTickets) {
+      if (bottomRef.current && !loading) {
         const bottomElements = gsap.utils.toArray(bottomRef.current.children)
         tl.fromTo(bottomElements,
           { y: 30, opacity: 0 },
@@ -139,10 +114,10 @@ export default function ProfilePage() {
           "-=0.4"
         )
       }
-    }, [user, loadingTickets]) // re-run animation slightly when tickets finally load if delayed
+    }, [user, loading]) // re-run animation slightly when tickets finally load if delayed
 
     return () => ctx.revert()
-  }, [user, loadingTickets])
+  }, [user, loading])
 
   // Interactive click handler for UI elements
   const handleInteraction = (e: React.MouseEvent<HTMLElement>) => {
@@ -212,7 +187,7 @@ export default function ProfilePage() {
     }, 300)
   }
 
-  if (!user) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-full bg-[#fcfbf9] dark:bg-[#0c0c0c] font-mono">
         <div className="text-gray-800 dark:text-[#f59e0b] animate-pulse text-xl shadow-none dark:shadow-[0_0_10px_#f59e0b]">
@@ -304,7 +279,7 @@ export default function ProfilePage() {
   `
 
   // Derived stats
-  const pendingTickets = tickets.filter(t => t.status !== 'resolved' && t.status !== 'rejected').length
+  const pendingTickets = workerData?.complaints?.filter((t: any) => t.status !== 'resolved' && t.status !== 'rejected').length || 0
 
   return (
     <div className="h-full w-full relative overflow-y-auto overflow-x-hidden terminal-container p-4 sm:p-8 font-mono text-xs sm:text-sm md:text-base flex flex-col font-bold" ref={containerRef}>
@@ -466,16 +441,27 @@ export default function ProfilePage() {
               </div>
               <div className="relative z-10 space-y-4">
                 <div className="flex justify-between border-b border-[#C9A84C] dark:border-[#f59e0b]/20 pb-2">
-                  <span className="text-gray-600 dark:text-[#f59e0b]/70">ISSUES REPORTED:</span>
-                  <span className="font-bold">{loadingTickets ? "..." : ticketCount}</span>
+                  <span className="text-gray-600 dark:text-[#f59e0b]/70">ISSUES RESOLVED:</span>
+                  <span className="font-bold">{workerData?.workerProfile?.total_resolved ?? 0}</span>
                 </div>
                 <div className="flex justify-between border-b border-[#C9A84C] dark:border-[#f59e0b]/20 pb-2">
-                  <span className="text-gray-600 dark:text-[#f59e0b]/70">RESOLUTIONS PENDING:</span>
-                  <span className="font-bold">{loadingTickets ? "..." : pendingTickets}</span>
+                  <span className="text-gray-600 dark:text-[#f59e0b]/70">PENDING ASSIGNMENTS:</span>
+                  <span className="font-bold">{workerData?.complaints?.filter((t: any) => t.status === 'assigned' || t.status === 'in_progress').length ?? 0}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-[#f59e0b]/70">SATISFACTION RATING:</span>
-                  <span className="font-bold">4.8/5.0</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-[#f59e0b]/70">AVERAGE RATING:</span>
+                  <div className="flex flex-col items-end gap-1">
+                    {workerData?.workerProfile?.average_rating > 0 ? (
+                      <>
+                        <Rating initialRating={workerData.workerProfile.average_rating} readonly />
+                        <span className="font-bold text-xs opacity-80">
+                          {workerData.workerProfile.average_rating.toFixed(1)} / 5.0
+                        </span>
+                      </>
+                    ) : (
+                      <span className="font-bold">NO RATINGS</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </button>
@@ -497,12 +483,12 @@ export default function ProfilePage() {
               <div className="text-gray-500 dark:text-[#f59e0b]/60"><Terminal size={20} /></div>
             </div>
             <div className="relative z-10 space-y-3 font-mono text-sm sm:text-base leading-relaxed" ref={bottomRef}>
-              {loadingTickets ? (
+              {loading ? (
                 <div className="text-gray-400 dark:text-[#f59e0b]/50 animate-pulse tracking-widest">{">"} SEARCHING DATABASE...</div>
-              ) : tickets.length === 0 ? (
+              ) : !workerData?.complaints?.length ? (
                 <div className="text-gray-400 dark:text-[#f59e0b]/50 tracking-widest">{">"} NO TICKETS FOUND IN QUERY.</div>
               ) : (
-                tickets.map((ticket, i) => (
+                workerData.complaints.slice(0, 3).map((ticket:any, i:number) => (
                   <button key={ticket.id} onClick={(e) => handleTicketClick(e, ticket.id)} className={`flex flex-wrap gap-x-2 gap-y-1 hover:bg-[#C9A84C]/10 dark:hover:bg-[#f59e0b]/10 p-1 -m-1 rounded transition-colors w-full text-left interactive-item ${i > 0 && ticket.status !== 'submitted' && ticket.status !== 'in_progress' ? 'opacity-80' : ''}`}>
                     <span className="text-gray-800 dark:text-[#f59e0b] mr-2 flex-shrink-0">{'>'} TICKET #{ticket.ticket_id || ticket.id.slice(0, 6)}:</span>
                     <span className="text-gray-700 dark:text-[#f59e0b]/80 uppercase">Status - {ticket.status?.replace('_', ' ') || "unknown"}</span>

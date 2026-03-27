@@ -20,6 +20,8 @@ type WorkerProfileRow = {
   department: string
   availability: string
   total_resolved: number
+  average_rating?: number | null
+  total_reviews?: number | null
 }
 
 type WorkerComplaintAssignmentRow = {
@@ -109,11 +111,16 @@ export default function WorkersPage() {
     const categoriesByDepartment = new Map<string, string[]>()
     const complaintsByWorker = new Map<string, WorkerComplaintAssignmentRow[]>()
 
+    const workerStatsByWorker = new Map<string, { average_rating?: number | null, total_reviews?: number | null }>()
     for (const worker of workerProfileRows) {
       const department = worker.department?.trim()
       if (!department) continue
       departmentsSet.add(department)
       workersByDepartment.set(department, (workersByDepartment.get(department) ?? 0) + 1)
+      workerStatsByWorker.set(worker.worker_id, { 
+        average_rating: worker.average_rating, 
+        total_reviews: worker.total_reviews 
+      })
     }
 
     for (const category of categoryRows) {
@@ -169,6 +176,8 @@ export default function WorkersPage() {
           workersCount: normalizedDepartment ? (workersByDepartment.get(normalizedDepartment) ?? 0) : 0,
           categories: normalizedDepartment ? (categoriesByDepartment.get(normalizedDepartment) ?? []) : [],
           workload: determineWorkload(activeTickets),
+          averageRating: workerStatsByWorker.get(profile.id)?.average_rating ?? 0,
+          totalReviews: workerStatsByWorker.get(profile.id)?.total_reviews ?? 0,
         } satisfies AuthorityRecord
       })
       .sort((a, b) => {
@@ -477,6 +486,8 @@ export default function WorkersPage() {
               <p><span className="font-semibold">Active Tickets:</span> {viewWorker.activeTickets}</p>
               <p><span className="font-semibold">Resolved Today:</span> {viewWorker.resolvedToday}</p>
               <p><span className="font-semibold">Avg. Resolution:</span> {viewWorker.avgResolutionDays.toFixed(1)} days</p>
+              <p><span className="font-semibold">Avg. Rating:</span> {viewWorker.averageRating ? `${viewWorker.averageRating.toFixed(1)} / 5.0` : "N/A"}</p>
+              <p><span className="font-semibold">Total Reviews:</span> {viewWorker.totalReviews ?? 0}</p>
               <p><span className="font-semibold">Workers in Dept:</span> {viewWorker.workersCount}</p>
             </div>
           </div>
