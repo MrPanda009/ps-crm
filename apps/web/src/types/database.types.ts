@@ -281,6 +281,38 @@ export type Database = {
           },
         ]
       }
+      detections_telemetry: {
+        Row: {
+          camera_id: string | null
+          confidence: number
+          digipin: string
+          id: string
+          timestamp: string | null
+        }
+        Insert: {
+          camera_id?: string | null
+          confidence: number
+          digipin: string
+          id?: string
+          timestamp?: string | null
+        }
+        Update: {
+          camera_id?: string | null
+          confidence?: number
+          digipin?: string
+          id?: string
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detections_telemetry_camera_id_fkey"
+            columns: ["camera_id"]
+            isOneToOne: false
+            referencedRelation: "cctv_cameras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       material_requests: {
         Row: {
           complaint_id: string
@@ -476,6 +508,44 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suspected_incidents: {
+        Row: {
+          detection_count: number | null
+          digipin: string
+          first_detected: string | null
+          last_camera_id: string | null
+          last_detected: string | null
+          max_confidence: number
+          status: string
+        }
+        Insert: {
+          detection_count?: number | null
+          digipin: string
+          first_detected?: string | null
+          last_camera_id?: string | null
+          last_detected?: string | null
+          max_confidence: number
+          status: string
+        }
+        Update: {
+          detection_count?: number | null
+          digipin?: string
+          first_detected?: string | null
+          last_camera_id?: string | null
+          last_detected?: string | null
+          max_confidence?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suspected_incidents_last_camera_id_fkey"
+            columns: ["last_camera_id"]
+            isOneToOne: false
+            referencedRelation: "cctv_cameras"
             referencedColumns: ["id"]
           },
         ]
