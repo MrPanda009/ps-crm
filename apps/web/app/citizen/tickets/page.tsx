@@ -612,10 +612,40 @@ function CitizenTicketsPageContent() {
                           <div className="flex flex-col items-center gap-1">
                             <Rating 
                               initialRating={ticket.rating} 
-                              onRate={(r) => {
-                                // For now, just show a success message or update locally
-                                console.log("Rated:", r, "for ticket:", ticket.id);
-                                alert("Thank you for your feedback! Rating: " + r + " stars.");
+                              onRate={async (r) => {
+                                try {
+                                  // 1. Get token
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  const token = session?.access_token;
+                                  if (!token) throw new Error("No session");
+
+                                  // 2. POST to review endpoint
+                                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                                  const res = await fetch(`${apiUrl}/api/complaints/review`, {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      "Authorization": `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                      complaint_id: ticket.id,
+                                      rating: r
+                                    })
+                                  });
+
+                                  if (res.ok) {
+                                    // Update locally for instant feedback
+                                    setTickets(prev => prev.map(t => 
+                                      t.id === ticket.id ? { ...t, rating: r } : t
+                                    ));
+                                  } else {
+                                    const err = await res.json();
+                                    alert(err.detail || "Failed to submit rating.");
+                                  }
+                                } catch (err) {
+                                  console.error("Rating submission error:", err);
+                                  alert("An error occurred. Check console for details.");
+                                }
                               }} 
                             />
                             <span className="text-[10px] text-gray-400">Rate your experience</span>

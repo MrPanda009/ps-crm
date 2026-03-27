@@ -125,6 +125,12 @@ class TicketCreated(BaseModel):
     image_metadata: Optional[Dict[str, str]] = None
 
 
+class ReviewSubmission(BaseModel):
+    complaint_id: str
+    rating: int        # 1-5
+    feedback: Optional[str] = None
+
+
 # =========================================================
 # 5. HELPERS
 # =========================================================
@@ -734,6 +740,78 @@ async def get_citizen_tickets(
         raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
 
 
+@app.post("/api/complaints/review")
+async def submit_complaint_review(
+    review: ReviewSubmission,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Allow citizens to rate resolved tickets.
+    Updates worker performance via DB trigger on the 'reviews' table.
+    """
+    citizen_id = get_citizen_id_from_token(authorization)
+
+    # 1. Fetch complaint to verify ownership, status, and assigned worker
+    try:
+        comp_res = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .select("id, status, citizen_id, assigned_worker_id")
+            .eq("id", review.complaint_id)
+            .maybe_single()
+            .execute()
+        )
+        complaint = comp_res.data
+        if not complaint:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+        
+        if complaint["citizen_id"] != citizen_id:
+            raise HTTPException(status_code=403, detail="You can only rate your own tickets")
+        
+        if complaint["status"] not in ["resolved", "rejected"]:
+            raise HTTPException(status_code=400, detail="Only resolved or rejected tickets can be rated")
+        
+        if not complaint.get("assigned_worker_id"):
+            raise HTTPException(status_code=400, detail="No worker was assigned to this ticket")
+
+        # 2. Insert the review
+        # The 'worker_id' column in the 'reviews' table triggers the performance update in 'worker_profiles'
+        review_res = await asyncio.to_thread(
+            lambda: supabase.table("reviews").insert({
+                "complaint_id": review.complaint_id,
+                "citizen_id":   citizen_id,
+                "worker_id":    complaint["assigned_worker_id"],
+                "rating":       review.rating,
+                "feedback":     review.feedback
+            }).execute()
+        )
+        
+        if not review_res.data:
+            raise HTTPException(status_code=500, detail="Failed to save review")
+
+        # Invalidate any authority/worker caches so they see the fresh rating
+        if redis_client:
+            try:
+                # Invalidate worker dashboard and profiles for the specific worker
+                wid = complaint["assigned_worker_id"]
+                redis_client.delete(f"worker:dashboard:{wid}")
+                redis_client.delete(f"worker:profile:v2:{wid}")
+                # Plus any generic authority worker lists (lazy: wipe all, or pattern match)
+                for key in redis_client.scan_iter("authority:workers:*"):
+                    redis_client.delete(key)
+            except Exception as e:
+                print(f"Redis invalidation on review failed: {e}")
+
+        return {"status": "success", "message": "Review submitted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Check for unique constraint violation (one review per complaint)
+        if "unique" in str(e).lower():
+            raise HTTPException(status_code=409, detail="This ticket has already been rated")
+        raise HTTPException(status_code=500, detail=f"Review submission failed: {str(e)}")
+
+
 # =========================================================
 # 8c. ADMIN DASHBOARD STATS (Consolidated + Redis)
 # =========================================================
@@ -1235,6 +1313,7 @@ async def get_authority_workers(
     try:
         worker_query = supabase.table("worker_profiles").select(
             "worker_id, availability, department, city, total_resolved, "
+            "average_rating, total_reviews, "
             "current_complaint_id, joined_at, profiles(full_name, email)"
         )
         if department:
@@ -1342,7 +1421,7 @@ async def get_worker_dashboard(
         [worker_profile_res, complaints_res, history_res] = await asyncio.gather(
             asyncio.to_thread(
                 lambda: supabase.table("worker_profiles")
-                .select("last_location")
+                .select("last_location, average_rating, total_reviews")
                 .eq("worker_id", worker_id)
                 .maybe_single()
                 .execute()
@@ -1417,7 +1496,7 @@ async def get_worker_profile_data(
             ),
             asyncio.to_thread(
                 lambda: supabase.table("worker_profiles")
-                .select("department, joined_at, availability, total_resolved, current_complaint_id")
+                .select("department, joined_at, availability, total_resolved, current_complaint_id, average_rating, total_reviews")
                 .eq("worker_id", worker_id)
                 .maybe_single()
                 .execute()
