@@ -1683,16 +1683,32 @@ async def get_authority_material_requests(
     get_citizen_id_from_token(authorization)
     
     try:
-        # Using Supabase's simple join syntax; ensure relationships are recognized in your DB schema.
-        response = await asyncio.to_thread(
-            lambda: supabase.table("material_requests")
-            .select("*, profiles(full_name), complaints(ticket_id), warehouse_inventory(name, unit)")
-            .eq("status", "pending")
-            .order("created_at", desc=True)
-            .execute()
-        )
-        return {"requests": response.data or []}
+        base_url = SUPABASE_URL.strip().rstrip("/")
+        api_key = SUPABASE_SERVICE_KEY.strip()
+
+        # Authority sees pending material requests using direct REST API
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{base_url}/rest/v1/material_requests",
+                params={
+                    "status": "eq.pending",
+                    "select": "*,profiles:worker_id(full_name),complaints(ticket_id),warehouse_inventory(name,unit)",
+                    "order": "created_at.desc"
+                },
+                headers={
+                    "apikey": api_key,
+                    "Authorization": f"Bearer {api_key}"
+                },
+                timeout=10.0
+            )
+        
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=f"Failed to fetch requests ({resp.status_code}): {resp.text}")
+            
+        return {"requests": resp.json()}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch requests: {str(e)}")
 
 
