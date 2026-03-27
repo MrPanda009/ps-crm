@@ -82,6 +82,9 @@ export default function WorkersPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date())
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
   const [viewWorker, setViewWorker] = useState<AuthorityRecord | null>(null)
   const [assignWorker, setAssignWorker] = useState<AuthorityRecord | null>(null)
   const [departmentDraft, setDepartmentDraft] = useState("")
@@ -207,11 +210,11 @@ export default function WorkersPage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const response = await fetch(`${apiUrl}/api/admin/workers`, {
         method: "GET",
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
+
 
       const payload = (await response.json().catch(() => null)) as {
         error?: string
@@ -322,7 +325,7 @@ export default function WorkersPage() {
       return
     }
 
-    const response = await fetch("/api/admin/workers", {
+    const response = await fetch(`${apiUrl}/api/admin/workers`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -330,6 +333,7 @@ export default function WorkersPage() {
       },
       body: JSON.stringify({ worker_id: assignWorker.id, department: departmentDraft }),
     })
+
 
     const payload = (await response.json().catch(() => null)) as { error?: string } | null
 
@@ -386,7 +390,7 @@ export default function WorkersPage() {
       return
     }
 
-    const response = await fetch("/api/admin/workers", {
+    const response = await fetch(`${apiUrl}/api/admin/workers`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -401,6 +405,7 @@ export default function WorkersPage() {
         department,
       }),
     })
+
 
     const payload = (await response.json().catch(() => null)) as { error?: string } | null
 

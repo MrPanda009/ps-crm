@@ -69,7 +69,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=False,
-    allow_methods=["POST", "OPTIONS", "GET"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
@@ -145,6 +145,35 @@ class MaterialAllotRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class AdminAuthorityUpdate(BaseModel):
+    authority_id: str
+    department: str
+
+
+class AdminAuthorityCreate(BaseModel):
+    full_name: str
+    email: str
+    password: str
+    phone: Optional[str] = None
+    city: Optional[str] = None
+    department: str
+
+
+class AdminWorkerUpdate(BaseModel):
+    worker_id: str
+    department: str
+
+
+class AdminWorkerCreate(BaseModel):
+    full_name: str
+    email: str
+    password: str
+    phone: Optional[str] = None
+    city: Optional[str] = None
+    department: str
+
+
+
 # =========================================================
 # 5. HELPERS
 # =========================================================
@@ -169,6 +198,23 @@ def get_citizen_id_from_token(authorization: Optional[str]) -> str:
         return citizen_id
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Failed to decode JWT: {str(e)}")
+
+
+async def require_admin(authorization: Optional[str]) -> str:
+    """Verify the caller has the 'admin' role in the profiles table."""
+    user_id = get_citizen_id_from_token(authorization)
+    try:
+        res = await asyncio.to_thread(
+            lambda: supabase.table("profiles").select("role").eq("id", user_id).maybe_single().execute()
+        )
+        if not res.data or res.data.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Forbidden. Admin role required.")
+        return user_id
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Admin validation failed: {str(e)}")
+
 
 
 class ChatHistory(BaseModel):
@@ -942,9 +988,99 @@ async def get_admin_authorities_list(
                 print(f"Redis write error: {e}")
 
         return { "source": "database", **payload }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Authorities data fetch failed: {str(e)}")
+
+
+
+@app.patch("/api/admin/authorities")
+async def update_admin_authority(
+    payload: AdminAuthorityUpdate,
+    authorization: Optional[str] = Header(None)
+):
+    """Update authority department and invalidate Redis cache."""
+    await require_admin(authorization)
+    
+    try:
+        # 1. Update Profile
+        await asyncio.to_thread(
+            lambda: supabase.table("profiles")
+            .update({"department": payload.department})
+            .eq("id", payload.authority_id)
+            .execute()
+        )
+
+        # 2. Update active complaints assigned to this officer
+        active_statuses = ["submitted", "under_review", "assigned", "in_progress", "escalated"]
+        await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .update({"assigned_department": payload.department})
+            .eq("assigned_officer_id", payload.authority_id)
+            .in_("status", active_statuses)
+            .execute()
+        )
+
+        # 3. Invalidate Redis Cache
+        if redis_client:
+            try:
+                redis_client.delete("admin:authorities:list")
+            except Exception as e:
+                print(f"Redis invalidation failed: {e}")
+
+        return {"status": "success", "message": "Authority department updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update authority: {str(e)}")
+
+
+@app.post("/api/admin/authorities")
+async def create_admin_authority(
+    payload: AdminAuthorityCreate,
+    authorization: Optional[str] = Header(None)
+):
+    """Create a new authority: Auth user + Profile + Redis invalidation."""
+    await require_admin(authorization)
+    
+    try:
+        # 1. Create Auth User
+        auth_res = await asyncio.to_thread(
+            lambda: supabase.auth.admin.create_user({
+                "email": payload.email,
+                "password": payload.password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "full_name": payload.full_name,
+                    "role": "authority",
+                    "department": payload.department
+                }
+            })
+        )
+        
+        user_id = auth_res.user.id
+
+        # 2. Create Profile
+        await asyncio.to_thread(
+            lambda: supabase.table("profiles").upsert({
+                "id": user_id,
+                "email": payload.email,
+                "full_name": payload.full_name,
+                "phone": payload.phone,
+                "city": payload.city,
+                "department": payload.department,
+                "role": "authority",
+                "is_blocked": False
+            }, on_conflict="id").execute()
+        )
+
+        # 3. Invalidate Redis
+        if redis_client:
+            try:
+                redis_client.delete("admin:authorities:list")
+            except Exception as e:
+                print(f"Redis invalidation failed: {e}")
+
+        return {"status": "success", "id": user_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create authority: {str(e)}")
 
 
 # =========================================================
@@ -993,6 +1129,119 @@ async def get_admin_workers_list(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Workers data fetch failed: {str(e)}")
+
+
+@app.patch("/api/admin/workers")
+async def update_admin_worker(
+    payload: AdminWorkerUpdate,
+    authorization: Optional[str] = Header(None)
+):
+    """Update worker department, upsert worker_profile, and invalidate Redis cache."""
+    await require_admin(authorization)
+    
+    try:
+        # 1. Update Profile
+        await asyncio.to_thread(
+            lambda: supabase.table("profiles")
+            .update({"department": payload.department})
+            .eq("id", payload.worker_id)
+            .execute()
+        )
+
+        # 2. Upsert Worker Profile details
+        await asyncio.to_thread(
+            lambda: supabase.table("worker_profiles")
+            .upsert({
+                "worker_id": payload.worker_id,
+                "department": payload.department,
+                "availability": "available"
+            }, on_conflict="worker_id")
+            .execute()
+        )
+
+        # 3. Update active complaints assigned to this worker
+        active_statuses = ["submitted", "under_review", "assigned", "in_progress", "escalated"]
+        await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .update({"assigned_department": payload.department})
+            .eq("assigned_worker_id", payload.worker_id)
+            .in_("status", active_statuses)
+            .execute()
+        )
+
+        # 4. Invalidate Redis Cache
+        if redis_client:
+            try:
+                redis_client.delete("admin:workers:list")
+            except Exception as e:
+                print(f"Redis invalidation failed: {e}")
+
+        return {"status": "success", "message": "Worker department updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update worker: {str(e)}")
+
+
+@app.post("/api/admin/workers")
+async def create_admin_worker(
+    payload: AdminWorkerCreate,
+    authorization: Optional[str] = Header(None)
+):
+    """Create a new worker: Auth user + Profile + Worker Profile + Redis invalidation."""
+    await require_admin(authorization)
+    
+    try:
+        # 1. Create Auth User
+        auth_res = await asyncio.to_thread(
+            lambda: supabase.auth.admin.create_user({
+                "email": payload.email,
+                "password": payload.password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "full_name": payload.full_name,
+                    "role": "worker",
+                    "department": payload.department
+                }
+            })
+        )
+        
+        user_id = auth_res.user.id
+
+        # 2. Create Profile
+        await asyncio.to_thread(
+            lambda: supabase.table("profiles").upsert({
+                "id": user_id,
+                "email": payload.email,
+                "full_name": payload.full_name,
+                "phone": payload.phone,
+                "city": payload.city,
+                "department": payload.department,
+                "role": "worker",
+                "is_blocked": False
+            }, on_conflict="id").execute()
+        )
+
+        # 3. Create Worker Profile details
+        await asyncio.to_thread(
+            lambda: supabase.table("worker_profiles").upsert({
+                "worker_id": user_id,
+                "department": payload.department,
+                "city": payload.city or "Unknown",
+                "availability": "available"
+            }, on_conflict="worker_id").execute()
+        )
+
+        # 4. Invalidate Redis
+        if redis_client:
+            try:
+                redis_client.delete("admin:workers:list")
+            except Exception as e:
+                print(f"Redis invalidation failed: {e}")
+
+        return {"status": "success", "id": user_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create worker: {str(e)}")
+
+
 
 
 # =========================================================
