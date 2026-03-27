@@ -131,6 +131,19 @@ class ReviewSubmission(BaseModel):
     feedback: Optional[str] = None
 
 
+class MaterialRequestCreate(BaseModel):
+    complaint_id: str
+    material_id: str
+    quantity: int
+    notes: Optional[str] = None
+
+
+class MaterialAllotRequest(BaseModel):
+    request_id: str
+    status: str # 'allotted' or 'rejected'
+    notes: Optional[str] = None
+
+
 # =========================================================
 # 5. HELPERS
 # =========================================================
@@ -1538,6 +1551,147 @@ async def get_worker_profile_data(
             print(f"Redis write error: {e}")
 
     return {"source": "database", **payload}
+
+
+# =========================================================
+# 8j. WAREHOUSE & MATERIAL TRACKING
+# =========================================================
+
+@app.get("/api/warehouse/inventory")
+async def get_warehouse_inventory(
+    authorization: Optional[str] = Header(None)
+):
+    """Fetch all materials from warehouse_inventory."""
+    get_citizen_id_from_token(authorization)
+    
+    try:
+        response = await asyncio.to_thread(
+            lambda: supabase.table("warehouse_inventory")
+            .select("*")
+            .order("name")
+            .execute()
+        )
+        return {"items": response.data or []}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch inventory: {str(e)}")
+
+
+@app.post("/api/worker/material-request")
+async def create_material_request(
+    request: MaterialRequestCreate,
+    authorization: Optional[str] = Header(None)
+):
+    """Worker requests materials for a complaint."""
+    worker_id = get_citizen_id_from_token(authorization)
+    
+    try:
+        # 1. Verify worker is assigned to this complaint
+        comp_res = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .select("id, assigned_worker_id")
+            .eq("id", request.complaint_id)
+            .maybe_single()
+            .execute()
+        )
+        if not comp_res.data:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+        if comp_res.data["assigned_worker_id"] != worker_id:
+            raise HTTPException(status_code=403, detail="You are not assigned to this complaint")
+            
+        # 2. Insert request
+        insert_res = await asyncio.to_thread(
+            lambda: supabase.table("material_requests").insert({
+                "worker_id": worker_id,
+                "complaint_id": request.complaint_id,
+                "material_id": request.material_id,
+                "requested_quantity": request.quantity,
+                "status": "pending",
+                "notes": request.notes
+            }).execute()
+        )
+        return {"status": "success", "data": insert_res.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create material request: {str(e)}")
+
+
+@app.get("/api/authority/material-requests")
+async def get_authority_material_requests(
+    authorization: Optional[str] = Header(None)
+):
+    """Authority sees pending material requests."""
+    get_citizen_id_from_token(authorization)
+    
+    try:
+        # Using Supabase's simple join syntax; ensure relationships are recognized in your DB schema.
+        response = await asyncio.to_thread(
+            lambda: supabase.table("material_requests")
+            .select("*, profiles(full_name), complaints(ticket_id), warehouse_inventory(name, unit)")
+            .eq("status", "pending")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return {"requests": response.data or []}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch requests: {str(e)}")
+
+
+@app.post("/api/authority/material-allot")
+async def allot_material(
+    request: MaterialAllotRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """Authority approves/allots or rejects material request."""
+    get_citizen_id_from_token(authorization)
+    
+    try:
+        # 1. Get the request details
+        req_res = await asyncio.to_thread(
+            lambda: supabase.table("material_requests")
+            .select("*, warehouse_inventory(available_quantity)")
+            .eq("id", request.request_id)
+            .maybe_single()
+            .execute()
+        )
+        if not req_res.data:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        req_data = req_res.data
+        if req_data["status"] != "pending":
+            raise HTTPException(status_code=400, detail=f"Request is already {req_data['status']}")
+            
+        if request.status == "allotted":
+            available = req_data["warehouse_inventory"]["available_quantity"]
+            if available < req_data["requested_quantity"]:
+                raise HTTPException(status_code=400, detail="Insufficient inventory for this request")
+            
+            # Decrement inventory (in production use a stored procedure for atomicity)
+            await asyncio.to_thread(
+                lambda: supabase.table("warehouse_inventory")
+                .update({"available_quantity": available - req_data["requested_quantity"]})
+                .eq("id", req_data["material_id"])
+                .execute()
+            )
+            
+        # 2. Update request status
+        update_res = await asyncio.to_thread(
+            lambda: supabase.table("material_requests")
+            .update({
+                "status": request.status,
+                "notes": request.notes,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            })
+            .eq("id", request.request_id)
+            .execute()
+        )
+        
+        return {"status": "success", "data": update_res.data[0]}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process allotment: {str(e)}")
 
 
 # =========================================================

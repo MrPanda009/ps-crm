@@ -281,6 +281,64 @@ export type Database = {
           },
         ]
       }
+      material_requests: {
+        Row: {
+          complaint_id: string
+          created_at: string | null
+          id: string
+          material_id: string
+          notes: string | null
+          requested_quantity: number
+          status: string
+          updated_at: string | null
+          worker_id: string
+        }
+        Insert: {
+          complaint_id: string
+          created_at?: string | null
+          id?: string
+          material_id: string
+          notes?: string | null
+          requested_quantity: number
+          status?: string
+          updated_at?: string | null
+          worker_id: string
+        }
+        Update: {
+          complaint_id?: string
+          created_at?: string | null
+          id?: string
+          material_id?: string
+          notes?: string | null
+          requested_quantity?: number
+          status?: string
+          updated_at?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_requests_complaint_id_fkey"
+            columns: ["complaint_id"]
+            isOneToOne: false
+            referencedRelation: "complaints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_requests_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_requests_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           aadhar_hash: string | null
@@ -521,6 +579,36 @@ export type Database = {
           email?: string
           new_id?: string | null
           old_id?: string | null
+        }
+        Relationships: []
+      }
+      warehouse_inventory: {
+        Row: {
+          available_quantity: number
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          unit: string
+          updated_at: string | null
+        }
+        Insert: {
+          available_quantity?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          unit: string
+          updated_at?: string | null
+        }
+        Update: {
+          available_quantity?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          unit?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
