@@ -5,12 +5,10 @@ import {
   ChevronDown,
   ClipboardList,
   FileBarChart2,
-  FolderTree,
   LayoutGrid,
   LogOut,
   Menu,
   MessageSquare,
-  Settings,
   Shield,
   UserCircle2,
   Users,
@@ -18,7 +16,7 @@ import {
 import Sidebar, { defaultSidebarConfig, SidebarNavigationItem } from "@/components/Sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
-import AuthorityNotificationBell from "@/app/authority/_components/AuthorityNotificationBell";
+import AdminNotificationBell from "@/app/admin/_components/AdminNotificationBell";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -58,9 +56,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { id: "complaints", name: "Complaints", icon: <ClipboardList size={20} strokeWidth={2} />, href: "/admin/complaints", isActive: pathname === "/admin/complaints" },
     { id: "authorities", name: "Authorities", icon: <Shield size={20} strokeWidth={2} />, href: "/admin/authorities", isActive: pathname === "/admin/authorities" },
     { id: "workers", name: "Workers", icon: <Users size={20} strokeWidth={2} />, href: "/admin/workers", isActive: pathname === "/admin/workers" },
-    { id: "categories", name: "Categories", icon: <FolderTree size={20} strokeWidth={2} />, href: "/admin/categories", isActive: pathname === "/admin/categories" },
     { id: "reports", name: "Reports", icon: <FileBarChart2 size={20} strokeWidth={2} />, href: "/admin/reports", isActive: pathname === "/admin/reports" },
-    { id: "settings", name: "Settings", icon: <Settings size={20} strokeWidth={2} />, href: "/admin/settings", isActive: pathname === "/admin/settings" },
   ];
 
   const sidebarConfig = {
@@ -143,7 +139,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Right side — Notifications + Profile */}
             <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
-              <AuthorityNotificationBell />
+              <AdminNotificationBell />
 
               <div ref={profileRef} className="relative">
                 <button

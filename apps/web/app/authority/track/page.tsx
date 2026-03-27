@@ -90,8 +90,47 @@ export default function TrackPage() {
   const [isSevOpen,    setIsSevOpen]    = useState(false)
   const [selectedId,   setSelectedId]   = useState<string | null>(null)
   const [expandedId,   setExpandedId]   = useState<string | null>(null)
+  const [dept,         setDept]         = useState("")
   const [recenterTrigger, setRecenterTrigger] = useState(0)
   const detailRef = useRef<HTMLDivElement>(null)
+
+  async function applyLiveUpvoteCounts(rows: Complaint[]): Promise<Complaint[]> {
+    if (rows.length === 0) return rows
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    const token = session?.access_token ?? null
+    if (sessionError || !token) {
+      return rows.map((row) => ({ ...row, upvote_count: row.upvote_count ?? 0 }))
+    }
+
+    const complaintIds = rows.map((row) => row.id)
+    const res = await fetch("/api/authority/upvote-counts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ complaintIds }),
+      cache: "no-store",
+    })
+
+    const payload = (await res.json().catch(() => ({}))) as {
+      counts?: Record<string, number>
+    }
+
+    if (!res.ok || !payload.counts) {
+      return rows.map((row) => ({ ...row, upvote_count: row.upvote_count ?? 0 }))
+    }
+
+    return rows.map((row) => ({
+      ...row,
+      upvote_count: payload.counts?.[row.id] ?? 0,
+    }))
+  }
 
   async function fetchData() {
     const { data: auth } = await supabase.auth.getUser()
@@ -118,6 +157,8 @@ export default function TrackPage() {
       rows = (d2 ?? []) as unknown as Complaint[]
     }
 
+    rows = await applyLiveUpvoteCounts(rows)
+
     let workerRows: Worker[] = []
     if (department) {
       const { data: wRows } = await supabase
@@ -134,19 +175,29 @@ export default function TrackPage() {
 
     setComplaints(rows)
     setWorkers(workerRows)
+    setDept(department)
     setError(null)
     setLoading(false)
   }
 
   useEffect(() => { void fetchData() }, [])
   useEffect(() => {
+    if (!dept) return
     const ch = supabase.channel("track-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "complaints" },      () => void fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "upvotes" },         () => void fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "worker_profiles" },() => void fetchData())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "complaints",
+        filter: `assigned_department=eq.${dept}`
+      }, () => void fetchData())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "upvotes"
+      }, () => void fetchData())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "worker_profiles",
+        filter: `department=eq.${dept}`
+      }, () => void fetchData())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [dept])
 
   useEffect(() => {
     if (expandedId && detailRef.current) {
@@ -425,9 +476,7 @@ export default function TrackPage() {
 
                       {/* Upvotes */}
                       <td className="px-2.5 py-2 whitespace-nowrap text-[10px]">
-                        {(c.upvote_count ?? 0) > 0
-                          ? <span className="font-semibold text-[#b4725a]">▲{c.upvote_count}</span>
-                          : <span className="text-gray-300">—</span>}
+                        <span className="font-semibold text-[#b4725a]">▲{c.upvote_count ?? 0}</span>
                       </td>
 
                       {/* SLA */}

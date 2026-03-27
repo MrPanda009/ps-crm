@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import AuthoritiesGrid from "@/components/admin-authorities/AuthoritiesGrid"
 import AuthorityFilters from "@/components/admin-authorities/AuthorityFilters"
 import AuthoritiesHeader from "@/components/admin-authorities/AuthoritiesHeader"
@@ -91,45 +92,13 @@ export default function WorkersPage() {
   const [newWorkerDepartment, setNewWorkerDepartment] = useState("")
   const [newWorkerPassword, setNewWorkerPassword] = useState("")
 
-  const fetchWorkers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession()
-
-    if (sessionError || !session?.access_token) {
-      setError("You must be logged in as admin")
-      setWorkers([])
-      setLoading(false)
-      return
-    }
-
-    const response = await fetch("/api/admin/workers", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      cache: "no-store",
-    })
-
-    const payload = (await response.json().catch(() => null)) as {
-      error?: string
-      profiles?: AuthorityProfileRow[]
-      complaints?: WorkerComplaintAssignmentRow[]
-      workerProfiles?: WorkerProfileRow[]
-      categories?: CategoryRow[]
-    } | null
-
-    if (!response.ok || !payload) {
-      setError(payload?.error || "Unable to load workers")
-      setWorkers([])
-      setLoading(false)
-      return
-    }
-
+  // Shared transform: raw API payload → AuthorityRecord[] + department options
+  const transformPayload = useCallback((payload: {
+    profiles?: AuthorityProfileRow[]
+    complaints?: WorkerComplaintAssignmentRow[]
+    workerProfiles?: WorkerProfileRow[]
+    categories?: CategoryRow[]
+  }) => {
     const profileRows = payload.profiles ?? []
     const complaintRows = payload.complaints ?? []
     const workerProfileRows = payload.workerProfiles ?? []
@@ -207,14 +176,79 @@ export default function WorkersPage() {
         return a.fullName.localeCompare(b.fullName)
       })
 
-    setWorkers(nextWorkers)
-    setDepartmentOptions(Array.from(departmentsSet).sort((a, b) => a.localeCompare(b)))
-    setLoading(false)
+    return {
+      workers: nextWorkers,
+      departments: Array.from(departmentsSet).sort((a, b) => a.localeCompare(b)),
+    }
+  }, [])
+
+  const fetchWorkers = useCallback(async () => {
+    setError(null)
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    if (sessionError || !session?.access_token) {
+      setError("You must be logged in as admin")
+      setWorkers([])
+      setLoading(false)
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const response = await fetch(`${apiUrl}/api/admin/workers`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string
+        source?: string
+        profiles?: AuthorityProfileRow[]
+        complaints?: WorkerComplaintAssignmentRow[]
+        workerProfiles?: WorkerProfileRow[]
+        categories?: CategoryRow[]
+      } | null
+
+      if (!response.ok || !payload) {
+        setError(payload?.error || "Unable to load workers")
+        setLoading(false)
+        return
+      }
+
+      const result = transformPayload(payload)
+      setWorkers(result.workers)
+      setDepartmentOptions(result.departments)
+
+      // Persist raw payload to localStorage for instant load next time
+      try { localStorage.setItem("admin_workers_payload", JSON.stringify(payload)) } catch {}
+    } catch (err) {
+      console.error("Workers fetch error:", err)
+      setError("Failed to load workers data")
+    } finally {
+      setLoading(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
+    // 1. Instant Load from localStorage
+    try {
+      const cached = localStorage.getItem("admin_workers_payload")
+      if (cached) {
+        const result = transformPayload(JSON.parse(cached))
+        setWorkers(result.workers)
+        setDepartmentOptions(result.departments)
+        setLoading(false)
+      }
+    } catch {}
+
+    // 2. Then fetch fresh data
     void fetchWorkers()
-  }, [fetchWorkers])
+  }, [fetchWorkers, transformPayload])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -392,12 +426,12 @@ export default function WorkersPage() {
         >
           + Add New Worker
         </button>
-        <button
-          type="button"
-          className="rounded-xl border border-[#d7cebf] bg-white px-4 py-2 text-sm font-medium text-[#2d2722] dark:border-[#3a3a3a] dark:bg-[#2a2a2a] dark:text-gray-100"
+        <Link
+          href="/admin/workers/reports"
+          className="rounded-xl border border-[#d7cebf] bg-white px-4 py-2 text-sm font-medium text-[#2d2722] hover:bg-gray-50 flex items-center justify-center transition-colors dark:border-[#3a3a3a] dark:bg-[#2a2a2a] dark:text-gray-100"
         >
           View Reports
-        </button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">

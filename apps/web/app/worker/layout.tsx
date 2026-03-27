@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, Menu, UserCircle2 } from "lucide-react";
+import { ChevronDown, Menu, Trophy, UserCircle2 } from "lucide-react";
 import Sidebar, { defaultSidebarConfig } from "@/components/Sidebar";
 import { ClipboardList, LayoutGrid, LogOut } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
@@ -69,12 +69,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         href: "/worker/tasks",
         isActive: pathname === "/worker/tasks",
       },
+      {
+        id: "profile",
+        name: "Profile",
+        icon: <Trophy size={20} strokeWidth={2} />,
+        href: "/worker/profile",
+        isActive: pathname === "/worker/profile",
+      },
     ],
     bottomNavigation: [],
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-[#161616]">
+    <div className="flex h-dvh overflow-hidden bg-gray-50 dark:bg-[#161616]">
       <Sidebar
         {...sidebarConfig}
         isOpen={isSidebarOpen}
@@ -84,7 +91,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         disableInternalScroll
       />
 
-      <div className="flex-1 flex min-h-0 min-w-0 flex-col max-w-full overflow-x-hidden">
+      <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-[2100] border-b border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
           <div className="flex min-w-0 max-w-full items-center justify-between gap-4 px-4 py-4 sm:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -98,11 +105,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100 md:text-xl lg:text-2xl">
-                  {pathname === '/worker/tasks' ? 'Tasks' : 'Worker Dashboard'}
+                  {pathname === '/worker/tasks' ? 'Tasks' : pathname === '/worker/profile' ? 'My Profile' : 'Worker Dashboard'}
                 </h1>
                 <p className="mt-0.5 line-clamp-1 text-xs text-gray-600 dark:text-gray-300 sm:text-sm">
                   {pathname === '/worker/tasks' 
                     ? 'View and manage all your assigned tasks.' 
+                    : pathname === '/worker/profile'
+                    ? 'Track your performance metrics and keep your worker status up to date.'
                     : 'Manage assigned complaints, track progress, and close tasks quickly.'}
                 </p>
               </div>
@@ -148,7 +157,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 min-w-0 w-full max-w-full overflow-x-hidden p-4">
+        <main className="flex-1 min-h-0 w-full max-w-full overflow-y-auto overflow-x-hidden p-4">
           {children}
         </main>
       </div>

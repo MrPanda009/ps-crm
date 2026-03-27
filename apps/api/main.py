@@ -41,6 +41,7 @@ from shared import (
     route_authority,
     _find_recent_duplicate,
     build_complaint_record,
+    redis_client,
 )
 
 
@@ -548,6 +549,16 @@ async def confirm(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database insert failed: {str(e)}")
 
+    # Clear Redis Cache for this user + admin complaints
+    if redis_client:
+        try:
+            redis_client.delete(f"user:tickets:{citizen_id}")
+            # Invalidate all admin complaint cache keys so dashboard reflects new ticket
+            for key in redis_client.scan_iter("admin:complaints:*"):
+                redis_client.delete(key)
+        except Exception as e:
+            print(f"Redis cache invalidation failed: {e}")
+
     if not response.data:
         raise HTTPException(status_code=500, detail="Database insert returned no data.")
 
@@ -575,6 +586,387 @@ async def confirm(
         timestamp=timestamp,
         image_metadata=img_metadata,
     )
+
+
+# =========================================================
+# 8b. CITIZEN TICKETS (with Redis Caching & Delta support)
+# =========================================================
+
+@app.get("/citizen/tickets")
+async def get_citizen_tickets(
+    since: Optional[str] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Fetch citizen tickets with Redis caching.
+    Supports a 'since' parameter (ISO timestamp) to return only new/updated records.
+    """
+    citizen_id = get_citizen_id_from_token(authorization)
+    cache_key = f"user:tickets:{citizen_id}"
+
+    # 1. Try to fetch from Redis if no delta is requested
+    if not since and redis_client:
+        try:
+            cached_data = redis_client.get(cache_key)
+            if cached_data:
+                return {
+                    "source": "cache",
+                    "tickets": json.loads(cached_data)
+                }
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    # 2. Fallback to Supabase
+    query = supabase.table("complaints").select(
+        "id, ticket_id, title, address_text, assigned_department, status, created_at, upvote_count"
+    ).eq("citizen_id", citizen_id).order("created_at", desc=True)
+
+    if since:
+        query = query.gt("created_at", since)
+
+    try:
+        response = query.execute()
+        tickets = response.data or []
+        
+        # 3. Cache the FULL list in Redis for 1 hour (only if not a delta query)
+        if not since and redis_client:
+            try:
+                redis_client.setex(cache_key, 3600, json.dumps(tickets))
+            except Exception as e:
+                print(f"Redis write error: {e}")
+
+        return {
+            "source": "database" if not since else "delta",
+            "tickets": tickets
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+
+# =========================================================
+# 8c. ADMIN DASHBOARD STATS (Consolidated + Redis)
+# =========================================================
+
+@app.get("/api/admin/dashboard/stats")
+async def get_admin_dashboard_stats(
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Consolidates 6 heavy Supabase counts into one Redis-cached payload.
+    Used by AdminStatsOverview component.
+    """
+    # 1. Check Redis Cache (5-minute TTL)
+    cache_key = "admin:stats:global"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return { "source": "cache", **json.loads(cached) }
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    # 2. Fetch from Supabase in Parallel
+    try:
+        [
+            total_res, active_res, resolved_res, escalated_res, authorities_res, resolved_rows
+        ] = await asyncio.gather(
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").in_("status", ["submitted", "under_review", "assigned", "in_progress", "escalated"]).execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").eq("status", "resolved").execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").eq("status", "escalated").execute()),
+            asyncio.to_thread(lambda: supabase.table("profiles").select("id", count="exact").eq("role", "authority").eq("is_blocked", False).execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("created_at, resolved_at").eq("status", "resolved").execute())
+        )
+
+        # Calculate Average Resolution Days
+        resolved_data = resolved_rows.data or []
+        durations = []
+        for r in resolved_data:
+            if r.get("resolved_at"):
+                try:
+                    start = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))
+                    end = datetime.fromisoformat(r["resolved_at"].replace("Z", "+00:00"))
+                    delta = (end - start).total_seconds() / (3600 * 24)
+                    if delta >= 0:
+                        durations.append(delta)
+                except Exception:
+                    pass
+        
+        avg_days = sum(durations) / len(durations) if durations else 0
+
+        stats = {
+            "totalComplaints":    total_res.count or 0,
+            "activeComplaints":   active_res.count or 0,
+            "resolvedComplaints": resolved_res.count or 0,
+            "urgentEscalations":  escalated_res.count or 0,
+            "avgResolutionDays":  round(avg_days, 1),
+            "authoritiesActive": authorities_res.count or 0,
+        }
+
+        # 3. Cache in Redis
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 300, json.dumps(stats))
+            except Exception as e:
+                print(f"Redis write error: {e}")
+
+        return { "source": "database", **stats }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Admin stats fetch failed: {str(e)}")
+
+
+# =========================================================
+# 8d. ADMIN AUTHORITIES LIST (Consolidated + Redis)
+# =========================================================
+
+@app.get("/api/admin/authorities")
+async def get_admin_authorities_list(
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Consolidates profiles, worker counts, and category data into one payload.
+    Matches the exact schema of the original Next.js /api/admin/authorities route.
+    """
+    cache_key = "admin:authorities:list"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return { "source": "cache", **json.loads(cached) }
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    try:
+        [profiles_res, complaints_res, workers_res, categories_res] = await asyncio.gather(
+            asyncio.to_thread(lambda: supabase.table("profiles").select("id, full_name, email, phone, city, department, is_blocked, created_at").eq("role", "authority").order("created_at", desc=True).execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id, assigned_officer_id, assigned_department, status, created_at, resolved_at").execute()),
+            asyncio.to_thread(lambda: supabase.table("worker_profiles").select("worker_id, department").execute()),
+            asyncio.to_thread(lambda: supabase.table("categories").select("name, department").eq("is_active", True).execute())
+        )
+
+        payload = {
+            "profiles":   profiles_res.data or [],
+            "complaints": complaints_res.data or [],
+            "workers":    workers_res.data or [],
+            "categories": categories_res.data or [],
+        }
+
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 600, json.dumps(payload))
+            except Exception as e:
+                print(f"Redis write error: {e}")
+
+        return { "source": "database", **payload }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authorities data fetch failed: {str(e)}")
+
+
+# =========================================================
+# 8e. ADMIN WORKERS LIST (Consolidated + Redis)
+# =========================================================
+
+@app.get("/api/admin/workers")
+async def get_admin_workers_list(
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Consolidates worker profiles, complaints, worker_profiles table, and categories
+    into one payload. Matches the exact schema of Next.js /api/admin/workers route.
+    """
+    cache_key = "admin:workers:list"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return { "source": "cache", **json.loads(cached) }
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    try:
+        [profiles_res, complaints_res, worker_profiles_res, categories_res] = await asyncio.gather(
+            asyncio.to_thread(lambda: supabase.table("profiles").select("id, full_name, email, phone, city, department, is_blocked, created_at").eq("role", "worker").order("created_at", desc=True).execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id, assigned_worker_id, assigned_department, status, created_at, resolved_at").execute()),
+            asyncio.to_thread(lambda: supabase.table("worker_profiles").select("worker_id, department, availability, total_resolved").execute()),
+            asyncio.to_thread(lambda: supabase.table("categories").select("name, department").eq("is_active", True).execute())
+        )
+
+        payload = {
+            "profiles":       profiles_res.data or [],
+            "complaints":     complaints_res.data or [],
+            "workerProfiles": worker_profiles_res.data or [],
+            "categories":     categories_res.data or [],
+        }
+
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 600, json.dumps(payload))
+            except Exception as e:
+                print(f"Redis write error: {e}")
+
+        return { "source": "database", **payload }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workers data fetch failed: {str(e)}")
+
+
+# =========================================================
+# 8f. ADMIN COMPLAINTS LIST (Consolidated + Redis)
+# =========================================================
+
+def _parse_priority_to_severity(priority: str) -> Optional[str]:
+    mapping = {"low": "L1", "medium": "L2", "high": "L3", "emergency": "L4"}
+    return mapping.get(priority)
+
+
+@app.get("/api/admin/complaints")
+async def get_admin_complaints_list(
+    page: int = 1,
+    pageSize: int = 20,
+    status: str = "all",
+    priority: str = "all",
+    authority: str = "all",
+    category: str = "all",
+    search: str = "",
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Consolidated complaints endpoint with pagination, filters, Redis caching,
+    and batch profile + worker + category fetching in a single response.
+    Replaces the Next.js /api/admin/complaints API route.
+    """
+    page = max(1, page)
+    pageSize = min(100, max(1, pageSize))
+    search = search.strip()
+
+    # Build a cache key from all query params
+    cache_key = f"admin:complaints:p={page}&ps={pageSize}&st={status}&pr={priority}&au={authority}&ca={category}&q={search}"
+
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return {"source": "cache", **json.loads(cached)}
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    range_from = (page - 1) * pageSize
+    range_to = range_from + pageSize - 1
+
+    # --- Step 1: Resolve category filter to IDs (if needed) ---
+    category_ids: Optional[List[int]] = None
+    if category != "all":
+        try:
+            cat_res = await asyncio.to_thread(
+                lambda: supabase.table("categories").select("id").eq("name", category).execute()
+            )
+            category_ids = [row["id"] for row in (cat_res.data or [])]
+            if not category_ids:
+                empty_payload = {"items": [], "profiles": [], "workers": [], "categories": [], "totalCount": 0}
+                return {"source": "database", **empty_payload}
+        except Exception:
+            category_ids = None
+
+    # --- Step 2: Build and execute the complaints query ---
+    def _build_complaints_query():
+        q = supabase.table("complaints").select(
+            "id, ticket_id, title, category_id, address_text, ward_name, city, "
+            "status, severity, escalation_level, created_at, "
+            "assigned_department, assigned_worker_id, assigned_officer_id, "
+            "categories(name)",
+            count="exact",
+        ).order("created_at", desc=True)
+
+        if status == "pending":
+            q = q.in_("status", ["submitted", "under_review", "assigned"])
+        elif status != "all":
+            q = q.eq("status", status)
+
+        severity_val = _parse_priority_to_severity(priority)
+        if severity_val:
+            q = q.eq("severity", severity_val)
+
+        if authority != "all":
+            q = q.eq("assigned_department", authority)
+
+        if category_ids is not None:
+            q = q.in_("category_id", category_ids)
+
+        if search:
+            safe = search.replace(",", " ")
+            q = q.or_(
+                f"ticket_id.ilike.%{safe}%,"
+                f"title.ilike.%{safe}%,"
+                f"address_text.ilike.%{safe}%,"
+                f"ward_name.ilike.%{safe}%,"
+                f"city.ilike.%{safe}%"
+            )
+
+        return q.range(range_from, range_to).execute()
+
+    # --- Step 3: Run complaints + static data in parallel ---
+    try:
+        [complaints_res, workers_res, categories_res] = await asyncio.gather(
+            asyncio.to_thread(_build_complaints_query),
+            asyncio.to_thread(
+                lambda: supabase.table("worker_profiles")
+                .select("worker_id, department, availability, worker:profiles!worker_profiles_worker_id_fkey(id, full_name, department)")
+                .order("joined_at", desc=True)
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("categories")
+                .select("id, name, department")
+                .eq("is_active", True)
+                .order("name")
+                .execute()
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Admin complaints fetch failed: {str(e)}")
+
+    complaint_rows = complaints_res.data or []
+    total_count = complaints_res.count or 0
+
+    # --- Step 4: Batch fetch profiles for assigned workers/officers ---
+    profile_ids = list(set(
+        pid
+        for row in complaint_rows
+        for pid in [row.get("assigned_worker_id"), row.get("assigned_officer_id")]
+        if pid
+    ))
+
+    profiles: List[Dict[str, Any]] = []
+    if profile_ids:
+        try:
+            profiles_res = await asyncio.to_thread(
+                lambda: supabase.table("profiles")
+                .select("id, full_name, department")
+                .in_("id", profile_ids)
+                .execute()
+            )
+            profiles = profiles_res.data or []
+        except Exception:
+            profiles = []
+
+    payload = {
+        "items": complaint_rows,
+        "profiles": profiles,
+        "workers": workers_res.data or [],
+        "categories": categories_res.data or [],
+        "totalCount": total_count,
+    }
+
+    # Cache for 2 minutes (short TTL since complaints change frequently)
+    if redis_client:
+        try:
+            redis_client.setex(cache_key, 120, json.dumps(payload))
+        except Exception as e:
+            print(f"Redis write error: {e}")
+
+    return {"source": "database", **payload}
 
 
 # =========================================================

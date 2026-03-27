@@ -17,18 +17,23 @@ import {
 import { supabase } from "@/src/lib/supabase"
 import {
   CheckCircle,
-  AlertCircle,
   Clock,
   TrendingUp,
   ChevronDown,
-  BarChart2,
+  Users,
+  HardHat,
 } from "lucide-react"
 import type {
   AuthorityProfileRow,
   ComplaintAssignmentRow,
-  WorkerProfileRow,
-  CategoryRow,
 } from "@/components/admin-authorities/types"
+
+type WorkerProfileRow = {
+  worker_id: string
+  department: string
+  availability: string
+  total_resolved: number
+}
 
 /* ─── colour palette ──────────────────────────────────────────────── */
 const GOLD = "#C9A84C"
@@ -36,7 +41,7 @@ const GOLD_MUTED = "#9b7d34"
 const RED = "#EF4444"
 const DARK_CARD = "#1a1a1a"
 const DARK_BORDER = "#2a2a2a"
-
+const TEAL = "#14b8a6"
 
 const activeStatuses = ["submitted", "under_review", "assigned", "in_progress", "escalated"] as const
 const activeStatusSet = new Set(activeStatuses)
@@ -86,7 +91,7 @@ function StatCard({
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-2xl font-bold text-[#27221d] dark:text-white">{value}</span>
           {delta && (
-            <span className={`text-xs font-semibold ${pos ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{delta}</span>
+            <span className={`text-xs font-semibold ${pos ? "text-emerald-500 dark:text-emerald-400" : "text-gray-500 dark:text-gray-400"}`}>{delta}</span>
           )}
         </div>
         {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
@@ -113,14 +118,17 @@ function DarkTooltip({ active, payload, label }: { active?: boolean; payload?: A
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
-export default function AdminReportsPage() {
+export default function WorkerReportsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
   const [complaints, setComplaints] = useState<ComplaintAssignmentRow[]>([])
   const [profiles, setProfiles] = useState<AuthorityProfileRow[]>([])
-  const [selectedDept, setSelectedDept] = useState<string>("All Departments")
-  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false)
-  const [deptSearch, setDeptSearch] = useState("")
+  const [workerProfiles, setWorkerProfiles] = useState<WorkerProfileRow[]>([])
+  
+  const [selectedWorker, setSelectedWorker] = useState<string>("All Workers")
+  const [workerDropdownOpen, setWorkerDropdownOpen] = useState(false)
+  const [workerSearch, setWorkerSearch] = useState("")
 
   /* ─── fetch ───────────────────────────────────────────────────── */
   const fetchData = useCallback(async () => {
@@ -132,7 +140,7 @@ export default function AdminReportsPage() {
       setLoading(false)
       return
     }
-    const response = await fetch("/api/admin/authorities", {
+    const response = await fetch("/api/admin/workers", {
       method: "GET",
       headers: { Authorization: `Bearer ${session.access_token}` },
       cache: "no-store",
@@ -140,55 +148,76 @@ export default function AdminReportsPage() {
     const payload = (await response.json().catch(() => null)) as {
       error?: string
       profiles?: AuthorityProfileRow[]
-      complaints?: ComplaintAssignmentRow[]
-      workers?: WorkerProfileRow[]
-      categories?: CategoryRow[]
+      complaints?: (ComplaintAssignmentRow & { assigned_worker_id?: string | null })[]
+      workerProfiles?: WorkerProfileRow[]
     } | null
     if (!response.ok || !payload) {
       setError(payload?.error || "Unable to load data")
       setLoading(false)
       return
     }
-    if (payload.complaints) setComplaints(payload.complaints)
+    
+    // Map assigned_worker_id to assigned_officer_id for consistency in types if needed,
+    // though the typing expects assigned_officer_id, the payload uses assigned_worker_id.
+    const mappedComplaints = (payload.complaints || []).map(c => ({
+      ...c,
+      assigned_officer_id: c.assigned_worker_id || c.assigned_officer_id
+    })) as ComplaintAssignmentRow[]
+
+    setComplaints(mappedComplaints)
     if (payload.profiles) setProfiles(payload.profiles)
+    if (payload.workerProfiles) setWorkerProfiles(payload.workerProfiles)
+    
     setLoading(false)
   }, [])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
-  /* ─── unique departments ──────────────────────────────────────── */
-  const allDepts = useMemo(() => {
-    const s = new Set<string>()
-    complaints.forEach((c) => { if (c.assigned_department) s.add(c.assigned_department.trim()) })
-    profiles.forEach((p) => { if (p.department) s.add(p.department.trim()) })
-    return ["All Departments", ...Array.from(s).sort()]
-  }, [complaints, profiles])
+  /* ─── worker name mapper ──────────────────────────────────────── */
+  const getWorkerName = useCallback((id: string) => {
+    const p = profiles.find(p => p.id === id)
+    return p?.full_name || p?.email || "Unknown"
+  }, [profiles])
+
+  /* ─── unique workers for dropdown ─────────────────────────────── */
+  const allWorkers = useMemo(() => {
+    const names = profiles.map(p => p.full_name || p.email).sort()
+    return ["All Workers", ...names]
+  }, [profiles])
 
   /* ─── top stat cards ──────────────────────────────────────────── */
   const statCards = useMemo(() => {
-    const totalResolved = complaints.filter((c) => c.status === "resolved").length
-    const totalActive = complaints.filter((c) => isActiveStatus(c.status)).length
-    const totalComplaints = complaints.length
+    const totalWorkers = profiles.length
+    const availableWorkers = workerProfiles.filter(w => w.availability === "available").length
+    
+    // Count complaints assigned to any worker
+    const assignedComplaints = complaints.filter(c => c.assigned_officer_id)
+    const activeTickets = assignedComplaints.filter((c) => isActiveStatus(c.status)).length
 
-    // Avg resolution time across all that have resolved_at
-    const resolved = complaints.filter((c) => c.resolved_at)
+    // Avg resolution time across assigned that have resolved_at
+    const resolved = assignedComplaints.filter((c) => c.resolved_at)
     const avgDays = resolved.length
       ? resolved.reduce((sum, c) => {
-        const ms = new Date(c.resolved_at!).getTime() - new Date(c.created_at).getTime()
-        return sum + ms / (86400000)
-      }, 0) / resolved.length
+          const ms = new Date(c.resolved_at!).getTime() - new Date(c.created_at).getTime()
+          return sum + ms / (86400000)
+        }, 0) / resolved.length
       : 0
 
-    return { totalResolved, totalActive, totalComplaints, avgDays }
-  }, [complaints])
+    return { totalWorkers, availableWorkers, activeTickets, avgDays }
+  }, [complaints, profiles, workerProfiles])
 
   /* ─── weekly issues SOLVED line chart ────────────────────────── */
   const weeklyData = useMemo(() => {
-    const filtered = complaints.filter((c) => {
-      if (!c.resolved_at) return false
-      if (selectedDept !== "All Departments" && c.assigned_department?.trim() !== selectedDept) return false
-      return true
-    })
+    // filter by resolved and assigned to worker
+    let filtered = complaints.filter((c) => c.resolved_at && c.assigned_officer_id)
+    
+    // Apply worker filter if selected
+    if (selectedWorker !== "All Workers") {
+      const workerProfile = profiles.find(p => (p.full_name || p.email) === selectedWorker)
+      if (workerProfile) {
+        filtered = filtered.filter(c => c.assigned_officer_id === workerProfile.id)
+      }
+    }
 
     // Last 8 weeks
     const now = new Date()
@@ -208,41 +237,55 @@ export default function AdminReportsPage() {
       }).length
       return { week: label, solved }
     })
-  }, [complaints, selectedDept])
+  }, [complaints, selectedWorker, profiles])
 
-  /* ─── bar chart: closed vs open by dept ──────────────────────── */
-  const deptBarData = useMemo(() => {
-    const counts: Record<string, { name: string; resolved: number; active: number }> = {}
+  /* ─── bar chart: active load by worker (Top 10) ──────────────── */
+  const workerLoadData = useMemo(() => {
+    const counts: Record<string, { id: string; name: string; active: number; total: number }> = {}
+    
     complaints.forEach((c) => {
-      const dept = c.assigned_department?.trim() || "Unassigned"
-      if (!counts[dept]) counts[dept] = { name: dept, resolved: 0, active: 0 }
-      if (c.status === "resolved") counts[dept].resolved++
-      else if (isActiveStatus(c.status)) counts[dept].active++
+      const wId = c.assigned_officer_id
+      if (!wId) return
+      
+      if (!counts[wId]) {
+        counts[wId] = { id: wId, name: getWorkerName(wId), active: 0, total: 0 }
+      }
+      
+      counts[wId].total++
+      if (isActiveStatus(c.status)) {
+        counts[wId].active++
+      }
     })
-    return Object.values(counts).sort((a, b) => (b.resolved + b.active) - (a.resolved + a.active))
-  }, [complaints])
+    
+    // Sort by active workload high -> low, take top 10
+    return Object.values(counts)
+      .filter(w => w.active > 0)
+      .sort((a, b) => b.active - a.active)
+      .slice(0, 10)
+  }, [complaints, getWorkerName])
 
   /* ─── resolution speed table ──────────────────────────────────── */
   const resolutionTable = useMemo(() => {
-    const authorityMap: Record<string, { name: string; totalDays: number; count: number }> = {}
+    const wMap: Record<string, { name: string; totalDays: number; count: number }> = {}
+    
     complaints.filter((c) => c.resolved_at && c.assigned_officer_id).forEach((c) => {
       const id = c.assigned_officer_id!
-      if (!authorityMap[id]) {
-        const profile = profiles.find((p) => p.id === id)
-        authorityMap[id] = { name: profile?.full_name || profile?.email || "Unknown", totalDays: 0, count: 0 }
+      if (!wMap[id]) {
+        wMap[id] = { name: getWorkerName(id), totalDays: 0, count: 0 }
       }
       const days = (new Date(c.resolved_at!).getTime() - new Date(c.created_at).getTime()) / 86400000
       if (days >= 0 && days < 3650) {
-        authorityMap[id].totalDays += days
-        authorityMap[id].count++
+        wMap[id].totalDays += days
+        wMap[id].count++
       }
     })
-    return Object.values(authorityMap)
+    
+    return Object.values(wMap)
       .filter((a) => a.count > 0)
-      .map((a) => ({ name: a.name, avgDays: a.totalDays / a.count }))
+      .map((a) => ({ name: a.name, avgDays: a.totalDays / a.count, totalResolved: a.count }))
       .sort((a, b) => a.avgDays - b.avgDays)
       .slice(0, 8)
-  }, [complaints, profiles])
+  }, [complaints, getWorkerName])
 
   const maxAvgDays = resolutionTable[resolutionTable.length - 1]?.avgDays || 1
 
@@ -252,8 +295,8 @@ export default function AdminReportsPage() {
 
       {/* Header */}
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: GOLD }}>Admin Analytics</p>
-        <h1 className="mt-1 text-2xl sm:text-3xl font-bold text-[#27221d] dark:text-white">Authority Performance Module</h1>
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: TEAL }}>Field Ops Analytics</p>
+        <h1 className="mt-1 text-2xl sm:text-3xl font-bold text-[#27221d] dark:text-white">Worker Performance Module</h1>
       </div>
 
       {error && (
@@ -262,7 +305,7 @@ export default function AdminReportsPage() {
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-800" style={{ borderTopColor: GOLD }} />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-800" style={{ borderTopColor: TEAL }} />
         </div>
       ) : (
         <div className="space-y-6">
@@ -270,79 +313,76 @@ export default function AdminReportsPage() {
           {/* Stat cards row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Total Complaints"
-              value={statCards.totalComplaints.toLocaleString()}
-              sub="Across all departments"
-              icon={<BarChart2 size={22} />}
-              color={GOLD}
+              label="Total Registered Workers"
+              value={statCards.totalWorkers.toLocaleString()}
+              sub="Field staff in system"
+              icon={<Users size={22} />}
+              color={TEAL}
             />
             <StatCard
-              label="Resolved Tickets"
-              value={statCards.totalResolved.toLocaleString()}
-              sub="Successfully closed"
+              label="Available Workers"
+              value={statCards.availableWorkers.toLocaleString()}
+              sub="Currently active & ready"
               icon={<CheckCircle size={22} />}
               color="#10b981"
-              delta={`+${statCards.totalResolved}`}
             />
             <StatCard
-              label="Active / Open Tickets"
-              value={statCards.totalActive.toLocaleString()}
-              sub="Awaiting resolution"
-              icon={<AlertCircle size={22} />}
+              label="Assigned Active Tickets"
+              value={statCards.activeTickets.toLocaleString()}
+              sub="Currently handled by field workers"
+              icon={<HardHat size={22} />}
               color={RED}
             />
             <StatCard
               label="Avg Resolution Time"
               value={`${statCards.avgDays.toFixed(1)} Days`}
-              sub="Across resolved tickets"
+              sub="Across field resolutions"
               icon={<Clock size={22} />}
               color="#3b82f6"
             />
           </div>
 
-          {/* Row 2: Weekly Solved + Dept bar */}
+          {/* Row 2: Weekly Solved + Worker load bar */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
             {/* Weekly Issues Solved line chart */}
             <div className="rounded-2xl p-5 bg-white border border-[#d8cfbe] shadow-sm dark:bg-[#1a1a1a] dark:border-[#2a2a2a] dark:shadow-none">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-[#27221d] dark:text-white">Weekly Issues Solved</h2>
-                  <p className="text-xs text-gray-500">Last 8 weeks resolved tickets</p>
+                  <h2 className="text-sm font-semibold text-[#27221d] dark:text-white">Weekly Issues Resolved (Field)</h2>
+                  <p className="text-xs text-gray-500">Last 8 weeks of field resolutions</p>
                 </div>
-                {/* Department dropdown */}
+                {/* Worker dropdown with search */}
                 <div className="relative">
                   <button
-                    onClick={() => { setDeptDropdownOpen((o) => !o); setDeptSearch("") }}
+                    onClick={() => { setWorkerDropdownOpen((o) => !o); setWorkerSearch("") }}
                     className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-[#27221d] dark:text-white transition-colors bg-white border border-[#d8cfbe] dark:bg-[#252525] dark:border-[#2a2a2a]"
                   >
-                    <span className="max-w-[120px] truncate">{selectedDept}</span>
-                    <ChevronDown size={12} className={`transition-transform ${deptDropdownOpen ? "rotate-180" : ""}`} />
+                    <span className="max-w-[120px] truncate">{selectedWorker}</span>
+                    <ChevronDown size={12} className={`transition-transform ${workerDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
-                  {deptDropdownOpen && (
+                  {workerDropdownOpen && (
                     <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-xl shadow-2xl overflow-hidden bg-white border border-[#d8cfbe] dark:bg-[#1e1e1e] dark:border-[#2a2a2a]">
-                      {/* Search input */}
                       <div className="p-2 border-b border-[#d8cfbe] dark:border-[#2a2a2a]">
                         <input
                           autoFocus
                           type="text"
-                          placeholder="Search department…"
-                          value={deptSearch}
-                          onChange={(e) => setDeptSearch(e.target.value)}
+                          placeholder="Search worker…"
+                          value={workerSearch}
+                          onChange={(e) => setWorkerSearch(e.target.value)}
                           className="w-full rounded-lg px-3 py-1.5 text-xs text-[#27221d] dark:text-white placeholder-gray-400 dark:placeholder-gray-600 outline-none bg-gray-50 border border-[#d8cfbe] dark:bg-[#252525] dark:border-[#2a2a2a]"
                         />
                       </div>
-                      {/* Filtered list */}
                       <div className="max-h-56 overflow-y-auto py-1">
-                        {allDepts
-                          .filter((dept) => dept.toLowerCase().includes(deptSearch.toLowerCase()))
-                          .map((dept) => (
+                        {allWorkers
+                          .filter((w) => w.toLowerCase().includes(workerSearch.toLowerCase()))
+                          .map((worker) => (
                             <button
-                              key={dept}
-                              onClick={() => { setSelectedDept(dept); setDeptDropdownOpen(false); setDeptSearch("") }}
-                              className={`w-full px-4 py-2 text-left text-xs transition-colors hover:bg-gray-50 dark:hover:bg-[#2a2a2a] dark:hover:text-white ${dept === selectedDept ? 'text-[#C9A84C] bg-gray-50 dark:bg-[#252525]' : 'text-gray-600 dark:text-gray-400'}`}
+                              key={worker}
+                              onClick={() => { setSelectedWorker(worker); setWorkerDropdownOpen(false); setWorkerSearch("") }}
+                              className={`w-full px-4 py-2 text-left text-xs transition-colors hover:bg-gray-50 dark:hover:bg-[#2a2a2a] dark:hover:text-white ${worker === selectedWorker ? 'text-[#14b8a6] bg-gray-50 dark:bg-[#252525]' : 'text-gray-600 dark:text-gray-400'}`}
                             >
-                              {dept}
+                              {worker}
                             </button>
                           ))}
                       </div>
@@ -358,41 +398,35 @@ export default function AdminReportsPage() {
                     <XAxis dataKey="week" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <RechartsTooltip content={<DarkTooltip />} />
-                    <ReferenceLine y={2} stroke={GOLD_MUTED} strokeDasharray="4 4" label={{ value: "Target", fill: GOLD_MUTED, fontSize: 10 }} />
+                    <ReferenceLine y={5} stroke={TEAL} strokeDasharray="4 4" strokeOpacity={0.6} label={{ value: "Target", fill: TEAL, fontSize: 10, opacity: 0.6 }} />
                     <Line
                       type="monotone"
                       dataKey="solved"
-                      name="Issues Solved"
-                      stroke={GOLD}
+                      name="Resolved Tickets"
+                      stroke={TEAL}
                       strokeWidth={2.5}
-                      dot={{ fill: GOLD, r: 4 }}
-                      activeDot={{ r: 6, fill: GOLD }}
+                      dot={{ fill: TEAL, r: 4 }}
+                      activeDot={{ r: 6, fill: TEAL }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Resolved vs Active by Dept bar chart */}
+            {/* Top 10 Active Workloads (Bar) */}
             <div className="rounded-2xl p-5 bg-white border border-[#d8cfbe] shadow-sm dark:bg-[#1a1a1a] dark:border-[#2a2a2a] dark:shadow-none">
               <div className="mb-4">
-                <h2 className="text-sm font-semibold text-[#27221d] dark:text-white">Ticket Load by Department</h2>
-                <p className="text-xs text-gray-500">Resolved vs active tickets per department</p>
+                <h2 className="text-sm font-semibold text-[#27221d] dark:text-white">Current Worker Load (Top 10)</h2>
+                <p className="text-xs text-gray-500">Number of active assigned tickets per worker</p>
               </div>
               <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={deptBarData} barSize={16} margin={{ top: 5, right: 10, left: -20, bottom: 30 }}>
+                  <BarChart data={workerLoadData} barSize={16} margin={{ top: 5, right: 10, left: -20, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#9ca3af" strokeOpacity={0.3} vertical={false} />
                     <XAxis dataKey="name" tick={{ fill: "#6b7280", fontSize: 10 }} angle={-30} textAnchor="end" interval={0} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <RechartsTooltip content={<DarkTooltip />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: "11px", color: "#9ca3af", paddingTop: "8px" }}
-                      iconType="circle"
-                      iconSize={8}
-                    />
-                    <Bar dataKey="resolved" name="Resolved" fill={GOLD} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="active" name="Active" fill={RED} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="active" name="Active Tickets" fill={RED} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -407,20 +441,21 @@ export default function AdminReportsPage() {
                 <p className="text-xs text-gray-500">Days to resolve — rank sorted (fastest first)</p>
               </div>
               <div className="flex items-center gap-2">
-                <TrendingUp size={14} style={{ color: GOLD }} />
-                <span className="text-xs" style={{ color: GOLD }}>Top Performers</span>
+                <TrendingUp size={14} style={{ color: TEAL }} />
+                <span className="text-xs" style={{ color: TEAL }}>Top Field Workers</span>
               </div>
             </div>
 
             {resolutionTable.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">No resolved ticket data available yet.</p>
+              <p className="text-sm text-gray-500 text-center py-8">No resolved ticket data available for workers yet.</p>
             ) : (
               <div className="space-y-3">
                 {/* Table header */}
-                <div className="grid grid-cols-[24px_1fr_160px_80px] gap-4 px-1 text-xs font-medium uppercase tracking-wider text-gray-500">
+                <div className="grid grid-cols-[24px_1fr_160px_80px_80px] gap-4 px-1 text-xs font-medium uppercase tracking-wider text-gray-500">
                   <span>#</span>
-                  <span>Authority</span>
+                  <span>Worker</span>
                   <span>Speed</span>
+                  <span className="text-right">Resolved</span>
                   <span className="text-right">Days</span>
                 </div>
                 {/* Table rows */}
@@ -430,13 +465,13 @@ export default function AdminReportsPage() {
                   return (
                     <div
                       key={row.name}
-                      className={`grid grid-cols-[24px_1fr_160px_80px] items-center gap-4 rounded-xl px-3 py-2.5 text-sm transition-colors border ${
+                      className={`grid grid-cols-[24px_1fr_160px_80px_80px] items-center gap-4 rounded-xl px-3 py-2.5 text-sm transition-colors border ${
                         isTop3 
-                          ? "bg-[#C9A84C]/10 border-[#C9A84C]/20 dark:bg-[#C9A84C]/5 dark:border-[#C9A84C]/15" 
+                          ? "bg-[#14b8a6]/10 border-[#14b8a6]/20 dark:bg-[#14b8a6]/5 dark:border-[#14b8a6]/15" 
                           : "bg-gray-50 border-[#d8cfbe] dark:bg-[#161616] dark:border-[#2a2a2a]"
                       }`}
                     >
-                      <span className="font-semibold" style={{ color: isTop3 ? GOLD : "#6b7280" }}>{i + 1}</span>
+                      <span className="font-semibold" style={{ color: isTop3 ? TEAL : "#6b7280" }}>{i + 1}</span>
                       <span className="font-medium text-[#27221d] dark:text-white truncate">{row.name}</span>
                       <div className="h-2 rounded-full overflow-hidden bg-gray-200 dark:bg-[#252525]">
                         <div
@@ -444,13 +479,18 @@ export default function AdminReportsPage() {
                           style={{
                             width: `${pct}%`,
                             background: isTop3
-                              ? `linear-gradient(90deg, ${GOLD}, ${GOLD_MUTED})`
+                              ? `linear-gradient(90deg, ${TEAL}, #0f766e)`
                               : `linear-gradient(90deg, #3b82f6, #1d4ed8)`,
                           }}
                         />
                       </div>
                       <div className="flex items-center justify-end">
-                        <span className="text-xs font-semibold" style={{ color: isTop3 ? GOLD : "#9ca3af" }}>
+                        <span className="text-xs text-gray-400">
+                          {row.totalResolved}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-end">
+                        <span className="text-xs font-semibold" style={{ color: isTop3 ? TEAL : "#9ca3af" }}>
                           {row.avgDays.toFixed(1)}d
                         </span>
                       </div>
@@ -463,10 +503,6 @@ export default function AdminReportsPage() {
 
         </div>
       )}
-      <div className="p-2 sm:p-4">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Reports</h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Generate and review administrative reports here.</p>
-      </div>
     </div>
   )
 }

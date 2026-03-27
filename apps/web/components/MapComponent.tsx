@@ -186,7 +186,7 @@ export default function MapComponent({
     try {
       const { data, error } = await supabase
         .from("complaints")
-        .select("*");
+        .select("id, title, description, location, severity, effective_severity");
 
       if (error) {
         setFetchError(error.message || "Unable to fetch complaints.");
@@ -204,7 +204,7 @@ export default function MapComponent({
       setRawCount(data.length);
 
       const formatted: MapComplaint[] = data
-        .map((c: ComplaintRow) => {
+        .map((c: any) => {
           const parsed = parseLocationToLatLng(c.location);
           if (!parsed) return null;
 
@@ -247,9 +247,26 @@ export default function MapComponent({
 
     fetchComplaints();
 
-    // Auto refresh every 5 sec
-    const interval = setInterval(fetchComplaints, 5000);
-    return () => clearInterval(interval);
+    // PERFORMANCE OPTIMIZATION: Realtime subscription instead of 5s polling
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'complaints'
+        },
+        () => {
+          console.log('Complaints changed, fetching updates...');
+          void fetchComplaints();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   if (!mounted) return null;

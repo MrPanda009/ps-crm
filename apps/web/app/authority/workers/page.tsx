@@ -90,12 +90,19 @@ export default function WorkersPage() {
   useEffect(() => { void fetchWorkers() }, [])
 
   useEffect(() => {
+    if (!dept) return
     const ch = supabase.channel("workers-realtime")
-      .on("postgres_changes", { event:"*", schema:"public", table:"worker_profiles" }, () => void fetchWorkers())
-      .on("postgres_changes", { event:"*", schema:"public", table:"complaints"      }, () => void fetchWorkers())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "worker_profiles",
+        filter: `department=eq.${dept}`
+      }, () => void fetchWorkers())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "complaints",
+        filter: `assigned_department=eq.${dept}`
+      }, () => void fetchWorkers())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [dept])
 
   const filtered = workers.filter(w => {
     const q = search.toLowerCase()

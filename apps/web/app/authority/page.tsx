@@ -209,14 +209,23 @@ export default function AuthorityDashboardPage() {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
+    if (!department) return
     const ch = supabase
       .channel("authority-dashboard-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "complaints" },       () => void load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "worker_profiles" }, () => void load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "upvotes" },         () => void load())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "complaints",
+        filter: `assigned_department=eq.${department}`
+      }, () => void load())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "worker_profiles",
+        filter: `department=eq.${department}`
+      }, () => void load())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "upvotes"
+      }, () => void load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [load])
+  }, [load, department])
 
   const urgentTickets = getUrgentTickets(complaints)
 

@@ -96,7 +96,7 @@ export default function CurrentTicketCard({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-2 px-5 pb-5 pt-0">
+      <div className="flex flex-wrap gap-2 px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
         <button
           type="button"
           onClick={() => {
@@ -104,7 +104,7 @@ export default function CurrentTicketCard({
               onNavigate(ticket.latitude!, ticket.longitude!);
             }
           }}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-600 transition-colors"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto dark:disabled:bg-gray-600"
           disabled={!canNavigate}
           title={
             canNavigate
@@ -124,7 +124,7 @@ export default function CurrentTicketCard({
               setNoteMode(false);
               setProgressNote("");
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-[#3a3a3a] dark:text-gray-200 dark:hover:bg-[#2a2a2a] transition-colors"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto dark:border-[#3a3a3a] dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
             title="Update ticket status"
           >
             <NotebookPen size={16} />
@@ -133,7 +133,7 @@ export default function CurrentTicketCard({
           </button>
 
           {dropdownOpen && (
-            <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-[#3a3a3a] dark:bg-[#1e1e1e]">
+            <div className="absolute left-0 top-full z-50 mt-1 w-[min(18rem,calc(100vw-3rem))] rounded-lg border border-gray-200 bg-white shadow-lg sm:w-64 dark:border-[#3a3a3a] dark:bg-[#1e1e1e]">
               {!noteMode ? (
                 <ul className="py-1">
                   {ticket.status === "assigned" && (
@@ -236,7 +236,7 @@ export default function CurrentTicketCard({
         <button
           type="button"
           onClick={() => onMarkCompleted(ticket.id)}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-600 transition-colors"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto dark:disabled:bg-gray-600"
           disabled={!canComplete}
           title={
             canComplete

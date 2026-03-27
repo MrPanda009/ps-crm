@@ -6,6 +6,7 @@ export type ComplaintStatus = Database["public"]["Enums"]["complaint_status"]
 export type DashboardTask = {
   id: string
   ticketId: string
+  assignedWorkerId: string | null
   description: string
   category: string
   location: string
@@ -104,9 +105,20 @@ function parseHexWkbPoint(hex: string): { lat: number; lng: number } | null {
 }
 
 export function parseLatLng(value: unknown): { lat: number; lng: number } | null {
+  const toFiniteNumber = (input: unknown): number | null => {
+    if (typeof input === "number") return Number.isFinite(input) ? input : null
+    if (typeof input === "string") {
+      const parsed = Number(input.trim())
+      return Number.isFinite(parsed) ? parsed : null
+    }
+    return null
+  }
+
   if (typeof value === "string") {
-    // WKT / EWKT: SRID=4326;POINT(lng lat) or POINT(lng lat)
-    const wktMatch = /POINT\(([-0-9.]+)\s+([-0-9.]+)\)/.exec(value)
+    const raw = value.trim()
+
+    // WKT / EWKT: SRID=4326;POINT(lng lat) or POINT (lng lat)
+    const wktMatch = /(?:SRID=\d+;\s*)?POINT\s*\(\s*([-0-9.]+)\s+([-0-9.]+)\s*\)/i.exec(raw)
     if (wktMatch) {
       return {
         lng: Number(wktMatch[1]),
@@ -114,26 +126,50 @@ export function parseLatLng(value: unknown): { lat: number; lng: number } | null
       }
     }
 
+    // Coordinates tuple: "lat,lng" or "(lat,lng)"
+    const tupleMatch = /^\s*\(?\s*([-0-9.]+)\s*,\s*([-0-9.]+)\s*\)?\s*$/.exec(raw)
+    if (tupleMatch) {
+      const first = Number(tupleMatch[1])
+      const second = Number(tupleMatch[2])
+      if (Number.isFinite(first) && Number.isFinite(second)) {
+        const looksLikeLatLng = Math.abs(first) <= 90 && Math.abs(second) <= 180
+        return {
+          lat: looksLikeLatLng ? first : second,
+          lng: looksLikeLatLng ? second : first,
+        }
+      }
+    }
+
     // Hex-encoded WKB / EWKB (PostGIS default output via Supabase)
-    const hexCoords = parseHexWkbPoint(value)
+    const hexCoords = parseHexWkbPoint(raw)
     if (hexCoords) return hexCoords
+
+    // JSON object string support
+    try {
+      const parsed = JSON.parse(raw)
+      return parseLatLng(parsed)
+    } catch {
+      // Ignore parse errors and continue to object branch fallback.
+    }
   }
 
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>
 
     if (Array.isArray(record.coordinates) && record.coordinates.length >= 2) {
-      const [lng, lat] = record.coordinates
-      if (typeof lat === "number" && typeof lng === "number") return { lat, lng }
+      const [lngRaw, latRaw] = record.coordinates
+      const lat = toFiniteNumber(latRaw)
+      const lng = toFiniteNumber(lngRaw)
+      if (lat != null && lng != null) return { lat, lng }
     }
 
-    const lat = record.lat
-    const lng = record.lng
-    if (typeof lat === "number" && typeof lng === "number") return { lat, lng }
+    const lat = toFiniteNumber(record.lat)
+    const lng = toFiniteNumber(record.lng ?? record.lon)
+    if (lat != null && lng != null) return { lat, lng }
 
-    const latitude = record.latitude
-    const longitude = record.longitude
-    if (typeof latitude === "number" && typeof longitude === "number") {
+    const latitude = toFiniteNumber(record.latitude ?? record.y)
+    const longitude = toFiniteNumber(record.longitude ?? record.x)
+    if (latitude != null && longitude != null) {
       return { lat: latitude, lng: longitude }
     }
   }

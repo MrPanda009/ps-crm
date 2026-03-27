@@ -25,6 +25,7 @@ const WorkerTaskMapPanel = dynamic(() => import("@/components/worker-dashboard/W
 type ComplaintWithCategory = {
   id: string
   ticket_id: string
+  assigned_worker_id: string | null
   description: string
   address_text: string | null
   severity: "L1" | "L2" | "L3" | "L4"
@@ -104,7 +105,7 @@ export default function WorkerDashboardPage() {
       supabase
         .from("complaints")
         .select(
-          "id, ticket_id, description, address_text, severity, status, created_at, resolved_at, location, categories(name)",
+          "id, ticket_id, assigned_worker_id, description, address_text, severity, status, created_at, resolved_at, location, categories(name)",
         )
         .eq("assigned_worker_id", currentWorkerId)
         .in("status", ["assigned", "in_progress", "resolved"]),
@@ -126,6 +127,7 @@ export default function WorkerDashboardPage() {
       return {
         id: complaint.id,
         ticketId: complaint.ticket_id || complaint.id,
+        assignedWorkerId: complaint.assigned_worker_id,
         description: complaint.description,
         category: complaint.categories?.name ?? "Uncategorized",
         location: complaint.address_text ?? "Unknown location",
@@ -139,7 +141,7 @@ export default function WorkerDashboardPage() {
       } satisfies DashboardTask
     })
 
-    setTasks(normalizedTasks)
+    setTasks(normalizedTasks.filter((task) => task.assignedWorkerId === currentWorkerId))
 
     const { data: ticketRows, error: ticketError } = await supabase
       .from("ticket_history")
@@ -179,15 +181,8 @@ export default function WorkerDashboardPage() {
     return () => window.clearTimeout(timeoutId)
   }, [fetchDashboardData])
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void fetchDashboardData()
-      }
-    }, 15000)
-
-    return () => window.clearInterval(intervalId)
-  }, [fetchDashboardData])
+  // PERFORMANCE OPTIMIZATION: Removed 15s polling. 
+  // We now rely entirely on the Realtime channels below for updates.
 
   // ── Realtime sync: listen for external changes ──────────────────────────────
   useEffect(() => {
@@ -351,8 +346,8 @@ export default function WorkerDashboardPage() {
   )
 
   const mapTasks = useMemo(
-    () => tasks.filter((task) => task.status === "assigned" || task.status === "in_progress"),
-    [tasks],
+    () => tasks.filter((task) => !workerId || task.assignedWorkerId === workerId),
+    [tasks, workerId],
   )
 
   const selectedTask = useMemo(
@@ -360,9 +355,13 @@ export default function WorkerDashboardPage() {
     [selectedTaskId, tasks],
   )
 
+  const handleSelectTask = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId)
+  }, [])
+
   const displayTask = useMemo(() => {
-    return selectedTask ?? currentTask ?? urgentTask ?? null
-  }, [currentTask, selectedTask, urgentTask])
+    return selectedTask
+  }, [selectedTask])
 
   const statsCards = useMemo(
     () => [
@@ -402,25 +401,25 @@ export default function WorkerDashboardPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-2rem)] flex-col gap-4 overflow-hidden">
+    <div className="flex min-h-full flex-col gap-3 overflow-visible lg:gap-4">
       {error ? (
         <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
           {error}
         </div>
       ) : null}
 
-      <section className="shrink-0 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="shrink-0 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         {statsCards.map((card) => {
           const Icon = card.icon
           return (
-            <article key={card.title} className={`rounded-xl border p-5 shadow-sm ${card.tone}`}>
-              <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-100 text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200">
-                  <Icon size={20} />
+            <article key={card.title} className={`rounded-xl border p-3 shadow-sm sm:p-5 ${card.tone}`}>
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200 sm:h-11 sm:w-11">
+                  <Icon size={18} />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{card.title}</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{card.value}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 sm:text-sm">{card.title}</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-2xl">{card.value}</p>
                 </div>
               </div>
             </article>
@@ -428,83 +427,62 @@ export default function WorkerDashboardPage() {
         })}
       </section>
 
-      <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-4">
-        <div className="min-h-0 space-y-4 overflow-y-auto pr-1 xl:col-span-3">
+      <section className="grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-4">
+        <div className="min-h-0 space-y-4 overflow-visible xl:col-span-3 xl:pr-1">
           <WorkerTaskMapPanel
             tasks={mapTasks}
             loading={loading}
             error={error}
-            highlightedTaskId={displayTask?.id ?? null}
-            onSelectTask={setSelectedTaskId}
+            highlightedTaskId={selectedTask?.id ?? null}
+            onSelectTask={handleSelectTask}
           />
-
-          {loading && !displayTask ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Loading task details...</p>
-            </div>
-          ) : null}
-
-          {!loading && !displayTask ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                No task selected yet. Select a marker from the map when assignment is available.
-              </p>
-            </div>
-          ) : null}
-
-          {displayTask ? (
-            <CurrentTicketCard
-              ticket={displayTask}
-              onNavigate={(latitude, longitude) => {
-                window.open(
-                  `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
-                  "_blank",
-                  "noopener,noreferrer",
-                )
-              }}
-              onUpdate={async (ticketId, note) => {
-                await handleUpdateProgress(ticketId, note)
-              }}
-              onStatusChange={async (ticketId, newStatus) => {
-                await updateTaskStatus(ticketId, newStatus as "in_progress" | "resolved" | "escalated")
-              }}
-              onMarkCompleted={(_ticketId) => setIsCompletionModalOpen(true)}
-            />
-          ) : null}
         </div>
 
-        <aside className="min-h-0 overflow-y-auto pr-1 xl:col-span-1">
-          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Reserved List Panel</h2>
-              <span className="text-xs text-gray-500 dark:text-gray-400">25% zone</span>
-            </div>
+        {displayTask ? (
+          <aside className="min-h-0 overflow-visible xl:col-span-1 xl:pr-1">
+            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Ticket Details</h2>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTaskId(null)}
+                  className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-[#3a3a3a] dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
+                >
+                  Close
+                </button>
+              </div>
 
-            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 dark:border-[#3a3a3a] dark:bg-[#161616]">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Future list module placeholder</p>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                This space is reserved for the right-side list you will finalize later.
-              </p>
-              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                Recent activity synced: {activity.length} item{activity.length === 1 ? "" : "s"}
-              </p>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Last update: {activity[0] ? relativeTime(activity[0].createdAt) : "No activity yet"}
-              </p>
-            </div>
-          </section>
-        </aside>
+              <CurrentTicketCard
+                ticket={displayTask}
+                onNavigate={(latitude, longitude) => {
+                  window.open(
+                    `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  )
+                }}
+                onUpdate={async (ticketId, note) => {
+                  await handleUpdateProgress(ticketId, note)
+                }}
+                onStatusChange={async (ticketId, newStatus) => {
+                  await updateTaskStatus(ticketId, newStatus as "in_progress" | "resolved" | "escalated")
+                }}
+                onMarkCompleted={(_ticketId) => setIsCompletionModalOpen(true)}
+              />
+            </section>
+          </aside>
+        ) : null}
       </section>
 
       {isCompletionModalOpen && displayTask ? (
-        <div className="fixed inset-0 z-[2200] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2200] flex items-center justify-center p-3 sm:p-4">
           <button
             type="button"
             aria-label="Close completion window"
             className="absolute inset-0 bg-gray-950/40 backdrop-blur-[1px]"
             onClick={() => setIsCompletionModalOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+          <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-lg sm:p-5 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Complete Ticket</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
               Ticket {displayTask.ticketId} will be marked completed. Photo upload is reserved for the next phase.

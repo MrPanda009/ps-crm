@@ -12,10 +12,10 @@ import { supabase } from "@/src/lib/supabase"
 import AuthorityNotificationBell from "@/app/authority/_components/AuthorityNotificationBell"
 
 const PAGE_META: Record<string, { title: string; sub: string }> = {
-  "/authority":         { title: "Authority",         sub: "Overview of department complaints, performance metrics, and recent activity." },
-  "/authority/track":   { title: "Track Complaints",  sub: "Monitor and manage complaints across the city through the live complaint map." },
-  "/authority/workers": { title: "Workers",            sub: "View and manage department field workers and their availability status." },
-  "/authority/reports": { title: "Reports",            sub: "Analyze complaint trends, resolution performance, and SLA compliance." },
+  "/authority": { title: "Authority", sub: "Overview of department complaints, performance metrics, and recent activity." },
+  "/authority/track": { title: "Track Complaints", sub: "Monitor and manage complaints across the city through the live complaint map." },
+  "/authority/workers": { title: "Workers", sub: "View and manage department field workers and their availability status." },
+  "/authority/reports": { title: "Reports", sub: "Analyze complaint trends, resolution performance, and SLA compliance." },
 }
 
 function usePageMeta(pathname: string) {
@@ -24,19 +24,19 @@ function usePageMeta(pathname: string) {
     .sort((a, b) => b.length - a.length)[0] ?? ""
   return PAGE_META[key] ?? {
     title: pathname.split("/").filter(Boolean).slice(-1)[0]?.replace(/-/g, " ") ?? "Dashboard",
-    sub:   "",
+    sub: "",
   }
 }
 
 export default function AuthorityLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [isCollapsed,   setIsCollapsed]   = useState(false)
-  const [profileOpen,   setProfileOpen]   = useState(false)
-  const [userName,      setUserName]      = useState("")
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [userName, setUserName] = useState("")
   const profileRef = useRef<HTMLDivElement>(null)
-  const pathname   = usePathname()
-  const router     = useRouter()
-  const pageMeta   = usePageMeta(pathname)
+  const pathname = usePathname()
+  const router = useRouter()
+  const pageMeta = usePageMeta(pathname)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -95,10 +95,10 @@ export default function AuthorityLayout({ children }: { children: React.ReactNod
       textMain: "text-white dark:text-white",
     },
     navigation: [
-      { id: "dashboard", name: "Dashboard",        icon: <LayoutGrid    size={20} strokeWidth={2} />, href: "/authority",         isActive: pathname === "/authority" },
-      { id: "track",     name: "Track Complaints", icon: <ClipboardList size={20} strokeWidth={2} />, href: "/authority/track",   isActive: pathname.startsWith("/authority/track") },
-      { id: "workers",   name: "Workers",          icon: <Users         size={20} strokeWidth={2} />, href: "/authority/workers", isActive: pathname.startsWith("/authority/workers") },
-      { id: "reports",   name: "Reports",          icon: <BarChart2     size={20} strokeWidth={2} />, href: "/authority/reports", isActive: pathname.startsWith("/authority/reports") },
+      { id: "dashboard", name: "Dashboard", icon: <LayoutGrid size={20} strokeWidth={2} />, href: "/authority", isActive: pathname === "/authority" },
+      { id: "track", name: "Track Complaints", icon: <ClipboardList size={20} strokeWidth={2} />, href: "/authority/track", isActive: pathname.startsWith("/authority/track") },
+      { id: "workers", name: "Workers", icon: <Users size={20} strokeWidth={2} />, href: "/authority/workers", isActive: pathname.startsWith("/authority/workers") },
+      { id: "reports", name: "Reports", icon: <BarChart2 size={20} strokeWidth={2} />, href: "/authority/reports", isActive: pathname.startsWith("/authority/reports") },
     ],
     bottomNavigation: defaultSidebarConfig.bottomNavigation,
   }
