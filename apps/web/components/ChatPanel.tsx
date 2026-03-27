@@ -149,7 +149,7 @@ const SUPPORTED_LANGUAGES = [
 ] as const;
 
 const CONFIRMATION_PATTERNS: Record<string, RegExp> = {
-  "hi-IN": /^(हां|हा|जी|yes|confirm|submit)$/i,
+  "hi-IN": /^(हां|हा|जी|yes|confirm|submit|haan|ha)$/i,
   "ta-IN": /^(ஆம்|ஆ|yes|confirm|submit)$/i,
   "te-IN": /^(అవు|అ|yes|confirm|submit)$/i,
   "kn-IN": /^(ಹೌದು|ಹೆ|yes|confirm|submit)$/i,
@@ -159,6 +159,19 @@ const CONFIRMATION_PATTERNS: Record<string, RegExp> = {
   "gu-IN": /^(હો|હા|yes|confirm|submit)$/i,
   "pa-IN": /^(ਹਾਂ|ਹੀ|yes|confirm|submit)$/i,
   "default": /^(yes|confirm|submit|haan|ha|हां)$/i,
+};
+
+const REJECTION_PATTERNS: Record<string, RegExp> = {
+  "hi-IN": /^(नहीं|नही|ना|no|cancel|radd|nhi|nahi|nahin)$/i,
+  "ta-IN": /^(இல்லை|இ|no|cancel|rattu)$/i,
+  "te-IN": /^(లేదు|కాదు|no|cancel|raddu)$/i,
+  "kn-IN": /^(ಇಲ್ಲ|ಇ|no|cancel|raddu)$/i,
+  "ml-IN": /^(ഇല്ല|വേണ്ട|അല്ല|no|cancel|radd)$/i,
+  "bn-IN": /^(না|ন|no|cancel|batil)$/i,
+  "mr-IN": /^(नाही|न|no|cancel|radd)$/i,
+  "gu-IN": /^(ના|ન|no|cancel|rad)$/i,
+  "pa-IN": /^(ਨਹੀਂ|ਨਹੀ|ਨਈਂ|no|cancel|radd)$/i,
+  "default": /^(no|cancel|reject|stop|nahi|nahin|na|noo+)$/i,
 };
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -183,7 +196,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "Transcribing your voice…",
     submitting: "Submitting your complaint…",
     confirm_complaint: "📋 Confirm Your Complaint",
-    type_yes: "Type YES to confirm submission",
+    type_yes: "Type YES/NO to confirm/deny submission",
     uploaded_photo: "📷 Uploaded a photo for analysis",
     show_full_details: "Show full details",
     show_less: "Show less",
@@ -195,7 +208,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "Location",
     tbl_desc: "Description",
     tbl_digipin: "DIGIPIN",
-    detecting: "Detecting…"
+    detecting: "Detecting…",
+    cancelled: "Okay, I've cancelled that. What else can I help you with?"
   },
   "hi-IN": {
     greeting: "नमस्ते! 🙏 मैं **जनसमाधान AI** हूँ।\nआप जिस नागरिक समस्या की रिपोर्ट करना चाहते हैं, उसके बारे में मुझे बताएं — या समस्या की फ़ोटो अपलोड करने के लिए **+** बटन पर टैप करें!",
@@ -218,7 +232,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "आपकी आवाज़ को टेक्स्ट में बदल रहे हैं…",
     submitting: "आपकी शिकायत दर्ज की जा रही है…",
     confirm_complaint: "📋 अपनी शिकायत की पुष्टि करें",
-    type_yes: "सबमिट करने के लिए YES टाइप करें",
+    type_yes: "सबमिट/अस्वीकार करने के लिए YES/NO टाइप करें",
     uploaded_photo: "📷 विश्लेषण के लिए एक तस्वीर अपलोड की गई",
     show_full_details: "पूरा विवरण दिखाएं",
     show_less: "कम दिखाएं",
@@ -229,8 +243,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_severity: "गंभीरता",
     tbl_location: "स्थान",
     tbl_desc: "विवरण",
-    tbl_digipin: "DIGIPIN",
-    detecting: "खोजा जा रहा है…"
+    tbl_digipin: "डिजिपिन",
+    detecting: "पता लगाया जा रहा है...",
+    cancelled: "ठीक है, मैंने इसे रद्द कर दिया है। मैं आपकी और क्या मदद कर सकता हूँ?"
   },
   "ta-IN": {
     greeting: "வணக்கம்! 🙏 நான் **JanSamadhan AI**.\nநீங்கள் புகாரளிக்க விரும்பும் குடிமைப் பிரச்சினையைப் பற்றி என்னிடம் கூறுங்கள் — அல்லது সমস্যার புகைப்படத்தைப் பதிவேற்ற **+** பொத்தானைத் தட்டவும்!",
@@ -253,7 +268,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "உங்கள் குரலை எழுத்துக்களாக மாற்றுகிறோம்…",
     submitting: "உங்கள் புகார் சமர்ப்பிக்கப்படுகிறது…",
     confirm_complaint: "📋 உங்கள் புகாரை உறுதிப்படுத்தவும்",
-    type_yes: "சமர்ப்பிக்க YES என தட்டச்சு செய்யவும்",
+    type_yes: "சமர்ப்பிக்க/மறுக்க YES/NO என தட்டச்சு செய்யவும்",
     uploaded_photo: "📷 பகுப்பாய்விற்காக ஒரு புகைப்படம் பதிவேற்றப்பட்டது",
     show_full_details: "முழு விவரங்களையும் காண்க",
     show_less: "குறைவாகக் காட்டு",
@@ -265,7 +280,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "இடம்",
     tbl_desc: "விளக்கம்",
     tbl_digipin: "DIGIPIN",
-    detecting: "கண்டறியப்படுகிறது…"
+    detecting: "கண்டறியப்படுகிறது…",
+    cancelled: "சரி, நான் அதை ரத்து செய்துவிட்டேன். நான் வேறு என்ன உதவி செய்ய முடியும்?"
   },
   "te-IN": {
     greeting: "నమస్తే! 🙏 నేను **JanSamadhan AI** ని.\nమీరు రిపోర్ట్ చేయాలనుకుంటున్న పౌర సమస్య గురించి నాకు చెప్పండి — లేదా సమస్య ఫోటోను అప్‌లోడ్ చేయడానికి **+** బటన్‌ను నొక్కండి!",
@@ -288,7 +304,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "మీ వాయిస్‌ని టెక్స్ట్‌కి మారుస్తోంది…",
     submitting: "మీ ఫిర్యాదు సమర్పించబడుతోంది…",
     confirm_complaint: "📋 మీ ఫిర్యాదును నిర్ధారించండి",
-    type_yes: "సమర్పించడానికి YES అని టైప్ చేయండి",
+    type_yes: "సబ్మిట్/తిరస్కరించడానికి YES/NO అని టైప్ చేయండి",
     uploaded_photo: "📷 విశ్లేషణ కోసం ఫోటో అప్‌లోడ్ చేయబడింది",
     show_full_details: "పూర్తి వివరాలు చూపించు",
     show_less: "తక్కువ చూపించు",
@@ -300,7 +316,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "స్థానం",
     tbl_desc: "వివరణ",
     tbl_digipin: "DIGIPIN",
-    detecting: "కనుగొంటోంది…"
+    detecting: "కనుగొంటోంది…",
+    cancelled: "సరే, నేను దానిని రద్దు చేసాను. నేను మీకు ఇంకా ఏ విధంగా సహాయపడగలను?"
   },
   "kn-IN": {
     greeting: "ನಮಸ್ಕಾರ! 🙏 ನಾನು **JanSamadhan AI**.\nನೀವು ವರದಿ ಮಾಡಲು ಬಯಸುವ ನಾಗರಿಕ ಸಮಸ್ಯೆಯ ಬಗ್ಗೆ ನನಗೆ ತಿಳಿಸಿ — ಅಥವಾ ಸಮಸ್ಯೆಯ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು **+** ಬಟನ್ ಟ್ಯಾಪ್ ಮಾಡಿ!",
@@ -323,7 +340,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "ನಿಮ್ಮ ಧ್ವನಿಯನ್ನು ಪಠ್ಯಕ್ಕೆ ಬದಲಾಯಿಸಲಾಗುತ್ತಿದೆ…",
     submitting: "ನಿಮ್ಮ ದೂರನ್ನು ಸಲ್ಲಿಸಲಾಗುತ್ತಿದೆ…",
     confirm_complaint: "📋 ನಿಮ್ಮ ದೂರನ್ನು ದೃಢೀಕರಿಸಿ",
-    type_yes: "ಸಲ್ಲಿಸಲು YES ಎಂದು ಟೈಪ್ ಮಾಡಿ",
+    type_yes: "ಸಲ್ಲಿಸಲು/ನಿರಾಕರಿಸಲು YES/NO ಎಂದು ಟೈಪ್ ಮಾಡಿ",
     uploaded_photo: "📷 ವಿಶ್ಲೇಷಣೆಗಾಗಿ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
     show_full_details: "ಪೂರ್ಣ ವಿವರಗಳನ್ನು ತೋರಿಸಿ",
     show_less: "ಕಡಿಮೆ ತೋರಿಸಿ",
@@ -335,7 +352,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "ಸ್ಥಳ",
     tbl_desc: "ವಿವರಣೆ",
     tbl_digipin: "DIGIPIN",
-    detecting: "ಪತ್ತೆಹಚ್ಚಲಾಗುತ್ತಿದೆ…"
+    detecting: "ಪತ್ತೆಹಚ್ಚಲಾಗುತ್ತಿದೆ…",
+    cancelled: "ಸರಿ, ನಾನು ಅದನ್ನು ರದ್ದುಗೊಳಿಸಿದ್ದೇನೆ. ನಾನು ನಿಮಗೆ ಬೇರೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?"
   },
   "ml-IN": {
     greeting: "നമസ്കാരം! 🙏 ഞാൻ **JanSamadhan AI** ആണ്.\nനിങ്ങൾ റിപ്പോർട്ട് ചെയ്യാൻ ആഗ്രഹിക്കുന്ന സിവിക് പ്രശ്നത്തെക്കുറിച്ച് എന്നോട് പറയുക — അല്ലെങ്കിൽ പ്രശ്നത്തിന്റെ ഫോട്ടോ അപ്‌ലോഡ് ചെയ്യാൻ **+** ബട്ടൺ ടാപ്പ് ചെയ്യുക!",
@@ -358,7 +376,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "നിങ്ങളുടെ ശബ്ദം ടൈപ്പ് ചെയ്യുന്നു…",
     submitting: "നിങ്ങളുടെ പരാതി സമർപ്പിക്കുന്നു…",
     confirm_complaint: "📋 നിങ്ങളുടെ പരാതി സ്ഥിരീകരിക്കുക",
-    type_yes: "സമർപ്പിക്കാൻ YES എന്ന് ടൈപ്പ് ചെയ്യുക",
+    type_yes: "സമർപ്പിക്കാൻ/നിരസിക്കാൻ YES/NO എന്ന് ടൈപ്പ് ചെയ്യുക",
     uploaded_photo: "📷 വിശകലനത്തിനായി ഒരു ഫോട്ടോ അപ്‌ലോഡ് ചെയ്തു",
     show_full_details: "പൂർണ്ണ വിവരങ്ങൾ കാണിക്കുക",
     show_less: "കുറച്ച് കാണിക്കുക",
@@ -370,7 +388,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "സ്ഥലം",
     tbl_desc: "വിവരണം",
     tbl_digipin: "DIGIPIN",
-    detecting: "കണ്ടെത്തുന്നു…"
+    detecting: "കണ്ടെത്തുന്നു…",
+    cancelled: "ശരി, ഞാൻ അത് റദ്ദാക്കി. എനിക്ക് നിങ്ങളെ വേറെ എങ്ങനെ സഹായിക്കാനാകും?"
   },
   "bn-IN": {
     greeting: "নমস্কার! 🙏 আমি **JanSamadhan AI**।\nআপনি যে নাগরিক সমস্যার কথা জানাতে চান সে সম্পর্কে আমাকে বলুন — অথবা সমস্যার একটি ছবি আপলোড করতে **+** বোতামে আলতো চাপুন!",
@@ -393,7 +412,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "আপনার কথা টেক্সটে রূপান্তর করা হচ্ছে…",
     submitting: "আপনার অভিযোগ জমা দেওয়া হচ্ছে…",
     confirm_complaint: "📋 আপনার অভিযোগ নিশ্চিত করুন",
-    type_yes: "জমা দিতে YES টাইপ করুন",
+    type_yes: "জমা দিতে/প্রত্যাখ্যান করতে YES/NO টাইপ করুন",
     uploaded_photo: "📷 বিশ্লেষণের জন্য একটি ছবি আপলোড করা হয়েছে",
     show_full_details: "সম্পূর্ণ বিবরণ দেখান",
     show_less: "কম দেখান",
@@ -405,7 +424,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "অবস্থান",
     tbl_desc: "বিবরণ",
     tbl_digipin: "DIGIPIN",
-    detecting: "সন্ধান করা হচ্ছে…"
+    detecting: "সন্ধান করা হচ্ছে…",
+    cancelled: "ঠিক আছে, আমি এটি বাতিল করেছি। আমি আর কীভাবে আপনাকে সাহায্য করতে পারি?"
   },
   "mr-IN": {
     greeting: "नमस्कार! 🙏 मी **JanSamadhan AI** आहे.\nतुम्हाला नोंदवायच्या असलेल्या नागरी समस्येबद्दल मला सांगा — किंवा समस्येचा फोटो अपलोड करण्यासाठी **+** बटणावर टॅप करा!",
@@ -428,7 +448,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "तुमचा आवाज मजकुरात रूपांतरित करत आहे…",
     submitting: "तुमची तक्रार सबमिट करत आहे…",
     confirm_complaint: "📋 तुमच्या तक्रारीची पुष्टी करा",
-    type_yes: "सबमिट करण्यासाठी YES टाइप करा",
+    type_yes: "सबमिट/नाकारण्यासाठी YES/NO टाइप करा",
     uploaded_photo: "📷 विश्लेषणासाठी फोटो अपलोड केला",
     show_full_details: "संपूर्ण तपशील पहा",
     show_less: "कमी दाखवा",
@@ -440,7 +460,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "स्थान",
     tbl_desc: "वर्णन",
     tbl_digipin: "DIGIPIN",
-    detecting: "शोधत आहे…"
+    detecting: "शोधत आहे…",
+    cancelled: "ठीक आहे, मी ते रद्द केले आहे. मी तुम्हाला आणखी कशी मदत करू शकतो?"
   },
   "gu-IN": {
     greeting: "નમસ્તે! 🙏 હું **JanSamadhan AI** છું.\nતમે જે નાગરિક સમસ્યા નોંધાવવા માંગતા હો તે વિશે મને જણાવો — અથવા સમસ્યાનો ફોટો અપલોડ કરવા માટે **+** બટન પર ટેપ કરો!",
@@ -463,7 +484,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "તમારા અવાજને ટેક્સ્ટમાં કન્વર્ટ કરી રહ્યાં છીએ…",
     submitting: "તમારી ફરિયાદ સબમિટ કરી રહ્યાં છીએ…",
     confirm_complaint: "📋 તમારી ફરિયાદની પુષ્ટિ કરો",
-    type_yes: "સબમિટ કરવા માટે YES ટાઇપ કરો",
+    type_yes: "સબમિટ/નકારવા માટે YES/NO ટાઇપ કરો",
     uploaded_photo: "📷 વિશ્લેષણ માટે એક ફોટો અપલોડ કર્યો",
     show_full_details: "સંપૂર્ણ વિગતો બતાવો",
     show_less: "ઓછું બતાવો",
@@ -475,7 +496,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "સ્થાન",
     tbl_desc: "વર્ણન",
     tbl_digipin: "DIGIPIN",
-    detecting: "શોધી રહ્યાં છીએ…"
+    detecting: "શોધી રહ્યાં છીએ…",
+    cancelled: "ઠીક છે, મેં તે રદ કર્યું છે. હું તમને બીજી કઈ રીતે મદદ કરી શકું?"
   },
   "pa-IN": {
     greeting: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! 🙏 ਮੈਂ **JanSamadhan AI** ਹਾਂ।\nਮੈਨੂੰ ਉਸ ਨਾਗਰਿਕ ਸਮੱਸਿਆ ਬਾਰੇ ਦੱਸੋ ਜਿਸਦੀ ਤੁਸੀਂ ਰਿਪੋਰਟ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ — ਜਾਂ ਸਮੱਸਿਆ ਦੀ ਫੋਟੋ ਅੱਪਲੋਡ ਕਰਨ ਲਈ **+** ਬਟਨ 'ਤੇ ਟੈਪ ਕਰੋ!",
@@ -498,7 +520,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     transcribing: "ਤੁਹਾਡੀ ਆਵਾਜ਼ ਨੂੰ ਟੈਕਸਟ ਵਿੱਚ ਬਦਲਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
     submitting: "ਤੁਹਾਡੀ ਸ਼ਿਕਾਇਤ ਜਮ੍ਹਾਂ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
     confirm_complaint: "📋 ਆਪਣੀ ਸ਼ਿਕਾਇਤ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
-    type_yes: "ਜਮ੍ਹਾਂ ਕਰਨ ਲਈ YES ਟਾਈਪ ਕਰੋ",
+    type_yes: "ਜਮ੍ਹਾਂ ਕਰਨ/ਰੱਦ ਕਰਨ ਲਈ YES/NO ਟਾਈਪ ਕਰੋ",
     uploaded_photo: "📷 ਵਿਸ਼ਲੇਸ਼ਣ ਲਈ ਇੱਕ ਫੋਟੋ ਅੱਪਲੋਡ ਕੀਤੀ ਗਈ",
     show_full_details: "ਪੂਰੇ ਵੇਰਵੇ ਦਿਖਾਓ",
     show_less: "ਘੱਟ ਦਿਖਾਓ",
@@ -510,7 +532,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     tbl_location: "ਸਥਾਨ",
     tbl_desc: "ਵਰਣਨ",
     tbl_digipin: "DIGIPIN",
-    detecting: "ਲੱਭਿਆ ਜਾ ਰਿਹਾ ਹੈ…"
+    detecting: "ਲੱਭਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
+    cancelled: "ਠੀਕ ਹੈ, ਮੈਂ ਇਸਨੂੰ ਰੱਦ ਕਰ ਦਿੱਤਾ ਹੈ। ਮੈਂ ਤੁਹਾਡੀ ਹੋਰ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?"
   }
 };
 
@@ -682,6 +705,10 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
     return CONFIRMATION_PATTERNS[selectedLanguage || "default"] || CONFIRMATION_PATTERNS.default;
   }, [selectedLanguage]);
 
+  const getRejectionPattern = useCallback(() => {
+    return REJECTION_PATTERNS[selectedLanguage || "default"] || REJECTION_PATTERNS.default;
+  }, [selectedLanguage]);
+
   /* ----- message helpers ----- */
   const addBotMessage = useCallback(
     (text: string, extra?: { extracted?: ExtractedComplaint | null; imagePreview?: ImageTicketPreview | null; geoDetails?: GeoDetails | null }) => {
@@ -807,6 +834,21 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       } else {
         await submitComplaint(true);
       }
+      return;
+    }
+
+    // Handle rejection if we have a pending ticket or duplicate context
+    if ((pendingComplaint || pendingImagePreview || duplicateContext) && getRejectionPattern().test(trimmed)) {
+      setMessages((prev) => [...prev, { id: uid(), role: "user", text: trimmed }]);
+      scrollToBottom();
+      setPendingComplaint(null);
+      setPendingImagePreview(null);
+      setPendingImageDataUrl(null);
+      setPendingImageFile(null);
+      setPendingLocation(null);
+      setLocationConfirmed(false);
+      setDuplicateContext(null);
+      addBotMessage(t(selectedLanguage, "cancelled"));
       return;
     }
 
