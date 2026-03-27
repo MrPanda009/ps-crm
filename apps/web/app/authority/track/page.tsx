@@ -94,6 +94,33 @@ export default function TrackPage() {
   const [recenterTrigger, setRecenterTrigger] = useState(0)
   const detailRef = useRef<HTMLDivElement>(null)
 
+  const CACHE_KEY = "authority_track_cache"
+
+  type TrackPayload = {
+    source?: string
+    department: string
+    complaints: Complaint[]
+    trendRows?: unknown[]
+    workers: {
+      worker_id: string
+      availability: string
+      department: string
+      profiles: { full_name: string } | { full_name: string }[] | null
+    }[]
+  }
+
+  function transformPayload(payload: TrackPayload) {
+    const department = payload.department ?? ""
+    const rows = (payload.complaints ?? []) as Complaint[]
+    const workerRows: Worker[] = (payload.workers ?? []).map((w) => ({
+      id:           w.worker_id,
+      full_name:    (Array.isArray(w.profiles) ? w.profiles[0] : w.profiles)?.full_name ?? "Unknown",
+      availability: w.availability ?? "inactive",
+      department:   w.department ?? department,
+    }))
+    return { complaints: rows, workers: workerRows, department }
+  }
+
   async function applyLiveUpvoteCounts(rows: Complaint[]): Promise<Complaint[]> {
     if (rows.length === 0) return rows
 
@@ -133,54 +160,70 @@ export default function TrackPage() {
   }
 
   async function fetchData() {
-    const { data: auth } = await supabase.auth.getUser()
-    const uid = auth?.user?.id
-    if (!uid) { setError("Not logged in"); setLoading(false); return }
-
-    const { data: profile } = await supabase
-      .from("profiles").select("department").eq("id", uid).maybeSingle()
-    const department = profile?.department ?? ""
-
-    let rows: Complaint[] = []
-    const { data: d1 } = await supabase
-      .from("complaints").select(COMPLAINT_SELECT)
-      .eq("assigned_officer_id", uid).neq("status", "rejected")
-      .order("created_at", { ascending: false })
-    rows = (d1 ?? []) as unknown as Complaint[]
-
-    if (rows.length === 0 && department) {
-      const { data: d2, error: e2 } = await supabase
-        .from("complaints").select(COMPLAINT_SELECT)
-        .eq("assigned_department", department).neq("status", "rejected")
-        .order("created_at", { ascending: false })
-      if (e2) { setError(e2.message); setLoading(false); return }
-      rows = (d2 ?? []) as unknown as Complaint[]
-    }
-
-    rows = await applyLiveUpvoteCounts(rows)
-
-    let workerRows: Worker[] = []
-    if (department) {
-      const { data: wRows } = await supabase
-        .from("worker_profiles")
-        .select("worker_id,availability,department,profiles(full_name)")
-        .eq("department", department)
-      workerRows = (wRows ?? []).map((w: any) => ({
-        id:           w.worker_id,
-        full_name:    (Array.isArray(w.profiles) ? w.profiles[0] : w.profiles)?.full_name ?? "Unknown",
-        availability: w.availability ?? "inactive",
-        department:   w.department ?? department,
-      }))
-    }
-
-    setComplaints(rows)
-    setWorkers(workerRows)
-    setDept(department)
     setError(null)
-    setLoading(false)
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    if (sessionError || !session?.access_token) {
+      setError("Not logged in")
+      setLoading(false)
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const response = await fetch(`${apiUrl}/api/authority/dashboard`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      const payload = (await response.json().catch(() => null)) as TrackPayload | null
+
+      if (!response.ok || !payload) {
+        setError("Failed to load complaints")
+        setLoading(false)
+        return
+      }
+
+      const result = transformPayload(payload)
+
+      // Apply live upvote counts (separate enrichment step)
+      const enrichedComplaints = await applyLiveUpvoteCounts(result.complaints)
+
+      setComplaints(enrichedComplaints)
+      setWorkers(result.workers)
+      setDept(result.department)
+      setError(null)
+
+      // Persist to localStorage for instant load next time
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(payload)) } catch {}
+    } catch (err) {
+      console.error("Track page fetch error:", err)
+      setError("Failed to load complaints data")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { void fetchData() }, [])
+  // Instant Load from localStorage, then fresh fetch
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY)
+      if (cached) {
+        const result = transformPayload(JSON.parse(cached))
+        setComplaints(result.complaints)
+        setWorkers(result.workers)
+        setDept(result.department)
+        setLoading(false)
+      }
+    } catch {}
+
+    void fetchData()
+  }, [])
+
   useEffect(() => {
     if (!dept) return
     const ch = supabase.channel("track-realtime")

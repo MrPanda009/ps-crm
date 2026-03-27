@@ -1,7 +1,7 @@
 // apps/web/app/authority/workers/page.tsx
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { supabase } from "@/src/lib/supabase"
 import { CheckCircle2, Circle, XCircle } from "lucide-react"
 
@@ -18,10 +18,49 @@ type Worker = {
   joined_at:         string | null
 }
 
+type WorkerPayload = {
+  source?: string
+  department: string
+  workers: {
+    worker_id: string
+    availability: string
+    department: string
+    city?: string
+    total_resolved?: number
+    current_complaint_id?: string | null
+    joined_at?: string | null
+    profiles: { full_name: string; email: string } | { full_name: string; email: string }[] | null
+  }[]
+  activeCounts: Record<string, number>
+}
+
 const AVAIL: Record<Availability, { label: string; pill: string; icon: React.ReactNode }> = {
   available: { label:"Available", pill:"bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", icon:<CheckCircle2 size={11} className="text-emerald-500"/> },
   busy:      { label:"Busy",      pill:"bg-amber-50 text-amber-700 ring-1 ring-amber-200",      icon:<Circle      size={11} className="text-amber-400"/>   },
   inactive:  { label:"Inactive",  pill:"bg-gray-100 text-gray-500",                             icon:<XCircle     size={11} className="text-gray-400"/>    },
+}
+
+const CACHE_KEY = "authority_workers_cache"
+
+function transformPayload(payload: WorkerPayload) {
+  const department = payload.department ?? ""
+  const activeCounts = payload.activeCounts ?? {}
+
+  const workers: Worker[] = (payload.workers ?? []).map((w) => {
+    const prof = Array.isArray(w.profiles) ? w.profiles[0] : w.profiles
+    return {
+      worker_id:    w.worker_id,
+      availability: (w.availability ?? "inactive") as Availability,
+      department:   w.department ?? department,
+      city:         w.city ?? "",
+      profiles:     prof ?? null,
+      total_resolved: w.total_resolved ?? 0,
+      active_complaints: activeCounts[w.worker_id] ?? 0,
+      joined_at:    w.joined_at ?? null,
+    }
+  })
+
+  return { workers, department }
 }
 
 export default function WorkersPage() {
@@ -32,62 +71,66 @@ export default function WorkersPage() {
   const [availFilter, setAvailFilter] = useState<"all"|Availability>("all")
   const [dept,        setDept]        = useState("")
 
-  async function fetchWorkers() {
-    setLoading(true)
-    const { data: auth } = await supabase.auth.getUser()
-    const uid = auth?.user?.id
-    if (!uid) { setError("Not logged in"); setLoading(false); return }
+  const applyPayload = useCallback((payload: WorkerPayload) => {
+    const result = transformPayload(payload)
+    setWorkers(result.workers)
+    setDept(result.department)
+  }, [])
 
-    const { data: profile } = await supabase
-      .from("profiles").select("department").eq("id", uid).maybeSingle()
-    const department = profile?.department ?? ""
-    setDept(department)
-
-    let query = supabase
-      .from("worker_profiles")
-      .select("worker_id,availability,department,city,total_resolved,current_complaint_id,joined_at,profiles(full_name,email)")
-
-    if (department) query = query.eq("department", department)
-
-    const { data: wRows, error: wErr } = await query
-
-    if (wErr) { setError(wErr.message); setLoading(false); return }
-    if (!wRows?.length) { setWorkers([]); setLoading(false); return }
-
-    // Count currently active (non-resolved) assigned complaints per worker
-    const ids = wRows.map((w: any) => w.worker_id)
-    const { data: activeRows } = await supabase
-      .from("complaints")
-      .select("assigned_worker_id")
-      .in("assigned_worker_id", ids)
-      .not("status", "in", "(resolved,rejected)")
-
-    const activeCounts: Record<string, number> = {}
-    ids.forEach(id => { activeCounts[id] = 0 })
-    ;(activeRows ?? []).forEach((r: any) => {
-      if (activeCounts[r.assigned_worker_id] !== undefined) activeCounts[r.assigned_worker_id]++
-    })
-
-    setWorkers(
-      wRows.map((w: any) => {
-        const prof = Array.isArray(w.profiles) ? w.profiles[0] : w.profiles
-        return {
-          worker_id:    w.worker_id,
-          availability: (w.availability ?? "inactive") as Availability,
-          department:   w.department ?? department,
-          city:         w.city ?? "",
-          profiles:     prof ?? null,
-          total_resolved: w.total_resolved ?? 0,
-          active_complaints: activeCounts[w.worker_id] ?? 0,
-          joined_at:    w.joined_at ?? null,
-        }
-      })
-    )
+  const fetchWorkers = useCallback(async () => {
     setError(null)
-    setLoading(false)
-  }
 
-  useEffect(() => { void fetchWorkers() }, [])
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    if (sessionError || !session?.access_token) {
+      setError("Not logged in")
+      setLoading(false)
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const response = await fetch(`${apiUrl}/api/authority/workers`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      const payload = (await response.json().catch(() => null)) as WorkerPayload | null
+
+      if (!response.ok || !payload) {
+        setError("Failed to load workers")
+        setLoading(false)
+        return
+      }
+
+      applyPayload(payload)
+
+      // Persist to localStorage for instant load next time
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(payload)) } catch {}
+    } catch (err) {
+      console.error("Workers fetch error:", err)
+      setError("Failed to load workers data")
+    } finally {
+      setLoading(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Instant Load from localStorage, then fresh fetch
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY)
+      if (cached) {
+        applyPayload(JSON.parse(cached))
+        setLoading(false)
+      }
+    } catch {}
+
+    void fetchWorkers()
+  }, [fetchWorkers, applyPayload])
 
   useEffect(() => {
     if (!dept) return
@@ -102,7 +145,7 @@ export default function WorkersPage() {
       }, () => void fetchWorkers())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [dept])
+  }, [dept, fetchWorkers])
 
   const filtered = workers.filter(w => {
     const q = search.toLowerCase()

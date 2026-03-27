@@ -968,6 +968,236 @@ async def get_admin_complaints_list(
 
     return {"source": "database", **payload}
 
+# =========================================================
+# 8g. AUTHORITY DASHBOARD (Consolidated + Redis)
+# =========================================================
+
+COMPLAINT_DASHBOARD_SELECT = (
+    "id, ticket_id, title, status, effective_severity, sla_deadline, "
+    "escalation_level, created_at, resolved_at, address_text, assigned_worker_id, "
+    "upvote_count, categories(name)"
+)
+
+TREND_SELECT = "status, created_at, resolved_at"
+
+
+@app.get("/api/authority/dashboard")
+async def get_authority_dashboard(
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Consolidated authority dashboard endpoint.
+    Returns complaints, trend rows, workers, department, and stats
+    in a single cached payload. Replaces 4-6 Supabase queries from the frontend.
+    """
+    officer_id = get_citizen_id_from_token(authorization)
+
+    # Check Redis cache
+    cache_key = f"authority:dashboard:{officer_id}"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return {"source": "cache", **json.loads(cached)}
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    # Step 1: Get officer's department
+    try:
+        profile_res = await asyncio.to_thread(
+            lambda: supabase.table("profiles")
+            .select("department")
+            .eq("id", officer_id)
+            .maybe_single()
+            .execute()
+        )
+        department = (profile_res.data or {}).get("department", "") or ""
+    except Exception:
+        department = ""
+
+    # Step 2: Date cutoffs
+    six_month_cutoff = datetime.now(timezone.utc)
+    # Go back 5 months to start of that month
+    month = six_month_cutoff.month - 5
+    year = six_month_cutoff.year
+    while month <= 0:
+        month += 12
+        year -= 1
+    six_month_cutoff = six_month_cutoff.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
+    six_month_iso = six_month_cutoff.isoformat()
+
+    # Step 3: Fetch complaints (try officer first, fallback to department)
+    try:
+        [officer_complaints_res, officer_trend_res] = await asyncio.gather(
+            asyncio.to_thread(
+                lambda: supabase.table("complaints")
+                .select(COMPLAINT_DASHBOARD_SELECT)
+                .eq("assigned_officer_id", officer_id)
+                .neq("status", "rejected")
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("complaints")
+                .select(TREND_SELECT)
+                .eq("assigned_officer_id", officer_id)
+                .gte("created_at", six_month_iso)
+                .execute()
+            ),
+        )
+        all_rows = officer_complaints_res.data or []
+        trend_rows = officer_trend_res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authority dashboard fetch failed: {str(e)}")
+
+    # Fallback: fetch by department if officer has no direct assignments
+    if len(all_rows) == 0 and department:
+        try:
+            [dept_complaints_res, dept_trend_res] = await asyncio.gather(
+                asyncio.to_thread(
+                    lambda: supabase.table("complaints")
+                    .select(COMPLAINT_DASHBOARD_SELECT)
+                    .eq("assigned_department", department)
+                    .neq("status", "rejected")
+                    .execute()
+                ),
+                asyncio.to_thread(
+                    lambda: supabase.table("complaints")
+                    .select(TREND_SELECT)
+                    .eq("assigned_department", department)
+                    .gte("created_at", six_month_iso)
+                    .execute()
+                ),
+            )
+            all_rows = dept_complaints_res.data or []
+            trend_rows = dept_trend_res.data or []
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Authority dashboard dept fetch failed: {str(e)}")
+
+    # Step 4: Fetch workers for this department
+    workers: List[Dict[str, Any]] = []
+    if department:
+        try:
+            workers_res = await asyncio.to_thread(
+                lambda: supabase.table("worker_profiles")
+                .select("worker_id, availability, department, profiles(full_name)")
+                .eq("department", department)
+                .execute()
+            )
+            workers = workers_res.data or []
+        except Exception:
+            workers = []
+
+    payload = {
+        "department": department,
+        "complaints": all_rows,
+        "trendRows": trend_rows,
+        "workers": workers,
+    }
+
+    # Cache for 5 minutes
+    if redis_client:
+        try:
+            redis_client.setex(cache_key, 300, json.dumps(payload))
+        except Exception as e:
+            print(f"Redis write error: {e}")
+
+    return {"source": "database", **payload}
+
+
+# =========================================================
+# 8h. AUTHORITY WORKERS LIST (Consolidated + Redis)
+# =========================================================
+
+@app.get("/api/authority/workers")
+async def get_authority_workers(
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Consolidated authority workers endpoint.
+    Returns worker profiles with active complaint counts in a single cached payload.
+    """
+    officer_id = get_citizen_id_from_token(authorization)
+
+    cache_key = f"authority:workers:{officer_id}"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return {"source": "cache", **json.loads(cached)}
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    # Step 1: Get officer's department
+    try:
+        profile_res = await asyncio.to_thread(
+            lambda: supabase.table("profiles")
+            .select("department")
+            .eq("id", officer_id)
+            .maybe_single()
+            .execute()
+        )
+        department = (profile_res.data or {}).get("department", "") or ""
+    except Exception:
+        department = ""
+
+    # Step 2: Fetch worker profiles (filtered by department if available)
+    try:
+        worker_query = supabase.table("worker_profiles").select(
+            "worker_id, availability, department, city, total_resolved, "
+            "current_complaint_id, joined_at, profiles(full_name, email)"
+        )
+        if department:
+            worker_query = worker_query.eq("department", department)
+
+        workers_res = await asyncio.to_thread(lambda: worker_query.execute())
+        worker_rows = workers_res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authority workers fetch failed: {str(e)}")
+
+    if not worker_rows:
+        payload = {"department": department, "workers": [], "activeCounts": {}}
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 600, json.dumps(payload))
+            except Exception:
+                pass
+        return {"source": "database", **payload}
+
+    # Step 3: Count active complaints per worker
+    worker_ids = [w["worker_id"] for w in worker_rows]
+    try:
+        active_res = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .select("assigned_worker_id")
+            .in_("assigned_worker_id", worker_ids)
+            .not_.in_("status", ["resolved", "rejected"])
+            .execute()
+        )
+        active_rows = active_res.data or []
+    except Exception:
+        active_rows = []
+
+    active_counts: Dict[str, int] = {wid: 0 for wid in worker_ids}
+    for row in active_rows:
+        wid = row.get("assigned_worker_id")
+        if wid and wid in active_counts:
+            active_counts[wid] += 1
+
+    payload = {
+        "department": department,
+        "workers": worker_rows,
+        "activeCounts": active_counts,
+    }
+
+    # Cache for 10 minutes
+    if redis_client:
+        try:
+            redis_client.setex(cache_key, 600, json.dumps(payload))
+        except Exception as e:
+            print(f"Redis write error: {e}")
+
+    return {"source": "database", **payload}
+
 
 # =========================================================
 # 9. ROOT MESSAGE
