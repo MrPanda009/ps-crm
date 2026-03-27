@@ -715,7 +715,7 @@ async def get_citizen_tickets(
 
     # 2. Fallback to Supabase
     query = supabase.table("complaints").select(
-        "id, ticket_id, title, address_text, assigned_department, status, created_at, upvote_count"
+        "id, ticket_id, title, address_text, assigned_department, status, created_at, upvote_count, reviews(rating)"
     ).eq("citizen_id", citizen_id).order("created_at", desc=True)
 
     if since:
@@ -958,7 +958,7 @@ async def get_admin_workers_list(
         [profiles_res, complaints_res, worker_profiles_res, categories_res] = await asyncio.gather(
             asyncio.to_thread(lambda: supabase.table("profiles").select("id, full_name, email, phone, city, department, is_blocked, created_at").eq("role", "worker").order("created_at", desc=True).execute()),
             asyncio.to_thread(lambda: supabase.table("complaints").select("id, assigned_worker_id, assigned_department, status, created_at, resolved_at").execute()),
-            asyncio.to_thread(lambda: supabase.table("worker_profiles").select("worker_id, department, availability, total_resolved").execute()),
+            asyncio.to_thread(lambda: supabase.table("worker_profiles").select("worker_id, department, availability, total_resolved, average_rating, total_reviews").execute()),
             asyncio.to_thread(lambda: supabase.table("categories").select("name, department").eq("is_active", True).execute())
         )
 

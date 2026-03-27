@@ -11,7 +11,7 @@ type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
 type TicketListRow = Pick<
   ComplaintRow,
   "id" | "ticket_id" | "title" | "address_text" | "assigned_department" | "status" | "created_at" | "upvote_count"
-> & { rating?: number };
+> & { rating?: number | null; reviews?: { rating: number } | { rating: number }[] | null };
 
 function formatStatus(status: string): string {
   return status
@@ -228,7 +228,15 @@ function CitizenTicketsPageContent() {
         });
 
         if (!res.ok) throw new Error(`API error: ${res.status}`);
-        const { source, tickets: incoming } = await res.json();
+        const { source, tickets: incomingRaw } = await res.json();
+        
+        // Flatten reviews(rating)
+        const incoming = incomingRaw.map((t: any) => {
+          const rating = t.reviews 
+            ? (Array.isArray(t.reviews) ? t.reviews[0]?.rating : (t.reviews as any).rating)
+            : t.rating;
+          return { ...t, rating };
+        });
 
         if (!isActive) return;
 
@@ -611,7 +619,7 @@ function CitizenTicketsPageContent() {
                         {ticket.status === "resolved" ? (
                           <div className="flex flex-col items-center gap-1">
                             <Rating 
-                              initialRating={ticket.rating} 
+                              initialRating={ticket.rating ?? undefined} 
                               onRate={async (r) => {
                                 try {
                                   // 1. Get token

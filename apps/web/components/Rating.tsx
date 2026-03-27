@@ -13,6 +13,11 @@ export default function Rating({ initialRating = 0, onRate, readonly = false }: 
   const [rating, setRating] = useState(initialRating);
   const [hoverRating, setHoverRating] = useState(0);
 
+  // Sync state if initialRating changes from parent
+  React.useEffect(() => {
+    setRating(initialRating);
+  }, [initialRating]);
+
   const handleRating = (value: number) => {
     if (readonly) return;
     setRating(value);
