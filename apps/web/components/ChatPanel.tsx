@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 import { Mic, MicOff, Send, Plus, MapPin, CheckCircle2, ChevronDown, ChevronUp, Image as ImageIcon, Loader2, RefreshCw, X, Globe } from "lucide-react";
 import gsap from "gsap";
 import { sendToGemini } from "@/lib/gemini";
@@ -546,7 +546,15 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [isInitialView, setIsInitialView] = useState(true);
+  const [skipAnimation, setSkipAnimation] = useState(false);
   const hasAnimatedRef = useRef(false);
+
+  // Instantly snap to bottom before browser paints if skipping animation
+  useLayoutEffect(() => {
+    if (!isInitialView && skipAnimation && scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "auto" });
+    }
+  }, [isInitialView, skipAnimation]);
 
   // Initialize from localStorage on mount
   useEffect(() => {
@@ -562,6 +570,19 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       localStorage.setItem("jansamadhan_lang", selectedLanguage);
     }
   }, [selectedLanguage]);
+
+  // Prevent accidental navigation during rendering/processing
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isLoading || submitting || isTranscribing) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isLoading, submitting, isTranscribing]);
 
   /* ----- refs ----- */
   const panelRef = useRef<HTMLDivElement>(null);
@@ -604,8 +625,8 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
     const initializeChat = async () => {
 
       // 1. Get current user to tie session to their account
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
       if (!userId) {
         setIsHistoryInitialized(true);
         return;
@@ -637,6 +658,8 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
                   text: m.text,
                 }));
 
+              hasAnimatedRef.current = true; // Skip opening transition for loaded history
+              setSkipAnimation(true);
               setIsInitialView(false);
             }
           }
@@ -651,12 +674,21 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         if (savedState) {
           if (savedState.pendingComplaint !== undefined) setPendingComplaint(savedState.pendingComplaint);
           if (savedState.pendingImagePreview !== undefined) setPendingImagePreview(savedState.pendingImagePreview);
-          if (savedState.pendingImageFile !== undefined) setPendingImageFile(savedState.pendingImageFile);
-          if (savedState.pendingImageDataUrl !== undefined) setPendingImageDataUrl(savedState.pendingImageDataUrl);
           if (savedState.pendingLocation !== undefined) setPendingLocation(savedState.pendingLocation);
           if (savedState.duplicateContext !== undefined) setDuplicateContext(savedState.duplicateContext);
           if (savedState.locationConfirmed !== undefined) setLocationConfirmed(savedState.locationConfirmed);
           if (savedState.submitted !== undefined) setSubmitted(savedState.submitted);
+
+          // Only restore the image file if there's actually a confirmed preview waiting!
+          // This prevents stuck image thumbnails from interrupted network connections.
+          if (savedState.pendingImagePreview) {
+             if (savedState.pendingImageFile !== undefined) setPendingImageFile(savedState.pendingImageFile);
+             if (savedState.pendingImageDataUrl !== undefined) setPendingImageDataUrl(savedState.pendingImageDataUrl);
+          } else {
+             setPendingImageFile(null);
+             setPendingImageDataUrl(null);
+             clearSharedState(`jansamadhan_pending_state_${userId}`).catch(console.error);
+          }
         }
       } catch (e) {
         console.error("Failed to restore UI state", e);
@@ -915,6 +947,8 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         } catch (err) {
           const msg = toUserFacingError(err);
           addBotMessage(`⚠️ ${msg}`);
+          setPendingImageDataUrl(null); // Clear the image if the network request fails or drops!
+          setPendingImageFile(null);
         } finally {
           setIsLoading(false);
           setInput("");
@@ -1101,8 +1135,9 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
 
     try {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
 
       if (!user) {
         addBotMessage(t(selectedLanguage, "login_required"));
@@ -1433,7 +1468,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || submitting || isRecording || isTranscribing} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]" aria-label="Upload photo" title="Upload a photo of the issue">
           <Plus size={18} />
         </button>
-        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
         <button ref={micBtnRef} onClick={handleMicClick} disabled={isLoading || submitting || isTranscribing} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-40 ${isRecording ? "border-red-400 bg-red-500 text-white hover:bg-red-600 dark:border-red-500 dark:bg-red-600 dark:hover:bg-red-700 focus:ring-red-400 dark:focus:ring-red-500 dark:focus:ring-offset-[#161616]" : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] focus:ring-[#b4725a] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"}`} aria-label={isRecording ? "Stop recording" : "Start voice input"} title={isRecording ? "Tap to stop recording" : "Tap to speak your complaint"}>
           {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
         </button>
@@ -1636,10 +1671,11 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
           {/* Messages area (Expands when active) */}
           <div 
             ref={scrollRef} 
-            className={`w-full transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] min-h-0 overflow-y-auto px-4 ${isInitialView ? 'flex-[0_1_0%] opacity-0 h-0 py-0' : 'flex-[1_1_0%] opacity-100 py-3'}`}
-            style={{ display: 'flex', flexDirection: 'column' }}
+            className={`w-full min-h-0 overflow-y-auto px-4 ${skipAnimation ? "" : "transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"} ${isInitialView ? "flex-[0_1_0%] opacity-0 h-0 py-0" : "flex-[1_1_0%] opacity-100 py-3"}`}
+            style={{ display: "flex", flexDirection: "column" }}
           >
-            <div ref={messagesAreaRef} className={`max-w-3xl mx-auto flex flex-col justify-end space-y-3 min-h-full w-full transition-opacity duration-300 delay-300 ${isInitialView ? 'opacity-0' : 'opacity-100'}`}>
+            <div ref={messagesAreaRef} className={`max-w-3xl mx-auto flex flex-col space-y-3 min-h-full w-full ${skipAnimation ? "" : "transition-opacity duration-300 delay-300"} ${isInitialView ? "opacity-0" : "opacity-100"}`}>
+              <div className="flex-1 min-h-0"></div>
               {messagesContent}
             </div>
           </div>
