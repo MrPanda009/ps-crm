@@ -12,6 +12,7 @@ from io import BytesIO
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Any
 from math import radians, sin, cos, sqrt, atan2
+import httpx
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -1598,7 +1599,7 @@ async def create_material_request(
         if comp_res.data["assigned_worker_id"] != worker_id:
             raise HTTPException(status_code=403, detail="You are not assigned to this complaint")
             
-        # 2. Insert request
+        # 2. Insert via direct REST API (bypasses supabase-py 204 bug)
         insert_payload = {
             "worker_id": worker_id,
             "complaint_id": request.complaint_id,
@@ -1607,19 +1608,27 @@ async def create_material_request(
             "status": "pending",
             "notes": request.notes
         }
-        try:
-            insert_res = await asyncio.to_thread(
-                lambda: supabase.table("material_requests").insert(insert_payload).execute()
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{SUPABASE_URL}/rest/v1/material_requests",
+                json=insert_payload,
+                headers={
+                    "apikey": SUPABASE_SERVICE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                timeout=15.0,
             )
-            return {"status": "success", "data": insert_res.data[0] if insert_res.data else insert_payload}
-        except Exception as insert_err:
-            # postgrest-py throws on 204 No Content ("Missing response") even though
-            # the row was actually created. Treat it as success.
-            err_str = str(insert_err)
-            if "Missing response" in err_str or "204" in err_str:
-                print(f"Material request inserted (204 silent success): {insert_payload}")
-                return {"status": "success", "data": insert_payload}
-            raise insert_err
+        print(f"[material-request] PostgREST status={resp.status_code} body={resp.text[:500]}")
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            return {"status": "success", "data": data[0] if isinstance(data, list) and data else data}
+        elif resp.status_code == 204:
+            # 204 = inserted but no body returned; still a success
+            return {"status": "success", "data": insert_payload}
+        else:
+            raise HTTPException(status_code=resp.status_code, detail=f"PostgREST error: {resp.text}")
     except HTTPException:
         raise
     except Exception as e:

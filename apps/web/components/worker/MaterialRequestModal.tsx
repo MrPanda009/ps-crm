@@ -112,13 +112,7 @@ export default function MaterialRequestModal({
 
         if (!response.ok) {
           const errorData = await response.json();
-          const detail = errorData.detail || "";
-          // postgrest-py throws on 204 "Missing response" but the row IS created
-          if (detail.includes("Missing response") || detail.includes("204")) {
-            console.warn("Material request created (204 silent success)");
-            continue; // treat as success, move to next item
-          }
-          throw new Error(detail || "Failed to submit request");
+          throw new Error(errorData.detail || "Failed to submit request");
         }
       }
       
