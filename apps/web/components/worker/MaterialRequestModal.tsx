@@ -19,7 +19,8 @@ interface RequestItem {
 interface MaterialRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  ticketId: string;
+  ticketId: string;        // Database UUID
+  ticketDisplayId: string; // Human readable DL-xxxx
   ticketTitle: string;
 }
 
@@ -27,6 +28,7 @@ export default function MaterialRequestModal({
   isOpen,
   onClose,
   ticketId,
+  ticketDisplayId,
   ticketTitle,
 }: MaterialRequestModalProps) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -106,7 +108,7 @@ export default function MaterialRequestModal({
             complaint_id: ticketId,
             material_id: item.materialId,
             quantity: item.quantity,
-            notes: `Requested for ticket ${ticketId}`
+            notes: `Requested for ticket ${ticketDisplayId}`
           }),
         });
 
@@ -140,7 +142,7 @@ export default function MaterialRequestModal({
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Request Materials</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{ticketId}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{ticketDisplayId}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-[#1e1e1e] rounded-full transition-colors">

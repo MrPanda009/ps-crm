@@ -336,7 +336,8 @@ export default function WorkerTasksPage() {
         <MaterialRequestModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          ticketId={selectedTask.ticket_id}
+          ticketId={selectedTask.id}
+          ticketDisplayId={selectedTask.ticket_id}
           ticketTitle={selectedTask.title}
         />
       )}
