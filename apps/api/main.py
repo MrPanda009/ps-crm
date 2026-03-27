@@ -32,14 +32,13 @@ from shared import (
     SEVERITY_MAP,
     REVERSE_GEOCODE_CACHE,
     ALLOWED_STATUSES,
-    DUPLICATE_LOOKBACK_HOURS,
     DUPLICATE_RADIUS_METERS,
     ISSUE_TYPE_AUTHORITY_KEYWORDS,
     NDMC_LOCALITY_HINTS,
     upload_image_to_supabase,
     reverse_geocode_from_coordinates,
     route_authority,
-    _find_recent_duplicate,
+    _find_active_spatial_duplicate,
     build_complaint_record,
     redis_client,
 )
@@ -454,7 +453,7 @@ async def confirm(
 
     category = CHILD_CATEGORIES[child_id]
 
-    duplicate = _find_recent_duplicate(category_id=child_id, latitude=latitude, longitude=longitude)
+    duplicate = _find_active_spatial_duplicate(category_id=child_id, latitude=latitude, longitude=longitude)
     if duplicate and not force_submit:
         raise HTTPException(
             status_code=409,
