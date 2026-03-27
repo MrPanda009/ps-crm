@@ -1608,31 +1608,54 @@ async def create_material_request(
             "status": "pending",
             "notes": request.notes
         }
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{SUPABASE_URL}/rest/v1/material_requests",
-                json=insert_payload,
-                headers={
-                    "apikey": SUPABASE_SERVICE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-                    "Content-Type": "application/json",
-                    "Prefer": "return=representation",
-                },
-                timeout=15.0,
-            )
-        print(f"[material-request] PostgREST status={resp.status_code} body={resp.text[:500]}")
-        if resp.status_code in (200, 201):
-            data = resp.json()
-            return {"status": "success", "data": data[0] if isinstance(data, list) and data else data}
-        elif resp.status_code == 204:
-            # 204 = inserted but no body returned; still a success
-            return {"status": "success", "data": insert_payload}
-        else:
-            raise HTTPException(status_code=resp.status_code, detail=f"PostgREST error: {resp.text}")
+        
+        # Trim whitespace from URL and keys if any
+        base_url = SUPABASE_URL.strip().rstrip("/")
+        api_key = SUPABASE_SERVICE_KEY.strip()
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{base_url}/rest/v1/material_requests",
+                    json=insert_payload,
+                    headers={
+                        "apikey": api_key,
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "Prefer": "return=representation",
+                    },
+                    timeout=15.0,
+                )
+            
+            print(f"[material-request] PostgREST status={resp.status_code}")
+            if resp.status_code in (200, 201):
+                try:
+                    data = resp.json()
+                    return {"status": "success", "data": data[0] if isinstance(data, list) and data else data}
+                except Exception as json_err:
+                    print(f"[material-request] JSON parse error: {str(json_err)}")
+                    return {"status": "success", "data": insert_payload}
+            elif resp.status_code == 204:
+                return {"status": "success", "data": insert_payload}
+            else:
+                err_text = resp.text[:500]
+                print(f"[material-request] PostgREST error {resp.status_code}: {err_text}")
+                raise HTTPException(status_code=resp.status_code, detail=f"PostgREST error ({resp.status_code}): {err_text}")
+                
+        except httpx.HTTPError as http_err:
+            print(f"[material-request] httpx error: {repr(http_err)}")
+            raise HTTPException(status_code=500, detail=f"HTTP connection error: {repr(http_err)}")
+        except Exception as inner_e:
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Internal logic error: {type(inner_e).__name__}: {str(inner_e)}")
+            
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create material request: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Critical failure: {str(e)}")
 
 
 @app.get("/api/authority/material-requests")
