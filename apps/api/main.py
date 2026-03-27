@@ -1599,17 +1599,27 @@ async def create_material_request(
             raise HTTPException(status_code=403, detail="You are not assigned to this complaint")
             
         # 2. Insert request
-        insert_res = await asyncio.to_thread(
-            lambda: supabase.table("material_requests").insert({
-                "worker_id": worker_id,
-                "complaint_id": request.complaint_id,
-                "material_id": request.material_id,
-                "requested_quantity": request.quantity,
-                "status": "pending",
-                "notes": request.notes
-            }).execute()
-        )
-        return {"status": "success", "data": insert_res.data[0]}
+        insert_payload = {
+            "worker_id": worker_id,
+            "complaint_id": request.complaint_id,
+            "material_id": request.material_id,
+            "requested_quantity": request.quantity,
+            "status": "pending",
+            "notes": request.notes
+        }
+        try:
+            insert_res = await asyncio.to_thread(
+                lambda: supabase.table("material_requests").insert(insert_payload).execute()
+            )
+            return {"status": "success", "data": insert_res.data[0] if insert_res.data else insert_payload}
+        except Exception as insert_err:
+            # postgrest-py throws on 204 No Content ("Missing response") even though
+            # the row was actually created. Treat it as success.
+            err_str = str(insert_err)
+            if "Missing response" in err_str or "204" in err_str:
+                print(f"Material request inserted (204 silent success): {insert_payload}")
+                return {"status": "success", "data": insert_payload}
+            raise insert_err
     except HTTPException:
         raise
     except Exception as e:
@@ -1667,26 +1677,39 @@ async def allot_material(
                 raise HTTPException(status_code=400, detail="Insufficient inventory for this request")
             
             # Decrement inventory (in production use a stored procedure for atomicity)
-            await asyncio.to_thread(
-                lambda: supabase.table("warehouse_inventory")
-                .update({"available_quantity": available - req_data["requested_quantity"]})
-                .eq("id", req_data["material_id"])
-                .execute()
-            )
+            try:
+                await asyncio.to_thread(
+                    lambda: supabase.table("warehouse_inventory")
+                    .update({"available_quantity": available - req_data["requested_quantity"]})
+                    .eq("id", req_data["material_id"])
+                    .execute()
+                )
+            except Exception as inv_err:
+                err_str = str(inv_err)
+                if "Missing response" not in err_str and "204" not in err_str:
+                    raise inv_err
+                print(f"Inventory update succeeded (204 silent): material_id={req_data['material_id']}")
             
         # 2. Update request status
-        update_res = await asyncio.to_thread(
-            lambda: supabase.table("material_requests")
-            .update({
-                "status": request.status,
-                "notes": request.notes,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            })
-            .eq("id", request.request_id)
-            .execute()
-        )
-        
-        return {"status": "success", "data": update_res.data[0]}
+        update_payload = {
+            "status": request.status,
+            "notes": request.notes,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        try:
+            update_res = await asyncio.to_thread(
+                lambda: supabase.table("material_requests")
+                .update(update_payload)
+                .eq("id", request.request_id)
+                .execute()
+            )
+            return {"status": "success", "data": update_res.data[0] if update_res.data else update_payload}
+        except Exception as upd_err:
+            err_str = str(upd_err)
+            if "Missing response" in err_str or "204" in err_str:
+                print(f"Material request status updated (204 silent): {request.request_id}")
+                return {"status": "success", "data": update_payload}
+            raise upd_err
         
     except HTTPException:
         raise

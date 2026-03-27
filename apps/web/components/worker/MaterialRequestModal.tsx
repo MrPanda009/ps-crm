@@ -253,7 +253,6 @@ export default function MaterialRequestModal({
               )}
             </button>
           </div>
-Form has been submitted successfully.
         </form>
       </div>
     </div>
