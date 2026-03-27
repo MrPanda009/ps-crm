@@ -20,7 +20,7 @@ import AdminNotificationBell from "@/app/admin/_components/AdminNotificationBell
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [userName, setUserName] = useState("");
   const profileRef = useRef<HTMLDivElement>(null);

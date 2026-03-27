@@ -543,6 +543,8 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [isInitialView, setIsInitialView] = useState(true);
+  const hasAnimatedRef = useRef(false);
 
   // Initialize from localStorage on mount
   useEffect(() => {
@@ -569,6 +571,9 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micPulseRef = useRef<gsap.core.Tween | null>(null);
+  const greetingRef = useRef<HTMLDivElement>(null);
+  const inputBarRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
 
   /* ----- conversation history for Gemini (role: user | model) ----- */
   const historyRef = useRef<ChatMessage[]>([]);
@@ -581,6 +586,23 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     });
   }, []);
+
+  /* ----- Detect transition from initial → active chat ----- */
+  useEffect(() => {
+    const hasUserMsg = messages.some((m) => m.role === "user");
+    if (hasUserMsg && isInitialView) {
+      if (!hasAnimatedRef.current) {
+        hasAnimatedRef.current = true;
+        // Use a short timeout to let the state update tick
+        setTimeout(() => {
+          setIsInitialView(false);
+        }, 10);
+        setTimeout(scrollToBottom, 600); // Wait for the transition to finish
+      } else {
+        setIsInitialView(false);
+      }
+    }
+  }, [messages, isInitialView, scrollToBottom]);
 
   const toggleImagePreviewDetails = useCallback((messageId: string) => {
     setExpandedImagePreview((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
@@ -1216,21 +1238,199 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
 
   const hasPending = !!(pendingComplaint || pendingImagePreview);
 
+  /* ---------- Shared input bar content ---------- */
+  const inputBarContent = (
+    <>
+      {hasPending && pendingLocation && (
+        <div className="mb-2 rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+          <div className="mb-2">
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">{t(selectedLanguage, "detected_location")}</p>
+          </div>
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{ maxHeight: isMapExpanded ? '400px' : '0px', opacity: isMapExpanded ? 1 : 0 }}
+          >
+            {isMapExpanded && (
+              <LocationPinPicker
+                key={pendingLocation.timestamp}
+                lat={pendingLocation.lat}
+                lng={pendingLocation.lng}
+                onPinMove={(lat, lng) => {
+                  setPendingLocation((prev) => ({ lat, lng, accuracy: prev?.accuracy ?? 9999, timestamp: new Date().toISOString() }));
+                  setLocationConfirmed(false);
+                }}
+              />
+            )}
+          </div>
+          <div className="mt-2 flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setLocationConfirmed(true)} className="rounded-md bg-[#4f392e] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#b4725a] transition-all duration-200 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-[#C9A84C] dark:text-black dark:hover:bg-[#d4b45c] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]">
+                {t(selectedLanguage, "confirm_location_btn")}
+              </button>
+              <button type="button" onClick={async () => { const loc = await getLocation(); setPendingLocation(loc); setLocationConfirmed(false); }} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 dark:border-[#2a2a2a] dark:text-gray-200 dark:hover:bg-[#2a2a2a] dark:focus:ring-[#2a2a2a] dark:focus:ring-offset-[#161616]">
+                {t(selectedLanguage, "move_pin_gps")}
+              </button>
+              <span className={`text-[11px] transition-colors duration-200 ${locationConfirmed ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`}>
+                {locationConfirmed ? t(selectedLanguage, "location_confirmed") : t(selectedLanguage, "move_pin_if_needed")}
+              </span>
+            </div>
+            <button type="button" onClick={() => setIsMapExpanded(!isMapExpanded)} className="flex shrink-0 items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-[#2a2a2a]">
+              {isMapExpanded ? (<><ChevronDown size={14} />{t(selectedLanguage, "hide_map")}</>) : (<><ChevronUp size={14} />{t(selectedLanguage, "show_map")}</>)}
+            </button>
+          </div>
+        </div>
+      )}
+      {isTranscribing && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+          <Loader2 size={14} className="animate-spin" />
+          {t(selectedLanguage, "transcribing")}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || submitting || isRecording || isTranscribing} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]" aria-label="Upload photo" title="Upload a photo of the issue">
+          <Plus size={18} />
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+        <button ref={micBtnRef} onClick={handleMicClick} disabled={isLoading || submitting || isTranscribing} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-40 ${isRecording ? "border-red-400 bg-red-500 text-white hover:bg-red-600 dark:border-red-500 dark:bg-red-600 dark:hover:bg-red-700 focus:ring-red-400 dark:focus:ring-red-500 dark:focus:ring-offset-[#161616]" : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] focus:ring-[#b4725a] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"}`} aria-label={isRecording ? "Stop recording" : "Start voice input"} title={isRecording ? "Tap to stop recording" : "Tap to speak your complaint"}>
+          {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+        </button>
+        <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={duplicateContext ? t(selectedLanguage, "type_upvote") : hasPending ? t(selectedLanguage, "confirm_location_prompt") : t(selectedLanguage, "describe_issue")} disabled={submitting} className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition-all duration-200 placeholder:text-gray-400 focus:border-[#b4725a] focus:ring-2 focus:ring-[#b4725a]/20 focus:bg-white dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-[#C9A84C] dark:focus:ring-[#C9A84C]/20 dark:focus:bg-[#252525]" />
+        <button onClick={handleSend} disabled={isLoading || submitting || !input.trim()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f392e] text-white transition-all duration-200 hover:bg-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-[#C9A84C] dark:text-black dark:hover:bg-[#d4b45c] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]" aria-label="Send message">
+          <Send size={16} />
+        </button>
+      </div>
+    </>
+  );
+
+  /* ---------- Messages content (shared between initial & active) ---------- */
+  const messagesContent = (
+    <>
+      {messages.map((msg) => (
+        <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div
+            className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+              msg.role === "user"
+                ? "rounded-br-sm bg-[#b4725a] text-white dark:bg-[#C9A84C] dark:text-black"
+                : "rounded-bl-sm bg-gray-100 text-gray-800 dark:bg-[#252525] dark:text-gray-100"
+            }`}
+          >
+            {msg.imageUrl && (
+              <img src={msg.imageUrl} alt="Uploaded issue" className="mb-2 rounded-lg max-h-40 w-full object-cover" />
+            )}
+            {!msg.imagePreview && renderMarkdown(msg.text)}
+            {msg.extracted && (
+              <div className="mt-3 rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">{t(selectedLanguage, "confirm_complaint")}</p>
+                <table className="w-full text-left">
+                  <tbody>
+                    {([
+                      [t(selectedLanguage, "tbl_title"), msg.extracted.title],
+                      [t(selectedLanguage, "tbl_issue"), msg.extracted.issue_type],
+                      [t(selectedLanguage, "tbl_severity"), msg.extracted.severity],
+                      [t(selectedLanguage, "tbl_location"), msg.geoDetails?.formatted_address || t(selectedLanguage, "detecting")],
+                      [t(selectedLanguage, "tbl_desc"), msg.extracted.description],
+                      [t(selectedLanguage, "tbl_digipin"), msg.geoDetails?.digipin || t(selectedLanguage, "detecting")],
+                    ] as [string, string][]).map(([label, value]) => (
+                      <tr key={label} className="border-b border-gray-100 last:border-0 dark:border-[#2a2a2a]">
+                        <td className="py-1 pr-2 font-medium text-gray-500 dark:text-gray-400">{label}</td>
+                        <td className="py-1 text-gray-800 dark:text-gray-200">{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">{t(selectedLanguage, "type_yes")}</p>
+              </div>
+            )}
+            {msg.imagePreview && (
+              <div className="mt-3 w-full max-w-[34rem] rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">{t(selectedLanguage, "confirm_complaint")}</p>
+                <div className={`grid gap-3 ${pendingImageDataUrl ? "grid-cols-[96px_minmax(0,1fr)]" : "grid-cols-1"}`}>
+                  {pendingImageDataUrl && (
+                    <div className="h-24 w-24 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#252525]">
+                      <img src={pendingImageDataUrl} alt="Issue photo" className="h-full w-full object-contain" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-left">
+                      {[
+                        [t(selectedLanguage, "tbl_title"), msg.imagePreview.title],
+                        [t(selectedLanguage, "tbl_issue"), msg.imagePreview.issue_name],
+                        [t(selectedLanguage, "tbl_severity"), `${msg.imagePreview.severity} (${msg.imagePreview.severity_db})`],
+                        [t(selectedLanguage, "tbl_location"), msg.imagePreview.formatted_address],
+                        [t(selectedLanguage, "tbl_desc"), msg.imagePreview.description],
+                        [t(selectedLanguage, "tbl_digipin"), msg.imagePreview.digipin],
+                      ].map(([label, value]) => {
+                        const shouldTrimLongText = !expandedImagePreview[msg.id] && (label === t(selectedLanguage, "tbl_location") || label === t(selectedLanguage, "tbl_desc")) && value.length > 110;
+                        const displayValue = shouldTrimLongText ? `${value.slice(0, 110)}...` : value;
+                        return (
+                          <React.Fragment key={label}>
+                            <p className="py-0.5 font-medium text-gray-500 dark:text-gray-400">{label}</p>
+                            <p className="py-0.5 break-words text-gray-800 dark:text-gray-200">{displayValue}</p>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                    <button type="button" onClick={() => toggleImagePreviewDetails(msg.id)} className="mt-2 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors dark:text-gray-400 dark:hover:bg-[#2a2a2a] dark:hover:text-gray-100">
+                      {expandedImagePreview[msg.id] ? (<><ChevronUp size={13} /> {t(selectedLanguage, "show_less")}</>) : (<><ChevronDown size={13} /> {t(selectedLanguage, "show_full_details")}</>)}
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">{t(selectedLanguage, "type_yes")}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+      {isLoading && (
+        <div className="flex justify-start">
+          <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 dark:bg-[#252525]">
+            <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
+            <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+            <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
+          </div>
+        </div>
+      )}
+      {submitting && (
+        <div className="flex justify-start">
+          <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-600 dark:bg-[#252525] dark:text-gray-300">
+            <Loader2 size={16} className="animate-spin" /> {t(selectedLanguage, "submitting")}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div
       ref={panelRef}
-      className="flex flex-col h-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-[#2a2a2a] dark:bg-[#161616]"
+      className="flex flex-col h-full overflow-hidden bg-gray-50 dark:bg-[#161616]"
     >
-      {/* -- Language Picker -- */}
+      {/* -- Language Picker (centered full-page) -- */}
       {!selectedLanguage && (
-        <div className="flex flex-col items-center justify-center h-full gap-4 p-6 bg-white dark:bg-[#161616]">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Choose your language</h2>
+        <div className="flex flex-col items-center justify-center h-full gap-6 p-6">
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="w-12 h-12 bg-[#C9A84C]"
+              style={{
+                WebkitMaskImage: 'url(/Emblem.svg)',
+                WebkitMaskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskImage: 'url(/Emblem.svg)',
+                maskSize: 'contain',
+                maskRepeat: 'no-repeat',
+                maskPosition: 'center',
+              }}
+            />
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Choose your language</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Select a language to get started</p>
+          </div>
           <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
             {SUPPORTED_LANGUAGES.map((lang) => (
               <button
                 key={lang.code}
                 onClick={() => setSelectedLanguage(lang.code)}
-                className="px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2a2a2a] hover:border-[#b4725a] dark:hover:border-[#C9A84C] hover:bg-[#b4725a]/10 dark:hover:bg-[#C9A84C]/10 transition-all text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#b4725a] dark:hover:text-[#C9A84C]"
+                className="px-4 py-3 rounded-xl border border-gray-200 dark:border-[#2a2a2a] hover:border-[#b4725a] dark:hover:border-[#C9A84C] hover:bg-[#b4725a]/10 dark:hover:bg-[#C9A84C]/10 transition-all text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#b4725a] dark:hover:text-[#C9A84C] bg-white dark:bg-[#1e1e1e] shadow-sm"
               >
                 {lang.name}
               </button>
@@ -1239,302 +1439,74 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
         </div>
       )}
 
-      {/* -- Messages -- */}
+      {/* -- Unified View: Smoothly transitions from Claude-like welcome to active chat -- */}
       {selectedLanguage && (
-        <>
-          <div className="flex justify-end px-4 py-2 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50/50 dark:bg-[#161616]">
+        <div className="flex flex-col h-full relative">
+          {/* Top spacer for initial vertical centering */}
+          <div 
+            className={`transition-[flex-grow] duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] ${isInitialView ? 'flex-grow-[1.5]' : 'flex-grow-0'}`}
+          />
+
+          {/* Language change button - absolutely positioned to not affect centering */}
+          <div className="absolute top-0 right-0 p-4 z-10 transition-opacity duration-300">
             <button
               onClick={() => setSelectedLanguage(null)}
-              className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors bg-white dark:bg-[#1e1e1e] px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-[#333] shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors bg-white/80 backdrop-blur-sm dark:bg-[#1e1e1e]/80 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#333] shadow-sm"
               title="Change Language"
             >
               <Globe size={14} className="text-[#b4725a] dark:text-[#C9A84C]" />
               <span>Change Language</span>
             </button>
           </div>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
-            <div className="flex flex-col justify-end space-y-3 min-h-full">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+
+          {/* Centered greeting container */}
+          <div 
+            ref={greetingRef} 
+            className={`w-full max-w-3xl mx-auto flex flex-col items-center px-4 shrink-0 transition-all duration-500 ease-in-out overflow-hidden transform origin-bottom ${isInitialView ? 'gap-6 opacity-100 max-h-[400px] mb-8 scale-100 translate-y-0 visible' : 'gap-0 opacity-0 max-h-0 mb-0 scale-95 -translate-y-8 invisible'}`}
+          >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "rounded-br-sm bg-[#b4725a] text-white dark:bg-[#C9A84C] dark:text-black"
-                  : "rounded-bl-sm bg-gray-100 text-gray-800 dark:bg-[#252525] dark:text-gray-100"
-              }`}
-            >
-              {/* User-uploaded image thumbnail */}
-              {msg.imageUrl && (
-                <img
-                  src={msg.imageUrl}
-                  alt="Uploaded issue"
-                  className="mb-2 rounded-lg max-h-40 w-full object-cover"
-                />
-              )}
-
-              {!msg.imagePreview && renderMarkdown(msg.text)}
-
-              {/* Text-based extracted complaint summary table */}
-              {msg.extracted && (
-                <div className="mt-3 rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-                  <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">{t(selectedLanguage, "confirm_complaint")}</p>
-                  <table className="w-full text-left">
-                    <tbody>
-                      {(
-                        [
-                          [t(selectedLanguage, "tbl_title"), msg.extracted.title],
-                          [t(selectedLanguage, "tbl_issue"), msg.extracted.issue_type],
-                          [t(selectedLanguage, "tbl_severity"), msg.extracted.severity],
-                          [t(selectedLanguage, "tbl_location"), msg.geoDetails?.formatted_address || t(selectedLanguage, "detecting")],
-                          [t(selectedLanguage, "tbl_desc"), msg.extracted.description],
-                          [t(selectedLanguage, "tbl_digipin"), msg.geoDetails?.digipin || t(selectedLanguage, "detecting")],
-                        ] as [string, string][]
-                      ).map(([label, value]) => (
-                        <tr key={label} className="border-b border-gray-100 last:border-0 dark:border-[#2a2a2a]">
-                          <td className="py-1 pr-2 font-medium text-gray-500 dark:text-gray-400">{label}</td>
-                          <td className="py-1 text-gray-800 dark:text-gray-200">{value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">
-                    {t(selectedLanguage, "type_yes")}
-                  </p>
-                </div>
-              )}
-
-              {/* Image-based ticket preview from FastAPI /analyze */}
-              {msg.imagePreview && (
-                <div className="mt-3 w-full max-w-[34rem] rounded-lg border border-gray-300 bg-white p-3 text-xs dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-                  <p className="mb-2 font-semibold text-gray-700 dark:text-gray-200">{t(selectedLanguage, "confirm_complaint")}</p>
-                  <div className={`grid gap-3 ${pendingImageDataUrl ? "grid-cols-[96px_minmax(0,1fr)]" : "grid-cols-1"}`}>
-                    {pendingImageDataUrl && (
-                      <div className="h-24 w-24 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-[#2a2a2a] dark:bg-[#252525]">
-                        <img
-                          src={pendingImageDataUrl}
-                          alt="Issue photo"
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                    )}
-
-                    <div className="min-w-0">
-                      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-left">
-                        {[
-                          [t(selectedLanguage, "tbl_title"), msg.imagePreview.title],
-                          [t(selectedLanguage, "tbl_issue"), msg.imagePreview.issue_name],
-                          [t(selectedLanguage, "tbl_severity"), `${msg.imagePreview.severity} (${msg.imagePreview.severity_db})`],
-                          [t(selectedLanguage, "tbl_location"), msg.imagePreview.formatted_address],
-                          [t(selectedLanguage, "tbl_desc"), msg.imagePreview.description],
-                          [t(selectedLanguage, "tbl_digipin"), msg.imagePreview.digipin],
-                        ].map(([label, value]) => {
-                          const shouldTrimLongText =
-                            !expandedImagePreview[msg.id] &&
-                            (label === t(selectedLanguage, "tbl_location") || label === t(selectedLanguage, "tbl_desc")) &&
-                            value.length > 110;
-                          const displayValue = shouldTrimLongText ? `${value.slice(0, 110)}...` : value;
-
-                          return (
-                            <React.Fragment key={label}>
-                              <p className="py-0.5 font-medium text-gray-500 dark:text-gray-400">{label}</p>
-                              <p className="py-0.5 break-words text-gray-800 dark:text-gray-200">{displayValue}</p>
-                            </React.Fragment>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleImagePreviewDetails(msg.id)}
-                        className="mt-2 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors dark:text-gray-400 dark:hover:bg-[#2a2a2a] dark:hover:text-gray-100"
-                      >
-                        {expandedImagePreview[msg.id] ? (
-                          <>
-                            <ChevronUp size={13} /> {t(selectedLanguage, "show_less")}
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown size={13} /> {t(selectedLanguage, "show_full_details")}
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="mt-2 text-center font-semibold text-amber-600 dark:text-amber-400">
-                    {t(selectedLanguage, "type_yes")}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {/* Typing indicator */}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 dark:bg-[#252525]">
-              <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
-              <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
-              <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
-            </div>
-          </div>
-        )}
-
-        {/* Submitting state */}
-        {submitting && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-2 text-sm text-gray-600 dark:bg-[#252525] dark:text-gray-300">
-              <Loader2 size={16} className="animate-spin" /> {t(selectedLanguage, "submitting")}
-            </div>
-          </div>
-        )}
-        </div>
-      </div>
-      </>
-      )}
-
-      {/* -- Input bar -- */}
-      {selectedLanguage && (
-      <div className="border-t border-gray-200 bg-white px-3 py-2 dark:border-[#2a2a2a] dark:bg-[#161616]">
-        {hasPending && pendingLocation && (
-          <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-            <div className="mb-2">
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">{t(selectedLanguage, "detected_location")}</p>
-            </div>
-            <div
-              className="overflow-hidden transition-all duration-300 ease-in-out"
+              className="w-14 h-14 bg-[#C9A84C] shrink-0 transition-all duration-500"
               style={{
-                maxHeight: isMapExpanded ? '400px' : '0px',
-                opacity: isMapExpanded ? 1 : 0,
+                WebkitMaskImage: 'url(/Emblem.svg)',
+                WebkitMaskSize: 'contain',
+                WebkitMaskRepeat: 'no-repeat',
+                WebkitMaskPosition: 'center',
+                maskImage: 'url(/Emblem.svg)',
+                maskSize: 'contain',
+                maskRepeat: 'no-repeat',
+                maskPosition: 'center',
               }}
-            >
-              {isMapExpanded && (
-                <LocationPinPicker
-                  key={pendingLocation.timestamp}
-                  lat={pendingLocation.lat}
-                  lng={pendingLocation.lng}
-                  onPinMove={(lat, lng) => {
-                    setPendingLocation((prev) => ({
-                      lat,
-                      lng,
-                      accuracy: prev?.accuracy ?? 9999,
-                      timestamp: new Date().toISOString(),
-                    }));
-                    setLocationConfirmed(false);
-                  }}
-                />
-              )}
-            </div>
-            <div className="mt-2 flex items-start justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setLocationConfirmed(true)}
-                  className="rounded-md bg-[#4f392e] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#b4725a] transition-all duration-200 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-[#C9A84C] dark:text-black dark:hover:bg-[#d4b45c] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
-                >
-                  {t(selectedLanguage, "confirm_location_btn")}
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const loc = await getLocation();
-                    setPendingLocation(loc);
-                    setLocationConfirmed(false);
-                  }}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 dark:border-[#2a2a2a] dark:text-gray-200 dark:hover:bg-[#2a2a2a] dark:focus:ring-[#2a2a2a] dark:focus:ring-offset-[#161616]"
-                >
-                  {t(selectedLanguage, "move_pin_gps")}
-                </button>
-                <span className={`text-[11px] transition-colors duration-200 ${locationConfirmed ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`}>
-                  {locationConfirmed ? t(selectedLanguage, "location_confirmed") : t(selectedLanguage, "move_pin_if_needed")}
-                </span>
+            />
+            {messages.length > 0 && (
+              <div className="rounded-2xl bg-white dark:bg-[#1e1e1e] px-6 py-4 text-sm leading-relaxed text-gray-800 dark:text-gray-100 shadow-sm border border-gray-100 dark:border-[#2a2a2a] max-w-lg text-center whitespace-pre-wrap shrink-0">
+                {renderMarkdown(messages[0].text)}
               </div>
+            )}
+          </div>
 
-              <button
-                type="button"
-                onClick={() => setIsMapExpanded(!isMapExpanded)}
-                className="flex shrink-0 items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-[#2a2a2a]"
-              >
-                {isMapExpanded ? (
-                  <>
-                    <ChevronDown size={14} />
-                    {t(selectedLanguage, "hide_map")}
-                  </>
-                ) : (
-                  <>
-                    <ChevronUp size={14} />
-                    {t(selectedLanguage, "show_map")}
-                  </>
-                )}
-              </button>
+          {/* Messages area (Expands when active) */}
+          <div 
+            ref={scrollRef} 
+            className={`w-full transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] min-h-0 overflow-y-auto px-4 ${isInitialView ? 'flex-[0_1_0%] opacity-0 h-0 py-0' : 'flex-[1_1_0%] opacity-100 py-3'}`}
+            style={{ display: 'flex', flexDirection: 'column' }}
+          >
+            <div ref={messagesAreaRef} className={`max-w-3xl mx-auto flex flex-col justify-end space-y-3 min-h-full w-full transition-opacity duration-300 delay-300 ${isInitialView ? 'opacity-0' : 'opacity-100'}`}>
+              {messagesContent}
             </div>
           </div>
-        )}
-        {/* Transcribing indicator */}
-        {isTranscribing && (
-          <div className="mb-2 flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
-            <Loader2 size={14} className="animate-spin" />
-            {t(selectedLanguage, "transcribing")}
+
+          {/* Bottom input bar */}
+          <div ref={inputBarRef} className="flex-shrink-0 px-4 pb-4 pt-2 relative z-20">
+            <div className="max-w-3xl mx-auto rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-3 shadow-lg">
+              {inputBarContent}
+            </div>
           </div>
-        )}
-        <div className="flex items-center gap-2">
-          {/* + button for image upload */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || submitting || isRecording || isTranscribing}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-all duration-200 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
-            aria-label="Upload photo"
-            title="Upload a photo of the issue"
-          >
-            <Plus size={18} />
-          </button>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleImageSelect}
-            className="hidden"
+          {/* Bottom spacer for initial vertical centering */}
+          <div 
+            className={`transition-[flex-grow] duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] ${isInitialView ? 'flex-grow-[1]' : 'flex-grow-0'}`}
           />
-
-          {/* 🎤 Mic button for voice input */}
-          <button
-            ref={micBtnRef}
-            onClick={handleMicClick}
-            disabled={isLoading || submitting || isTranscribing}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-40 ${
-              isRecording
-                ? "border-red-400 bg-red-500 text-white hover:bg-red-600 dark:border-red-500 dark:bg-red-600 dark:hover:bg-red-700 focus:ring-red-400 dark:focus:ring-red-500 dark:focus:ring-offset-[#161616]"
-                : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-[#b4725a] hover:text-white hover:border-[#b4725a] hover:shadow-md dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#C9A84C] dark:hover:text-black dark:hover:border-[#C9A84C] focus:ring-[#b4725a] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
-            }`}
-            aria-label={isRecording ? "Stop recording" : "Start voice input"}
-            title={isRecording ? "Tap to stop recording" : "Tap to speak your complaint"}
-          >
-            {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
-          </button>
-
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={duplicateContext ? t(selectedLanguage, "type_upvote") : hasPending ? t(selectedLanguage, "confirm_location_prompt") : t(selectedLanguage, "describe_issue")}
-            disabled={submitting}
-            className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-800 outline-none transition-all duration-200 placeholder:text-gray-400 focus:border-[#b4725a] focus:ring-2 focus:ring-[#b4725a]/20 focus:bg-white dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-[#C9A84C] dark:focus:ring-[#C9A84C]/20 dark:focus:bg-[#252525]"
-          />
-          <button
-            onClick={handleSend}
-            disabled={isLoading || submitting || !input.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f392e] text-white transition-all duration-200 hover:bg-[#b4725a] hover:shadow-md disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-[#b4725a] focus:ring-offset-2 dark:bg-[#C9A84C] dark:text-black dark:hover:bg-[#d4b45c] dark:focus:ring-[#C9A84C] dark:focus:ring-offset-[#161616]"
-            aria-label="Send message"
-          >
-            <Send size={16} />
-          </button>
         </div>
-      </div>
       )}
     </div>
   );
