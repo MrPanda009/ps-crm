@@ -32,6 +32,7 @@ try:
 except IndexError:
     ROOT_DIR = Path(__file__).resolve().parent  # Docker: /app
 load_dotenv(ROOT_DIR / ".env", override=False)
+load_dotenv(ROOT_DIR / "apps" / "api" / ".env", override=False)
 load_dotenv(ROOT_DIR / "apps" / "web" / ".env.local", override=False)
 
 GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY")

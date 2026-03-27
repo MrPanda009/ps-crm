@@ -577,6 +577,112 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
 
   /* ----- conversation history for Gemini (role: user | model) ----- */
   const historyRef = useRef<ChatMessage[]>([]);
+  const sessionIdRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
+  const [isHistoryInitialized, setIsHistoryInitialized] = useState(false);
+
+  // Initialize session and history — tied to logged-in user via localStorage
+  useEffect(() => {
+    const initializeChat = async () => {
+
+      // 1. Get current user to tie session to their account
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      if (!userId) {
+        setIsHistoryInitialized(true);
+        return;
+      }
+      userIdRef.current = userId;
+
+      // 2. Use user-specific key in localStorage (persists across tabs & reloads)
+      const storageKey = `jansamadhan_session_id_${userId}`;
+      let sid = localStorage.getItem(storageKey);
+      if (!sid) {
+        sid = crypto.randomUUID();
+        localStorage.setItem(storageKey, sid);
+      }
+      sessionIdRef.current = sid;
+
+      // 3. Fetch history from Redis via backend if we don't have messages yet
+      if (messages.length === 0) {
+        try {
+          const res = await fetch(`${API_URL}/api/chat/history/${sid}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.messages && data.messages.length > 0) {
+              setMessages(data.messages);
+              // Reconstruct historyRef for Gemini
+              historyRef.current = data.messages
+                .filter((m: DisplayMessage) => m.role === "user" || m.role === "bot")
+                .map((m: DisplayMessage) => ({
+                  role: m.role === "bot" ? "model" : "user",
+                  text: m.text,
+                }));
+
+              setIsInitialView(false);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch chat history:", err);
+        } finally {
+          setIsHistoryInitialized(true);
+        }
+      } else {
+        setIsHistoryInitialized(true);
+      }
+    };
+
+    initializeChat();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear chat history from Redis & localStorage on logout
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT") {
+        // Clear Redis-cached history
+        if (sessionIdRef.current) {
+          try {
+            await fetch(`${API_URL}/api/chat/history/${sessionIdRef.current}`, {
+              method: "DELETE",
+            });
+          } catch { /* best-effort cleanup */ }
+        }
+        
+        // Clear the specific user's session from localStorage
+        if (userIdRef.current) {
+          localStorage.removeItem(`jansamadhan_session_id_${userIdRef.current}`);
+          userIdRef.current = null;
+        }
+        
+        sessionIdRef.current = null;
+
+        setMessages([]);
+        setIsInitialView(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync messages to Redis whenever they change
+  useEffect(() => {
+    const syncHistory = async () => {
+      if (!sessionIdRef.current || !isHistoryInitialized || messages.length === 0) return;
+      
+      try {
+        await fetch(`${API_URL}/api/chat/history/${sessionIdRef.current}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages }),
+        });
+      } catch (err) {
+        console.error("Failed to sync chat history:", err);
+      }
+    };
+
+    // Debounce sync slightly to avoid excessive writes
+    const timer = setTimeout(syncHistory, 1000);
+    return () => clearTimeout(timer);
+  }, [messages]);
 
   /* ----- helpers ----- */
   const uid = () => Math.random().toString(36).slice(2, 10);

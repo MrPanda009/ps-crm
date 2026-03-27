@@ -146,11 +146,62 @@ def get_citizen_id_from_token(authorization: Optional[str]) -> str:
         payload_b64 += "=" * (4 - len(payload_b64) % 4)
         payload = json.loads(base64.urlsafe_b64decode(payload_b64))
         citizen_id = payload.get("sub")
-        if not citizen_id:
-            raise HTTPException(status_code=401, detail="JWT does not contain user id (sub).")
         return citizen_id
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Failed to decode JWT: {str(e)}")
+
+
+class ChatHistory(BaseModel):
+    messages: List[Dict[str, Any]]
+
+
+@app.get("/api/chat/history/{session_id}")
+async def get_chat_history(session_id: str):
+    """Retrieve chat history from Redis for a given session."""
+    if not redis_client:
+        return {"messages": []}
+    
+    try:
+        data = redis_client.get(f"chat:history:{session_id}")
+        if data:
+            return {"messages": json.loads(data)}
+        return {"messages": []}
+    except Exception as e:
+        print(f"Redis chat history read error: {e}")
+        return {"messages": []}
+
+
+@app.post("/api/chat/history/{session_id}")
+async def save_chat_history(session_id: str, history: ChatHistory):
+    """Save chat history to Redis with a 24-hour TTL."""
+    if not redis_client:
+        return {"status": "ok"}
+    
+    try:
+        # Store for 24 hours (persists across browser sessions while logged in)
+        redis_client.setex(
+            f"chat:history:{session_id}",
+            86400, 
+            json.dumps(history.messages)
+        )
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Redis chat history write error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save chat history")
+
+
+@app.delete("/api/chat/history/{session_id}")
+async def delete_chat_history(session_id: str):
+    """Delete chat history from Redis on logout."""
+    if not redis_client:
+        return {"status": "ok"}
+    
+    try:
+        redis_client.delete(f"chat:history:{session_id}")
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Redis chat history delete error: {e}")
+        return {"status": "ok"}
 
 
 
