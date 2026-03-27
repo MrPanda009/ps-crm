@@ -1198,6 +1198,177 @@ async def get_authority_workers(
 
     return {"source": "database", **payload}
 
+# =========================================================
+# 8i. WORKER DASHBOARD (Consolidated + Redis)
+# =========================================================
+
+WORKER_COMPLAINT_SELECT = (
+    "id, ticket_id, title, assigned_worker_id, description, address_text, "
+    "severity, status, created_at, resolved_at, location, categories(name)"
+)
+
+
+@app.get("/api/worker/dashboard")
+async def get_worker_dashboard(
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Consolidated worker dashboard endpoint.
+    Returns worker profile, complaints, and activity feed in one payload.
+    Used by both worker/page.tsx (dashboard) and worker/tasks/page.tsx.
+    """
+    worker_id = get_citizen_id_from_token(authorization)
+
+    cache_key = f"worker:dashboard:{worker_id}"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return {"source": "cache", **json.loads(cached)}
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    # Step 1: Verify worker role
+    try:
+        profile_res = await asyncio.to_thread(
+            lambda: supabase.table("profiles")
+            .select("id, email, role")
+            .eq("id", worker_id)
+            .eq("role", "worker")
+            .maybe_single()
+            .execute()
+        )
+        profile_data = profile_res.data
+        if not profile_data:
+            raise HTTPException(status_code=403, detail="Access denied. Worker role required.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Profile check failed: {str(e)}")
+
+    # Step 2: Fetch worker profile, complaints, and activity in parallel
+    try:
+        [worker_profile_res, complaints_res, history_res] = await asyncio.gather(
+            asyncio.to_thread(
+                lambda: supabase.table("worker_profiles")
+                .select("last_location")
+                .eq("worker_id", worker_id)
+                .maybe_single()
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("complaints")
+                .select(WORKER_COMPLAINT_SELECT)
+                .eq("assigned_worker_id", worker_id)
+                .in_("status", ["assigned", "in_progress", "resolved"])
+                .order("created_at", desc=True)
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("ticket_history")
+                .select("id, complaint_id, old_status, new_status, note, created_at")
+                .eq("changed_by", worker_id)
+                .order("created_at", desc=True)
+                .limit(10)
+                .execute()
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Worker dashboard fetch failed: {str(e)}")
+
+    payload = {
+        "workerId": worker_id,
+        "workerProfile": worker_profile_res.data,
+        "complaints": complaints_res.data or [],
+        "activityHistory": history_res.data or [],
+    }
+
+    # Cache for 2 minutes (worker data changes frequently with task updates)
+    if redis_client:
+        try:
+            redis_client.setex(cache_key, 120, json.dumps(payload))
+        except Exception as e:
+            print(f"Redis write error: {e}")
+
+    return {"source": "database", **payload}
+
+
+@app.get("/api/worker/profile")
+async def get_worker_profile_data(
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Consolidated worker profile endpoint.
+    Returns personal profile, worker role profile, comprehensive complaints, and ticket history.
+    Used by /worker/profile for performance metrics and trends.
+    """
+    worker_id = get_citizen_id_from_token(authorization)
+    if not worker_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    cache_key = f"worker:profile:v2:{worker_id}"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return {"source": "cache", **json.loads(cached)}
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    try:
+        [profile_res, worker_profile_res, complaints_res, history_res] = await asyncio.gather(
+            asyncio.to_thread(
+                lambda: supabase.table("profiles")
+                .select("full_name, email, city")
+                .eq("id", worker_id)
+                .maybe_single()
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("worker_profiles")
+                .select("department, joined_at, availability, total_resolved, current_complaint_id")
+                .eq("worker_id", worker_id)
+                .maybe_single()
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("complaints")
+                .select("id, status, created_at, resolved_at, updated_at, sla_deadline, assigned_worker_id")
+                .eq("assigned_worker_id", worker_id)
+                .execute()
+            ),
+            asyncio.to_thread(
+                lambda: supabase.table("ticket_history")
+                .select("id, note, created_at")
+                .eq("changed_by", worker_id)
+                .order("created_at", desc=True)
+                .limit(200)
+                .execute()
+            ),
+        )
+    except Exception as e:
+        print(f"Parallel fetch error in /api/worker/profile: {e}")
+        raise HTTPException(status_code=500, detail=f"Data fetch failed: {str(e)}")
+
+    if not profile_res.data or not worker_profile_res.data:
+        raise HTTPException(status_code=404, detail="Worker profile not found.")
+
+    payload = {
+        "profile": profile_res.data,
+        "workerProfile": worker_profile_res.data,
+        "complaints": complaints_res.data or [],
+        "ticketHistory": history_res.data or [],
+    }
+
+    # Cache for 5 minutes (stats change slower on profile than dashboard)
+    if redis_client:
+        try:
+            redis_client.setex(cache_key, 300, json.dumps(payload))
+        except Exception as e:
+            print(f"Redis write error: {e}")
+
+    return {"source": "database", **payload}
+
 
 # =========================================================
 # 9. ROOT MESSAGE

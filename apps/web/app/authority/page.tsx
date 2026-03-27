@@ -145,6 +145,8 @@ function transformPayload(payload: DashboardPayload) {
   return { complaints, workers: mappedWorkers, stats, allTrend, department }
 }
 
+// Cache initialization moved to useEffect to avoid hydration mismatches
+
 export default function AuthorityDashboardPage() {
   const [complaints,  setComplaints]  = useState<AuthorityComplaintRow[]>([])
   const [workers,     setWorkers]     = useState<WorkerOption[]>([])
@@ -214,7 +216,7 @@ export default function AuthorityDashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Instant Load from localStorage, then fresh fetch
+  // 1. Instant UI: Load from cache (client-side only to avoid hydration mismatch)
   useEffect(() => {
     try {
       const cached = localStorage.getItem(CACHE_KEY)
@@ -223,9 +225,12 @@ export default function AuthorityDashboardPage() {
         setLoading(false)
       }
     } catch {}
+  }, [applyPayload])
 
+  // 2. Fresh fetch
+  useEffect(() => {
     void load()
-  }, [load, applyPayload])
+  }, [load])
 
   useEffect(() => {
     if (!department) return
