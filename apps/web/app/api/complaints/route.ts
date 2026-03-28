@@ -13,14 +13,16 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY ?? supabaseAnonKey;
 const mapplsApiKey = process.env.MAPPLS_API_KEY ?? process.env.NEXT_PUBLIC_MAPPLS_API_KEY ?? "";
 const reverseGeocodeCache = new Map<string, ReverseGeo>();
-const ALLOWED_STATUSES = ["submitted", "verified", "assigned", "in_progress", "resolved", "closed"] as const;
+const ALLOWED_STATUSES = ["submitted", "verified", "assigned", "in_progress", "reopened", "pending_closure", "resolved", "closed"] as const;
 type LifecycleStatus = (typeof ALLOWED_STATUSES)[number];
-type DbStatus = Database["public"]["Enums"]["complaint_status"];
+type DbStatus = Database["public"]["Enums"]["complaint_status"] | "pending_closure" | "reopened";
 const DB_STATUS_BY_LIFECYCLE: Record<LifecycleStatus, DbStatus> = {
   submitted: "submitted",
   verified: "under_review",
   assigned: "assigned",
   in_progress: "in_progress",
+  reopened: "reopened",
+  pending_closure: "pending_closure",
   resolved: "resolved",
   closed: "resolved",
 };
@@ -116,6 +118,10 @@ interface DuplicateMatch {
 }
 
 function canTransitionStatus(current: string, next: string): boolean {
+  // Allow citizen to reject pending_closure back to in_progress
+  if (current === "pending_closure" && next === "in_progress") return true;
+  if (current === "pending_closure" && next === "reopened") return true;
+  if (current === "resolved" && next === "reopened") return true;
   const order = ALLOWED_STATUSES;
   const from = order.indexOf(current as (typeof ALLOWED_STATUSES)[number]);
   const to = order.indexOf(next as (typeof ALLOWED_STATUSES)[number]);
@@ -128,7 +134,10 @@ function toLifecycleStatus(status: unknown): LifecycleStatus {
   if (status === "under_review") return "verified";
   if (status === "assigned") return "assigned";
   if (status === "in_progress") return "in_progress";
+  if (status === "reopened") return "reopened";
+  if (status === "pending_closure") return "pending_closure";
   if (status === "resolved") return "resolved";
+  if (status === "closed") return "closed";
   return "submitted";
 }
 
@@ -692,23 +701,54 @@ export async function PUT(req: NextRequest) {
     );
   }
 
+  // Use the new RPC to perform the update with the citizen's ID context.
+  // This satisfies the ticket_history.changed_by NOT NULL constraint which relies on auth.uid().
+  const authorization = req.headers.get("authorization") ?? "";
+  const bearerPrefix = "Bearer ";
+  const token = authorization.startsWith(bearerPrefix)
+    ? authorization.slice(bearerPrefix.length).trim()
+    : "";
+
+  let citizenId: string | null = null;
+  if (token) {
+    const authClient = getAuthClient();
+    const { data: { user } } = await authClient.auth.getUser(token);
+    citizenId = user?.id ?? null;
+  }
+
+  if (!citizenId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { data: updated, error: updateError } = await supabase
-    .from("complaints")
-    .update({ status: DB_STATUS_BY_LIFECYCLE[body.status] })
-    .eq("id", body.complaint_id)
-    .select("id, ticket_id, status, updated_at")
-    .single();
+    .rpc("update_complaint_status_citizen", {
+      p_complaint_id: body.complaint_id,
+      p_status: DB_STATUS_BY_LIFECYCLE[body.status],
+      p_citizen_id: citizenId,
+    });
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  // The RPC returns {success: boolean, error: string}
+  if (updated && (updated as any).success === false) {
+    return NextResponse.json({ error: (updated as any).error }, { status: 403 });
+  }
+
+  // Need to fetch the updated record to match previous return format
+  const { data: finalRecord } = await supabase
+    .from("complaints")
+    .select("id, ticket_id, status, updated_at")
+    .eq("id", body.complaint_id)
+    .single();
+
   return NextResponse.json(
     {
       success: true,
       complaint: {
-        ...updated,
-        status: toLifecycleStatus(updated?.status),
+        ...finalRecord,
+        status: toLifecycleStatus(finalRecord?.status),
       },
     },
     { status: 200 },

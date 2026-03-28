@@ -20,6 +20,7 @@ function statusClasses(status: string): string {
   if (normalized === "submitted") return "bg-amber-100 text-amber-700";
   if (normalized === "assigned") return "bg-blue-100 text-blue-700";
   if (normalized === "in_progress" || normalized === "under_review") return "bg-purple-100 text-purple-700";
+  if (normalized === "reopened") return "bg-red-100 text-red-700 font-bold animate-pulse";
   if (normalized === "resolved") return "bg-green-100 text-green-700";
   if (normalized === "rejected") return "bg-red-100 text-red-700";
   return "bg-gray-100 text-gray-600";
@@ -143,7 +144,7 @@ export default function WorkerTasksPage() {
 
     const upsertTask = (prev: ComplaintRow[], incoming: ComplaintRow, currentWorkerId: string): ComplaintRow[] => {
       // Only keep assigned, in_progress, or resolved tickets in this view
-      const isValidStatus = ["assigned", "in_progress", "resolved"].includes(incoming.status || "");
+      const isValidStatus = ["assigned", "in_progress", "resolved", "reopened"].includes(incoming.status || "");
       const isAssignedToCurrentWorker = incoming.assigned_worker_id === currentWorkerId;
       
       const existingIndex = prev.findIndex((item) => item.id === incoming.id);

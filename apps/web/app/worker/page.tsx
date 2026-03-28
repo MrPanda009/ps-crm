@@ -278,7 +278,7 @@ export default function WorkerDashboardPage() {
   const urgentTask = useMemo(() => (sortedAssignedTasks.length > 0 ? sortedAssignedTasks[0] : null), [sortedAssignedTasks])
 
   const updateTaskStatus = useCallback(
-    async (complaintId: string, nextStatus: "in_progress" | "resolved" | "escalated", note?: string) => {
+    async (complaintId: string, nextStatus: "in_progress" | "pending_closure" | "resolved" | "escalated", note?: string) => {
       if (!workerId) return
 
       const task = tasks.find((item) => item.id === complaintId)
@@ -287,7 +287,7 @@ export default function WorkerDashboardPage() {
       const { error: updateError } = await supabase
         .from("complaints")
         .update({
-          status: nextStatus,
+          status: nextStatus as any,
           resolved_at: nextStatus === "resolved" ? new Date().toISOString() : null,
         })
         .eq("id", complaintId)
@@ -310,12 +310,28 @@ export default function WorkerDashboardPage() {
         setError("Task updated, but activity log write failed.")
       }
 
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+          await fetch(`${apiUrl}/api/worker/dashboard/invalidate`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+        }
+      } catch (err) {
+        console.error("Cache invalidation failed:", err)
+      }
+
       if (nextStatus === "in_progress") {
         await supabase
           .from("worker_profiles")
           .update({ current_complaint_id: complaintId, availability: "busy" })
           .eq("worker_id", workerId)
       }
+
+      // pending_closure: worker stays busy, ticket is awaiting citizen confirmation
+      // Don't clear current_complaint_id or set availability to available
 
       if (nextStatus === "resolved") {
         await supabase
@@ -338,9 +354,27 @@ export default function WorkerDashboardPage() {
 
   const handleCompleteTask = useCallback(
     async (complaintId: string) => {
-      await updateTaskStatus(complaintId, "resolved", "Completed from worker dashboard")
+      await updateTaskStatus(complaintId, "pending_closure", completionNote.trim() || "Completed from worker dashboard")
+
+      // Trigger WhatsApp notification to the citizen
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+          await fetch(`${apiUrl}/api/notify/closure-confirmation`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ complaint_id: complaintId }),
+          })
+        }
+      } catch (err) {
+        console.error("WhatsApp notification failed (non-blocking):", err)
+      }
     },
-    [updateTaskStatus],
+    [updateTaskStatus, completionNote],
   )
 
   const handleUpdateProgress = useCallback(
@@ -500,7 +534,7 @@ export default function WorkerDashboardPage() {
                   await handleUpdateProgress(ticketId, note)
                 }}
                 onStatusChange={async (ticketId, newStatus) => {
-                  await updateTaskStatus(ticketId, newStatus as "in_progress" | "resolved" | "escalated")
+                  await updateTaskStatus(ticketId, newStatus as "in_progress" | "pending_closure" | "resolved" | "escalated")
                 }}
                 onMarkCompleted={(_ticketId) => setIsCompletionModalOpen(true)}
               />
@@ -520,7 +554,7 @@ export default function WorkerDashboardPage() {
           <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-lg sm:p-5 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Complete Ticket</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Ticket {displayTask.ticketId} will be marked completed. Photo upload is reserved for the next phase.
+              Ticket {displayTask.ticketId} will be sent to the citizen for confirmation before final closure.
             </p>
 
             <label className="mt-4 block text-xs font-medium text-gray-600 dark:text-gray-300">Proof image (future flow)</label>

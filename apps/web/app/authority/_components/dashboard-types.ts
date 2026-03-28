@@ -8,6 +8,7 @@ export type ComplaintStatus =
   | "resolved"
   | "rejected"
   | "escalated"
+  | "reopened"
 
 export type SeverityLevel = "L1" | "L2" | "L3" | "L4"
 
@@ -51,7 +52,7 @@ export type DashboardStats = {
 }
 
 export const PENDING_STATUSES:   ComplaintStatus[] = ["submitted", "under_review"]
-export const ACTIVE_STATUSES:    ComplaintStatus[] = ["assigned", "in_progress"]
+export const ACTIVE_STATUSES:    ComplaintStatus[] = ["assigned", "in_progress", "reopened"]
 export const ESCALATED_STATUSES: ComplaintStatus[] = ["escalated"]
 export const URGENT_SEVERITIES:  SeverityLevel[]   = ["L3", "L4"]
 
@@ -122,6 +123,7 @@ export const STATUS_META: Record<ComplaintStatus, { label: string; badge: string
   resolved:     { label: "Resolved",     badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300", step: 5 },
   rejected:     { label: "Rejected",     badge: "bg-red-50 text-red-600 ring-1 ring-red-200 dark:bg-red-900/30 dark:text-red-400",                  step: 0 },
   escalated:    { label: "Escalated",    badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-900/30 dark:text-purple-300",   step: 6 },
+  reopened:     { label: "Reopened",     badge: "bg-red-100 text-red-700 ring-1 ring-red-200 font-bold dark:bg-red-900/40 dark:text-red-300 animate-pulse", step: 4 },
 }
 
 export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
@@ -132,6 +134,7 @@ export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
   resolved:     "#10b981",
   rejected:     "#ef4444",
   escalated:    "#a855f7",
+  reopened:     "#ef4444",
 }
 
 // ── SLA helper ────────────────────────────────────────────────────────────────
