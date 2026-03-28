@@ -20,6 +20,32 @@ except ModuleNotFoundError:
 DEFAULT_MODEL = str(Path(__file__).parent.parent / "models/best.onnx")
 MODEL_PATH = os.getenv("MODEL_PATH", DEFAULT_MODEL)
 
+def download_model_if_missing():
+    """
+    If the model file is missing, try to download it from a URL provided in MODEL_URL.
+    This solves the GitHub 100MB push limit issue.
+    """
+    model_path = Path(MODEL_PATH)
+    model_url = os.getenv("MODEL_URL")
+    
+    if not model_path.exists() and model_url:
+        print(f"DEBUG: Model file not found at {model_path}. Attempting download from {model_url}...")
+        try:
+            import requests
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            response = requests.get(model_url, stream=True, timeout=300)
+            response.raise_for_status()
+            with open(model_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print(f"DEBUG: Model downloaded successfully to {model_path}")
+        except Exception as e:
+            print(f"ERROR: Failed to download model: {e}")
+            print(traceback.format_exc())
+
+# Run download check before startup
+download_model_if_missing()
+
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="JanSamadhan AI Service", version="1.0.0")
