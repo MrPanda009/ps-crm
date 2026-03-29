@@ -43,67 +43,6 @@ export default function SurveillancePage() {
 
   useEffect(() => {
     fetchCameras();
-
-    // Set up Realtime Subscription for seamless updates
-    const channel = supabase
-      .channel('cctv-cameras-changes')
-      .on(
-        'postgres_changes' as any,
-        {
-          event: '*',
-          schema: 'public',
-          table: 'cctv_cameras',
-        },
-        async (payload: any) => {
-          console.log('[SURVEILLANCE][REALTIME_UPDATE]', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            const cam = payload.new;
-            const newCam = {
-              camera_id: cam.id,
-              camera_name: cam.name,
-              road_type: cam.road_type,
-              latitude: cam.latitude,
-              longitude: cam.longitude,
-              digipin: cam.digipin,
-              video_url: cam.video_url,
-              status: cam.last_status || 'Idle',
-              verification_result: cam.verification_result || undefined,
-            };
-            setCameras(prev => {
-              // Avoid duplicates if fetchCameras is also running
-              if (prev.some(c => c.camera_id === newCam.camera_id)) return prev;
-              return [...prev, newCam].sort((a, b) => 
-                (a.camera_id || '').localeCompare(b.camera_id || '')
-              );
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            const cam = payload.new;
-            setCameras(prev => prev.map(c => 
-              c.camera_id === cam.id 
-                ? {
-                    ...c,
-                    camera_name: cam.name,
-                    road_type: cam.road_type,
-                    latitude: cam.latitude,
-                    longitude: cam.longitude,
-                    digipin: cam.digipin,
-                    video_url: cam.video_url,
-                    status: cam.last_status || 'Idle',
-                    verification_result: cam.verification_result || undefined,
-                  }
-                : c
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setCameras(prev => prev.filter(c => c.camera_id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const fetchCameras = async () => {

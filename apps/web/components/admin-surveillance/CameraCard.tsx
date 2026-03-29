@@ -56,7 +56,34 @@ export const CameraCard: React.FC<CameraCardProps> = ({
   }, [data, isAddMode]);
 
   // Real-time listener: auto-activate dropdown when worker triggers Pending Verification
+  useEffect(() => {
+    if (isAddMode || !localData.camera_id) return;
 
+    const channel = supabase
+      .channel(`camera-status-${localData.camera_id}`)
+      .on(
+        'postgres_changes' as any,
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'cctv_cameras',
+          filter: `id=eq.${localData.camera_id}`,
+        },
+        (payload: any) => {
+          const newStatus = payload.new?.last_status as CameraStatus | undefined;
+          if (newStatus) {
+            setLocalData(prev => ({ ...prev, status: newStatus }));
+            if (onUpdate && localData.camera_id) {
+              onUpdate(localData.camera_id, { status: newStatus });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAddMode, localData.camera_id]);
 
   // --- Logic ---
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';

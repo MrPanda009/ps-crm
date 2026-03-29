@@ -191,37 +191,6 @@ class CameraAnalyzeRequest(BaseModel):
     camera_id: str
 
 
-# Helper for Cache Invalidation
-def invalidate_complaint_caches(citizen_id: Optional[str] = None):
-    """
-    Invalidates all relevant Redis caches when a new complaint is created
-    or an existing one is modified.
-    """
-    if not redis_client:
-        return
-    try:
-        if citizen_id:
-            redis_client.delete(f"user:tickets:{citizen_id}")
-        
-        # Invalidate dashboard stats
-        redis_client.delete("admin:stats:global")
-        
-        # Invalidate nearby tickets map
-        redis_client.delete("global:citizen:nearby_tickets")
-
-        # Bulk invalidate patterns
-        patterns = ["admin:complaints:*", "authority:dashboard:*"]
-        for pattern in patterns:
-            try:
-                for key in redis_client.scan_iter(pattern):
-                    redis_client.delete(key)
-            except Exception:
-                pass
-                
-        print(f"[Redis] Invalidation clear for {citizen_id or 'global'}")
-    except Exception as e:
-        print(f"[Redis Cache Invalidation Error] {e}")
-
 
 @app.post("/cctv/analyze_live")
 async def cctv_analyze_live(
@@ -248,12 +217,6 @@ async def cctv_analyze_live(
                 timeout=60.0
             )
             data = resp.json()
-            
-            # Target Invalidation: If a ticket was formed or duplicate found, clear caches
-            cctv_status = data.get("status")
-            if resp.status_code == 200 and cctv_status in ["ticket_created", "duplicate_prevented"]:
-                invalidate_complaint_caches() # Pass citizen_id if known, but CCTV is usually system-wide
-
             return JSONResponse(status_code=resp.status_code, content=data)
         except Exception as e:
             print(f"[AI Proxy Error] {e}")
@@ -751,8 +714,15 @@ async def confirm(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database insert failed: {str(e)}")
 
-    # Clear Redis Cache for this user + dashboards
-    invalidate_complaint_caches(citizen_id)
+    # Clear Redis Cache for this user + admin complaints
+    if redis_client:
+        try:
+            redis_client.delete(f"user:tickets:{citizen_id}")
+            # Invalidate all admin complaint cache keys so dashboard reflects new ticket
+            for key in redis_client.scan_iter("admin:complaints:*"):
+                redis_client.delete(key)
+        except Exception as e:
+            print(f"Redis cache invalidation failed: {e}")
 
     if not response.data:
         raise HTTPException(status_code=500, detail="Database insert returned no data.")
