@@ -213,21 +213,32 @@ export function getUrgentTickets(
 
 export function getStatusBreakdown(
   complaints: AuthorityComplaintRow[]
-): { status: ComplaintStatus; label: string; count: number; color: string }[] {
-  const map: Partial<Record<ComplaintStatus, number>> = {}
+): { status: ComplaintStatus | string; label: string; count: number; color: string }[] {
+  const map: Record<string, number> = {}
   for (const c of complaints) {
-    if (c.status === "rejected") continue
-    map[c.status] = (map[c.status] ?? 0) + 1
+    const statusKey = c.status ?? "unknown"
+    if (statusKey === "rejected") continue
+    if (!STATUS_META[statusKey as ComplaintStatus]) {
+      // Unexpected status from backend; keep it in breakdown with a fallback label/color
+      map[statusKey] = (map[statusKey] ?? 0) + 1
+      continue
+    }
+    map[statusKey] = (map[statusKey] ?? 0) + 1
   }
-  return (Object.entries(map) as [ComplaintStatus, number][])
+
+  return Object.entries(map)
     .filter(([, count]) => count > 0)
     .sort((a, b) => b[1] - a[1])
-    .map(([status, count]) => ({
-      status,
-      label: STATUS_META[status].label,
-      count,
-      color: STATUS_CHART_COLOR[status],
-    }))
+    .map(([status, count]) => {
+      const knownStatus = status as ComplaintStatus
+      const meta = STATUS_META[knownStatus]
+      return {
+        status,
+        label: meta?.label ?? `${status}`,
+        count,
+        color: STATUS_CHART_COLOR[knownStatus] ?? "#9ca3af",
+      }
+    })
 }
 
 export function timeAgo(dateStr: string): string {
