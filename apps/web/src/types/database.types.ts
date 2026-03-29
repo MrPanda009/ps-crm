@@ -849,6 +849,14 @@ export type Database = {
         Args: { p_complaint_id: string }
         Returns: undefined
       }
+      update_complaint_status_citizen: {
+        Args: {
+          p_complaint_id: string
+          p_status: string
+          p_citizen_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       complaint_source: "citizen" | "system"
@@ -861,6 +869,7 @@ export type Database = {
         | "resolved"
         | "rejected"
         | "escalated"
+        | "reopened"
       severity_level: "L1" | "L2" | "L3" | "L4"
       worker_availability: "available" | "busy" | "inactive"
     }
@@ -1003,6 +1012,7 @@ export const Constants = {
         "resolved",
         "rejected",
         "escalated",
+        "reopened",
       ],
       severity_level: ["L1", "L2", "L3", "L4"],
       worker_availability: ["available", "busy", "inactive"],

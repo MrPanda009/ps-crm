@@ -25,6 +25,8 @@ function statusClasses(status: string): string {
   if (normalized === "submitted") return "bg-amber-100 text-amber-700";
   if (normalized === "assigned") return "bg-blue-100 text-blue-700";
   if (normalized === "in_progress" || normalized === "under_review") return "bg-purple-100 text-purple-700";
+  if (normalized === "reopened") return "bg-red-100 text-red-700 font-bold animate-pulse";
+  if (normalized === "pending_closure") return "bg-orange-100 text-orange-700";
   if (normalized === "resolved") return "bg-green-100 text-green-700";
   if (normalized === "rejected") return "bg-red-100 text-red-700";
   return "bg-gray-100 text-gray-600";
@@ -214,7 +216,7 @@ function CitizenTicketsPageContent() {
 
         // Use the latest ticket's created_at as the 'since' threshold for delta sync
         const lastSyncTime = localData.length > 0 ? localData[0].created_at : null;
-        
+
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const url = new URL(`${apiUrl}/citizen/tickets`);
         if (lastSyncTime) {
@@ -229,10 +231,10 @@ function CitizenTicketsPageContent() {
 
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         const { source, tickets: incomingRaw } = await res.json();
-        
+
         // Flatten reviews(rating)
         const incoming = incomingRaw.map((t: any) => {
-          const rating = t.reviews 
+          const rating = t.reviews
             ? (Array.isArray(t.reviews) ? t.reviews[0]?.rating : (t.reviews as any).rating)
             : t.rating;
           return { ...t, rating };
@@ -246,7 +248,7 @@ function CitizenTicketsPageContent() {
             // Merge delta updates (newest first)
             const map = new Map(prev.map(t => [t.id, t]));
             incoming.forEach((t: TicketListRow) => map.set(t.id, t));
-            updated = Array.from(map.values()).sort((a, b) => 
+            updated = Array.from(map.values()).sort((a, b) =>
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
           } else {
@@ -417,9 +419,8 @@ function CitizenTicketsPageContent() {
                       setSortBy("latest");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
-                      sortBy === "latest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "latest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                      }`}
                   >
                     Latest
                   </button>
@@ -428,9 +429,8 @@ function CitizenTicketsPageContent() {
                       setSortBy("upvotes");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
-                      sortBy === "upvotes" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "upvotes" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                      }`}
                   >
                     Highest Upvote
                   </button>
@@ -439,9 +439,8 @@ function CitizenTicketsPageContent() {
                       setSortBy("oldest");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
-                      sortBy === "oldest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "oldest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                      }`}
                   >
                     Oldest
                   </button>
@@ -465,9 +464,8 @@ function CitizenTicketsPageContent() {
                       setStatusFilter(null);
                       setStatusDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
-                      statusFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${statusFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                      }`}
                   >
                     All
                   </button>
@@ -478,9 +476,8 @@ function CitizenTicketsPageContent() {
                         setStatusFilter(status);
                         setStatusDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
-                        statusFilter === status ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
-                      }`}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${statusFilter === status ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                        }`}
                     >
                       {formatStatus(status)}
                     </button>
@@ -505,9 +502,8 @@ function CitizenTicketsPageContent() {
                       setDepartmentFilter(null);
                       setDepartmentDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
-                      departmentFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${departmentFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                      }`}
                   >
                     All Departments
                   </button>
@@ -518,9 +514,8 @@ function CitizenTicketsPageContent() {
                         setDepartmentFilter(dept);
                         setDepartmentDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${
-                        departmentFilter === dept ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
-                      }`}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${departmentFilter === dept ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                        }`}
                     >
                       {dept}
                     </button>
@@ -575,14 +570,13 @@ function CitizenTicketsPageContent() {
               {!loading && !error && filteredTickets.length > 0 && (
                 <ul className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                   {filteredTickets.map((ticket) => (
-                      <li
-                        key={ticket.id}
-                        ref={ticket.id === activeHighlight ? highlightedRef : null}
-                        className={`grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px_150px] gap-3 px-5 py-4 text-sm text-gray-700 transition-all duration-1000 dark:text-gray-300 dark:hover:bg-[#1e1e1e] ${
-                        ticket.id === activeHighlight
-                          ? "bg-purple-100/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] z-10 relative dark:bg-purple-900/40"
-                          : "hover:bg-gray-50"
-                      }`}
+                    <li
+                      key={ticket.id}
+                      ref={ticket.id === activeHighlight ? highlightedRef : null}
+                      className={`grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px_150px] gap-3 px-5 py-4 text-sm text-gray-700 transition-all duration-1000 dark:text-gray-300 dark:hover:bg-[#1e1e1e] ${ticket.id === activeHighlight
+                        ? "bg-purple-100/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] z-10 relative dark:bg-purple-900/40"
+                        : "hover:bg-gray-50"
+                        }`}
                     >
                       <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate dark:text-gray-200">
                         {ticket.ticket_id || "N/A"}
@@ -618,8 +612,8 @@ function CitizenTicketsPageContent() {
                       <div className="flex items-center justify-center">
                         {ticket.status === "resolved" ? (
                           <div className="flex flex-col items-center gap-1">
-                            <Rating 
-                              initialRating={ticket.rating ?? undefined} 
+                            <Rating
+                              initialRating={ticket.rating ?? undefined}
                               onRate={async (r) => {
                                 try {
                                   // 1. Get token
@@ -643,7 +637,7 @@ function CitizenTicketsPageContent() {
 
                                   if (res.ok) {
                                     // Update locally for instant feedback
-                                    setTickets(prev => prev.map(t => 
+                                    setTickets(prev => prev.map(t =>
                                       t.id === ticket.id ? { ...t, rating: r } : t
                                     ));
                                   } else {
@@ -654,12 +648,67 @@ function CitizenTicketsPageContent() {
                                   console.error("Rating submission error:", err);
                                   alert("An error occurred. Check console for details.");
                                 }
-                              }} 
+                              }}
                             />
                             <span className="text-[10px] text-gray-400">Rate your experience</span>
                           </div>
+                        ) : (ticket.status as string) === "pending_closure" ? (
+                          <div className="flex w-full max-w-[120px] flex-col gap-1.5">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  if (!session?.access_token) throw new Error("No session");
+                                  const res = await fetch("/api/complaints", {
+                                    method: "PUT",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      "Authorization": `Bearer ${session.access_token}`
+                                    },
+                                    body: JSON.stringify({ complaint_id: ticket.id, status: "resolved" })
+                                  });
+                                  if (res.ok) {
+                                    setTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, status: "resolved" } : t));
+                                  } else {
+                                    alert("Failed to confirm resolution.");
+                                  }
+                                } catch (e) {
+                                  console.error(e);
+                                }
+                              }}
+                              className="w-full rounded bg-green-500 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-600"
+                            >
+                              Confirm Resolved
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  if (!session?.access_token) throw new Error("No session");
+                                  const res = await fetch("/api/complaints", {
+                                    method: "PUT",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      "Authorization": `Bearer ${session.access_token}`
+                                    },
+                                    body: JSON.stringify({ complaint_id: ticket.id, status: "reopened" })
+                                  });
+                                  if (res.ok) {
+                                    setTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, status: "in_progress" } : t));
+                                  } else {
+                                    alert("Failed to reject resolution.");
+                                  }
+                                } catch (e) {
+                                  console.error(e);
+                                }
+                              }}
+                              className="w-full rounded border border-gray-300 bg-white py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-[#3a3a3a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
+                            >
+                              Not Resolved
+                            </button>
+                          </div>
                         ) : (
-                          <span className="text-xs text-gray-400 italic">Pending resolution</span>
+                          <span className="text-xs italic text-gray-400">Pending resolution</span>
                         )}
                       </div>
                     </li>

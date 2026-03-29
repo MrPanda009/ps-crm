@@ -167,7 +167,7 @@ if REDIS_URL:
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 REVERSE_GEOCODE_CACHE: Dict[str, Dict[str, str]] = {}
-ALLOWED_STATUSES = {"submitted", "verified", "assigned", "in_progress", "resolved", "closed"}
+ALLOWED_STATUSES = {"submitted", "verified", "assigned", "in_progress", "pending_closure", "resolved", "closed"}
 DUPLICATE_RADIUS_METERS = 20.0  # Synced with YOLO Reliability Engine
 CCTV_SYSTEM_EMAIL = "cctv.system@jansamadhan.gov.in"
 CCTV_SYSTEM_ID = "00000000-0000-0000-0000-000000000000" # Reserved for auto-tickets

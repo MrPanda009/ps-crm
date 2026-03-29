@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { supabase } from "@/src/lib/supabase"
 import { AssignDropdown, ComplaintDetailPanel } from "../_components/ComplaintDetailPanel"
-import { getSeverityConfig } from "../_components/dashboard-types"
+import { getSeverityConfig, getStatusMeta } from "../_components/dashboard-types"
 
 const MapComponent = dynamic(() => import("@/app/MapComponent"), { ssr: false })
 
@@ -26,15 +26,6 @@ const SEV_RANK: Record<string, number> = {
   critical: 4, high: 3, medium: 2, low: 1,
 }
 
-const STATUS_META: Record<Status, { label: string; badge: string }> = {
-  submitted:    { label: "Submitted",    badge: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
-  under_review: { label: "Under Review", badge: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
-  assigned:     { label: "Assigned",     badge: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
-  in_progress:  { label: "In Progress",  badge: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" },
-  resolved:     { label: "Resolved",     badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
-  rejected:     { label: "Rejected",     badge: "bg-red-50 text-red-600 ring-1 ring-red-200" },
-  escalated:    { label: "Escalated",    badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200" },
-}
 
 const TERMINAL_STATUSES: Status[] = ["resolved", "rejected"]
 const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated"]
@@ -307,7 +298,7 @@ export default function TrackPage() {
         return [
           c.ticket_id, c.title, c.categories?.name ?? "",
           sev.label,
-          STATUS_META[c.status]?.label ?? c.status,
+          getStatusMeta(c.status).label,
           c.upvote_count ?? 0,
           sla.breached ? `BREACHED (${sla.text})` : sla.text,
           new Date(c.created_at).toLocaleDateString("en-IN"),
@@ -460,11 +451,11 @@ export default function TrackPage() {
           <div className="relative">
             <button onClick={() => { setIsStatOpen(o => !o); setIsSortOpen(false); setIsSevOpen(false) }}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {statusFilter === "all" ? "All statuses" : STATUS_META[statusFilter as Status].label}
+              {statusFilter === "all" ? "All statuses" : getStatusMeta(statusFilter as Status).label}
               <span className="text-[10px] opacity-60">▼</span>
             </button>
             <div className={`absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isStatOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
-              {[["all","All statuses"], ...ALL_STATUSES.map(s => [s, STATUS_META[s].label])].map(([v,l]) => (
+              {[["all","All statuses"], ...ALL_STATUSES.map(s => [s, getStatusMeta(s).label])].map(([v,l]) => (
                 <button key={v} onClick={() => { setStatusFilter(v); setIsStatOpen(false) }}
                   className={`block w-full px-3 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${statusFilter===v?"font-semibold text-[#b4725a]":"text-gray-700 dark:text-gray-300"}`}>
                   {l}
@@ -500,7 +491,7 @@ export default function TrackPage() {
                   </td></tr>
                 ) : filtered.map(c => {
                   const sev        = getSeverityConfig(c.effective_severity)
-                  const st         = STATUS_META[c.status]
+                  const st         = getStatusMeta(c.status)
                   const sla        = slaStatus(c.sla_deadline, c.status)
                   const isExpanded = expandedId === c.id
                   const isSelected = selectedId === c.id

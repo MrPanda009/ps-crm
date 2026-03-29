@@ -8,6 +8,7 @@ export type ComplaintStatus =
   | "resolved"
   | "rejected"
   | "escalated"
+  | "reopened"
 
 export type SeverityLevel = "L1" | "L2" | "L3" | "L4"
 
@@ -51,7 +52,7 @@ export type DashboardStats = {
 }
 
 export const PENDING_STATUSES:   ComplaintStatus[] = ["submitted", "under_review"]
-export const ACTIVE_STATUSES:    ComplaintStatus[] = ["assigned", "in_progress"]
+export const ACTIVE_STATUSES:    ComplaintStatus[] = ["assigned", "in_progress", "reopened"]
 export const ESCALATED_STATUSES: ComplaintStatus[] = ["escalated"]
 export const URGENT_SEVERITIES:  SeverityLevel[]   = ["L3", "L4"]
 
@@ -122,6 +123,7 @@ export const STATUS_META: Record<ComplaintStatus, { label: string; badge: string
   resolved:     { label: "Resolved",     badge: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300", step: 5 },
   rejected:     { label: "Rejected",     badge: "bg-red-50 text-red-600 ring-1 ring-red-200 dark:bg-red-900/30 dark:text-red-400",                  step: 0 },
   escalated:    { label: "Escalated",    badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-900/30 dark:text-purple-300",   step: 6 },
+  reopened:     { label: "Reopened",     badge: "bg-red-100 text-red-700 ring-1 ring-red-200 font-bold dark:bg-red-900/40 dark:text-red-300 animate-pulse", step: 4 },
 }
 
 export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
@@ -132,6 +134,17 @@ export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
   resolved:     "#10b981",
   rejected:     "#ef4444",
   escalated:    "#a855f7",
+  reopened:     "#ef4444",
+}
+
+export const UNKNOWN_STATUS_META = {
+  label: "Unknown",
+  badge: "bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300",
+  step: 0,
+}
+
+export function getStatusMeta(status: string | ComplaintStatus) {
+  return STATUS_META[status as ComplaintStatus] ?? UNKNOWN_STATUS_META
 }
 
 // ── SLA helper ────────────────────────────────────────────────────────────────
@@ -210,21 +223,32 @@ export function getUrgentTickets(
 
 export function getStatusBreakdown(
   complaints: AuthorityComplaintRow[]
-): { status: ComplaintStatus; label: string; count: number; color: string }[] {
-  const map: Partial<Record<ComplaintStatus, number>> = {}
+): { status: ComplaintStatus | string; label: string; count: number; color: string }[] {
+  const map: Record<string, number> = {}
   for (const c of complaints) {
-    if (c.status === "rejected") continue
-    map[c.status] = (map[c.status] ?? 0) + 1
+    const statusKey = c.status ?? "unknown"
+    if (statusKey === "rejected") continue
+    if (!STATUS_META[statusKey as ComplaintStatus]) {
+      // Unexpected status from backend; keep it in breakdown with a fallback label/color
+      map[statusKey] = (map[statusKey] ?? 0) + 1
+      continue
+    }
+    map[statusKey] = (map[statusKey] ?? 0) + 1
   }
-  return (Object.entries(map) as [ComplaintStatus, number][])
+
+  return Object.entries(map)
     .filter(([, count]) => count > 0)
     .sort((a, b) => b[1] - a[1])
-    .map(([status, count]) => ({
-      status,
-      label: STATUS_META[status].label,
-      count,
-      color: STATUS_CHART_COLOR[status],
-    }))
+    .map(([status, count]) => {
+      const knownStatus = status as ComplaintStatus
+      const meta = STATUS_META[knownStatus]
+      return {
+        status,
+        label: meta?.label ?? `${status}`,
+        count,
+        color: STATUS_CHART_COLOR[knownStatus] ?? "#9ca3af",
+      }
+    })
 }
 
 export function timeAgo(dateStr: string): string {
