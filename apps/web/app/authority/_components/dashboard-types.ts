@@ -137,6 +137,16 @@ export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
   reopened:     "#ef4444",
 }
 
+export const UNKNOWN_STATUS_META = {
+  label: "Unknown",
+  badge: "bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300",
+  step: 0,
+}
+
+export function getStatusMeta(status: string | ComplaintStatus) {
+  return STATUS_META[status as ComplaintStatus] ?? UNKNOWN_STATUS_META
+}
+
 // ── SLA helper ────────────────────────────────────────────────────────────────
 
 export function isBreached(deadline: string | null, status: ComplaintStatus): boolean {

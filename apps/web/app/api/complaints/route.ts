@@ -741,9 +741,23 @@ export async function PUT(req: NextRequest) {
   // Need to fetch the updated record to match previous return format
   const { data: finalRecord } = await supabase
     .from("complaints")
-    .select("id, ticket_id, status, updated_at")
+    .select("id, ticket_id, status, updated_at, assigned_worker_id")
     .eq("id", body.complaint_id)
     .single();
+
+  if (finalRecord?.assigned_worker_id && body.status === "reopened") {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      // We don't need to await this as it's a side effect to clear cache
+      fetch(`${apiUrl}/api/worker/dashboard/invalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ worker_id: finalRecord.assigned_worker_id }),
+      }).catch(err => console.error("Worker cache invalidation fetch error:", err));
+    } catch (err) {
+      console.error("Worker cache invalidation error:", err);
+    }
+  }
 
   return NextResponse.json(
     {

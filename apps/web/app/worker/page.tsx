@@ -37,6 +37,7 @@ type ComplaintWithCategory = {
     | "resolved"
     | "rejected"
     | "escalated"
+    | "reopened"
   created_at: string
   resolved_at: string | null
   location: unknown
@@ -211,6 +212,27 @@ export default function WorkerDashboardPage() {
   // PERFORMANCE OPTIMIZATION: Removed 15s polling. 
   // We now rely entirely on the Realtime channels below for updates.
 
+  // Invalidate Redis cache then fetch fresh data — used by realtime handlers
+  // so the re-fetch doesn't just return stale cached data.
+  const invalidateAndFetch = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+        await fetch(`${apiUrl}/api/worker/dashboard/invalidate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        })
+      }
+    } catch (err) {
+      console.error("Cache invalidation failed:", err)
+    }
+    await fetchDashboardData()
+  }, [fetchDashboardData])
+
   // ── Realtime sync: listen for external changes ──────────────────────────────
   useEffect(() => {
     if (!workerId) return
@@ -221,7 +243,7 @@ export default function WorkerDashboardPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "complaints", filter: `assigned_worker_id=eq.${workerId}` },
-        () => void fetchDashboardData(),
+        () => void invalidateAndFetch(),
       )
       // Catch tickets being reassigned AWAY from this worker (old row had our id, new row doesn't)
       .on(
@@ -230,7 +252,7 @@ export default function WorkerDashboardPage() {
         (payload) => {
           const old = payload.old as { assigned_worker_id?: string }
           if (old.assigned_worker_id === workerId) {
-            void fetchDashboardData()
+            void invalidateAndFetch()
           }
         },
       )
@@ -238,24 +260,24 @@ export default function WorkerDashboardPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "worker_profiles", filter: `worker_id=eq.${workerId}` },
-        () => void fetchDashboardData(),
+        () => void invalidateAndFetch(),
       )
       // Activity feed: new ticket_history entry by this worker
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "ticket_history", filter: `changed_by=eq.${workerId}` },
-        () => void fetchDashboardData(),
+        () => void invalidateAndFetch(),
       )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [workerId, fetchDashboardData])
+  }, [workerId, invalidateAndFetch])
 
   const sortedAssignedTasks = useMemo(() => {
     return tasks
-      .filter((task) => task.status === "assigned")
+      .filter((task) => task.status === "assigned" || task.status === "reopened")
       .sort((a, b) => {
         if (severityWeight[b.severity] !== severityWeight[a.severity]) {
           return severityWeight[b.severity] - severityWeight[a.severity]
@@ -270,7 +292,7 @@ export default function WorkerDashboardPage() {
 
     return {
       tasksToday: tasks.filter((task) => new Date(task.createdAt).getTime() >= startOfDay).length,
-      pending: tasks.filter((task) => task.status === "assigned").length,
+      pending: tasks.filter((task) => task.status === "assigned" || task.status === "reopened").length,
       completedToday: tasks.filter(
         (task) => task.status === "resolved" && task.resolvedAt && new Date(task.resolvedAt).getTime() >= startOfDay,
       ).length,

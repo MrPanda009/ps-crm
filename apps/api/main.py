@@ -1798,7 +1798,6 @@ async def get_worker_dashboard(
                 lambda: supabase.table("complaints")
                 .select(WORKER_COMPLAINT_SELECT)
                 .eq("assigned_worker_id", worker_id)
-                .in_("status", ["assigned", "in_progress", "resolved", "reopened"])
                 .order("created_at", desc=True)
                 .execute()
             ),
@@ -1831,13 +1830,22 @@ async def get_worker_dashboard(
     return {"source": "database", **payload}
 
 
+class WorkerCacheInvalidateRequest(BaseModel):
+    worker_id: Optional[str] = None
+
 @app.post("/api/worker/dashboard/invalidate")
 async def invalidate_worker_dashboard_cache(
-    authorization: Optional[str] = Header(None)
+    body: WorkerCacheInvalidateRequest = WorkerCacheInvalidateRequest(),
+    authorization: Optional[str] = Header(None),
 ):
-    """Invalidate worker dashboard cache so UI updates instantly after state change."""
-    worker_id = get_citizen_id_from_token(authorization)
-    if redis_client:
+    """Invalidate worker dashboard cache so UI updates instantly after state change.
+    Accepts worker_id from request body (for server-to-server calls) or falls back
+    to extracting it from the Authorization header."""
+    # Prefer explicit worker_id from body (server-to-server), fall back to auth token
+    worker_id = body.worker_id
+    if not worker_id:
+        worker_id = get_citizen_id_from_token(authorization)
+    if redis_client and worker_id:
         try:
             redis_client.delete(f"worker:dashboard:{worker_id}")
         except Exception as e:
