@@ -412,13 +412,9 @@ export function useNearbyTickets() {
           .eq("citizen_id", userId)
           .eq("complaint_id", id);
         
-        if (delError) throw delError;
+        if (delError && delError.code !== 'PGRST116') throw delError;
 
-        const { error: updError } = await supabase
-          .from("complaints")
-          .update({ upvote_count: Math.max(0, (target.upvote_count ?? 1) - 1) })
-          .eq("id", id);
-        
+        const { error: updError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: id });
         if (updError) throw updError;
 
       } else {
@@ -436,16 +432,32 @@ export function useNearbyTickets() {
           .from("upvotes")
           .insert({ citizen_id: userId, complaint_id: id });
         
-        if (insError) throw insError;
+        if (insError && insError.code !== '23505') throw insError;
 
         const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: id });
         if (rpcError) throw rpcError;
       }
       setError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to sync upvote";
-      setError(msg);
-      // Revert local state on error
+    } catch (err: any) {
+      console.error("Upvote persistence failed:", err);
+      const msg = err?.message || "Check your internet or permissions.";
+      setError(`Upvote failed: ${msg}`);
+      
+      // Immediate local rollback
+      const wasUpvoted = !hasUpvoted.has(id); // Since we already toggled it
+      if (wasUpvoted) {
+          // Re-add if we tried to delete
+          setHasUpvoted((prev) => new Set([...prev, id]));
+      } else {
+          // Remove if we tried to add
+          setHasUpvoted((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+      }
+      
+      // Final sync with server truth
       await fetchComplaints();
     }
   }

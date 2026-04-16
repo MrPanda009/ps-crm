@@ -63,6 +63,31 @@ export default function TicketDetailClient() {
     };
 
     fetchTicket();
+
+    // ─── Realtime Subscription for Live Upvote Updates ───────────────────────
+    const channel = supabase
+      .channel(`ticket-detail-${ticketId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "complaints",
+          filter: `id=eq.${ticketId}`,
+        },
+        (payload) => {
+          const newData = payload.new as Complaint;
+          if (newData && newData.upvote_count !== undefined) {
+            setUpvoteCount(newData.upvote_count);
+            setTicket(newData);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [ticketId]);
 
   // Entry animations
@@ -89,17 +114,34 @@ export default function TicketDetailClient() {
 
     try {
       if (wasUpvoted) {
-        await supabase.from("upvotes").delete().eq("citizen_id", user.id).eq("complaint_id", ticketId);
-        await supabase.from("complaints").update({ upvote_count: Math.max(0, upvoteCount - 1) }).eq("id", ticketId);
+        const { error: delError } = await supabase.from("upvotes").delete().eq("citizen_id", user.id).eq("complaint_id", ticketId);
+        // If it's already deleted, we don't treat it as a fatal error
+        if (delError && delError.code !== 'PGRST116') throw delError;
+        
+        const { error: rpcError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: ticketId });
+        if (rpcError) throw rpcError;
       } else {
-        await supabase.from("upvotes").insert({ citizen_id: user.id, complaint_id: ticketId });
-        await supabase.rpc('increment_upvote_count', { p_complaint_id: ticketId });
+        const { error: insError } = await supabase.from("upvotes").insert({ citizen_id: user.id, complaint_id: ticketId });
+        
+        // Error code 23505 is 'unique_violation' (duplicate key).
+        // If it already exists, we ignore and proceed to the RPC to ensure the count is synced.
+        if (insError && insError.code !== '23505') throw insError;
+        
+        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: ticketId });
+        if (rpcError) throw rpcError;
       }
-    } catch (err) {
-      console.error("Upvote failed:", err);
-      // Rollback
+      
+      // Verification: re-fetch from DB to ensure local state is synced after non-optimistic action
+      // (The realtime subscription will also handle this, but explicit fetch is safer)
+    } catch (err: any) {
+      console.error("Upvote persistence failed:", err);
+      // Rollback optimistic UI
       setHasUpvoted(wasUpvoted);
-      setUpvoteCount(upvoteCount);
+      setUpvoteCount(wasUpvoted ? upvoteCount + 1 : upvoteCount - 1);
+      
+      // Inform the user why it failed
+      const msg = err?.message || "Check your internet or permissions.";
+      alert(`Upvote failed: ${msg}`);
     }
   };
 
