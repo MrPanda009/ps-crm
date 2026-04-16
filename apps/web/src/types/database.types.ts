@@ -96,6 +96,7 @@ export type Database = {
         Row: {
           created_at: string | null
           digipin: string | null
+          generated_ticket_id: string | null
           id: string
           last_status: string | null
           latitude: number
@@ -110,6 +111,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           digipin?: string | null
+          generated_ticket_id?: string | null
           id?: string
           last_status?: string | null
           latitude: number
@@ -124,6 +126,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           digipin?: string | null
+          generated_ticket_id?: string | null
           id?: string
           last_status?: string | null
           latitude?: number

@@ -46,14 +46,15 @@ from shared import (
 
 
 # ── config ────────────────────────────────────────────────────────────────────
-WHATSAPP_TOKEN           = os.getenv("WHATSAPP_TOKEN", "").strip()
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "").strip()
-WHATSAPP_VERIFY_TOKEN    = os.getenv("WHATSAPP_VERIFY_TOKEN", "jansamadhan_verify").strip()
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "jansamadhan_verify").strip()
+
+def get_whatsapp_token():
+    return os.getenv("WHATSAPP_TOKEN", "").strip()
 
 def get_graph_api_url():
     """Generates the URL dynamically to ensure environment changes are picked up."""
     id_val = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "").strip()
-    return f"https://graph.facebook.com/v21.0/{id_val}/messages"
+    return f"https://graph.facebook.com/v22.0/{id_val}/messages"
 
 # In-memory session store  { phone_number: { ...session data } }
 # For production, replace with Redis or Supabase table
@@ -664,13 +665,16 @@ async def send_text(phone: str, text: str):
         "text": {"body": text},
     }
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Authorization": f"Bearer {get_whatsapp_token()}",
         "Content-Type": "application/json",
     }
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
-        if resp.status_code != 200:
-            print(f"[send_text error] {resp.status_code}: {resp.text}")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
+            if resp.status_code != 200:
+                print(f"[send_text error] {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"[send_text exception] {e}")
 
 
 async def send_location_request(phone: str, text: str):
@@ -693,13 +697,16 @@ async def send_location_request(phone: str, text: str):
         }
     }
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Authorization": f"Bearer {get_whatsapp_token()}",
         "Content-Type": "application/json",
     }
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
-        if resp.status_code != 200:
-            print(f"[send_location_request error] {resp.status_code}: {resp.text}")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
+            if resp.status_code != 200:
+                print(f"[send_location_request error] {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"[send_location_request exception] {e}")
 
 
 async def send_button_message(phone: str, body_text: str, buttons: list):
@@ -731,13 +738,16 @@ async def send_button_message(phone: str, body_text: str, buttons: list):
         }
     }
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Authorization": f"Bearer {get_whatsapp_token()}",
         "Content-Type": "application/json",
     }
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
-        if resp.status_code != 200:
-            print(f"[send_button_message error] {resp.status_code}: {resp.text}")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
+            if resp.status_code != 200:
+                print(f"[send_button_message error] {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"[send_button_message exception] {e}")
 
 
 async def send_list_message(phone: str, body_text: str, button_text: str, sections: list):
@@ -762,13 +772,16 @@ async def send_list_message(phone: str, body_text: str, button_text: str, sectio
         }
     }
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Authorization": f"Bearer {get_whatsapp_token()}",
         "Content-Type": "application/json",
     }
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
-        if resp.status_code != 200:
-            print(f"[send_list_message error] {resp.status_code}: {resp.text}")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
+            if resp.status_code != 200:
+                print(f"[send_list_message error] {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"[send_list_message exception] {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -776,9 +789,10 @@ async def send_list_message(phone: str, body_text: str, button_text: str, sectio
 # ═══════════════════════════════════════════════════════════════════════════════
 
 async def download_whatsapp_media(media_id: str) -> bytes:
-    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
+    headers = {"Authorization": f"Bearer {get_whatsapp_token()}"}
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
         # Step 1: get download URL
         meta_resp = await client.get(
             f"https://graph.facebook.com/v22.0/{media_id}",
@@ -791,3 +805,6 @@ async def download_whatsapp_media(media_id: str) -> bytes:
         file_resp = await client.get(media_url, headers=headers)
         file_resp.raise_for_status()
         return file_resp.content
+    except Exception as e:
+        print(f"[download_whatsapp_media exception] {e}")
+        raise
