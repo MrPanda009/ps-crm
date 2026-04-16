@@ -165,7 +165,7 @@ async function getAuthToken(): Promise<string | null> {
 }
 
 export default function RewardsPage() {
-  const [jsPoints, setJsPoints] = useState(0);
+  const [jsPoints, setJsPoints] = useState<number | null>(null);
   const [rewards, setRewards] = useState<RewardCatalogItem[]>([]);
   const [redeemedRewardIds, setRedeemedRewardIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -173,12 +173,13 @@ export default function RewardsPage() {
   const [redeemingRewardId, setRedeemingRewardId] = useState<string | null>(null);
 
   const progressPass = useMemo<PassTier[]>(() => {
-    const firstLockedIndex = progressPassBase.findIndex((tier) => jsPoints < tier.pointsRequired);
+    const balance = jsPoints ?? 0;
+    const firstLockedIndex = progressPassBase.findIndex((tier) => balance < tier.pointsRequired);
 
     return progressPassBase.map((tier, index) => {
       let status: PassTier["status"] = "locked";
 
-      if (jsPoints >= tier.pointsRequired) {
+      if (balance >= tier.pointsRequired) {
         status = "received";
       } else if (index === firstLockedIndex) {
         status = "current";
@@ -290,7 +291,9 @@ export default function RewardsPage() {
               <p className="text-xs text-gray-500 dark:text-gray-400">Complete Jan Samadhan tasks to earn points and advance tiers.</p>
             </div>
             <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Balance: <span className="text-amber-700 dark:text-amber-400">{jsPoints.toLocaleString()} JS Points</span>
+              Balance: <span className="text-amber-700 dark:text-amber-400">
+                {jsPoints === null ? "Loading..." : `${jsPoints.toLocaleString()} JS Points`}
+              </span>
             </div>
           </div>
 
@@ -376,7 +379,7 @@ export default function RewardsPage() {
               const visual = rewardVisual(item.kind, item.title);
               const isOwned = redeemedRewardIds.has(item.id);
               const hasStock = item.stock_remaining == null || item.stock_remaining > 0;
-              const canAfford = jsPoints >= item.points_cost;
+              const canAfford = jsPoints !== null && jsPoints >= item.points_cost;
               const isRedeeming = redeemingRewardId === item.id;
 
               return (

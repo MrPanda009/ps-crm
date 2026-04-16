@@ -38,7 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [citizenId, setCitizenId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [hasUnreadUpdates, setHasUnreadUpdates] = useState(false);
-  const [globalJsPoints, setGlobalJsPoints] = useState(3500);
+  const [globalJsPoints, setGlobalJsPoints] = useState<number | null>(null);
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -84,6 +84,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener('update-js-points', handleUpdate);
     return () => window.removeEventListener('update-js-points', handleUpdate);
   }, []);
+
+  useEffect(() => {
+    const fetchPoints = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      try {
+        const response = await fetch("/api/citizen/wallet", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: "no-store",
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setGlobalJsPoints(data.wallet.points_balance ?? 0);
+        }
+      } catch (err) {
+        console.error("Failed to fetch JS points:", err);
+      }
+    };
+
+    if (citizenId) {
+      void fetchPoints();
+    }
+  }, [citizenId]);
 
   useEffect(() => {
     if (!citizenId) return;
@@ -292,7 +318,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[9px] text-amber-700 dark:text-[#C9A84C] font-semibold leading-none mb-0.5">JS POINTS</span>
-                    <span className="text-sm font-bold leading-none text-amber-900 dark:text-white">{globalJsPoints}</span>
+                    <span className="text-sm font-bold leading-none text-amber-900 dark:text-white">
+                      {globalJsPoints === null ? "Loading..." : globalJsPoints.toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </div>
