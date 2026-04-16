@@ -260,7 +260,20 @@ export default function WorkerTasksPage() {
   }, []);
 
   return (
-    <div className="w-full px-4 py-4 sm:px-6">
+    <div className="flex min-h-full flex-col gap-4 overflow-visible lg:gap-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">Tasks</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">View and manage all your assigned tasks.</p>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span className="rounded-full border border-gray-200 bg-white px-3 py-1 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">{tasks.length} Total</span>
+          <span className="rounded-full border border-gray-200 bg-white px-3 py-1 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">{tasks.filter((task) => task.status === 'assigned' || task.status === 'in_progress' || task.status === 'reopened').length} Active</span>
+        </div>
+      </header>
+
+      <div className="w-full px-0 py-0 sm:px-0">
       <section className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#161616]">
         <div className="overflow-x-auto">
           <div className="min-w-[1100px]">
@@ -374,6 +387,7 @@ export default function WorkerTasksPage() {
           ticketTitle={selectedTask.title}
         />
       )}
+      </div>
     </div>
   );
 }

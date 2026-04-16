@@ -232,21 +232,6 @@ export default function CurrentTicketCard({
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => onMarkCompleted(ticket.id)}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto dark:disabled:bg-gray-600"
-          disabled={!canComplete}
-          title={
-            canComplete
-              ? "Mark ticket completed"
-              : "Ticket must be in progress to complete"
-          }
-        >
-          <CheckCircle2 size={16} />
-          Mark Completed
-        </button>
       </div>
     </article>
   );

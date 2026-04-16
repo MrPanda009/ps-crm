@@ -1746,6 +1746,11 @@ WORKER_COMPLAINT_SELECT = (
     "severity, status, created_at, resolved_at, location, categories(name)"
 )
 
+WORKER_COMPLAINT_SELECT_FALLBACK = (
+    "id, ticket_id, title, assigned_worker_id, description, address_text, "
+    "severity, status, created_at, resolved_at, location"
+)
+
 
 @app.get("/api/worker/dashboard")
 async def get_worker_dashboard(
@@ -1788,40 +1793,63 @@ async def get_worker_dashboard(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Profile check failed: {str(e)}")
 
-    # Step 2: Fetch worker profile, complaints, and activity in parallel
+    # Step 2: Fetch worker profile, complaints, and activity with partial-failure tolerance
+    worker_profile_res = None
+    complaints_res = None
+    history_res = None
+
     try:
-        [worker_profile_res, complaints_res, history_res] = await asyncio.gather(
-            asyncio.to_thread(
-                lambda: supabase.table("worker_profiles")
-                .select("last_location, average_rating, total_reviews")
-                .eq("worker_id", worker_id)
-                .maybe_single()
-                .execute()
-            ),
-            asyncio.to_thread(
+        worker_profile_res = await asyncio.to_thread(
+            lambda: supabase.table("worker_profiles")
+            .select("last_location, average_rating, total_reviews")
+            .eq("worker_id", worker_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as e:
+        print(f"Worker dashboard worker_profile fetch failed: {e}")
+
+    try:
+        complaints_res = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .select(WORKER_COMPLAINT_SELECT)
+            .eq("assigned_worker_id", worker_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+    except Exception as e:
+        print(f"Worker dashboard complaints fetch failed, retrying without categories join: {e}")
+        try:
+            complaints_res = await asyncio.to_thread(
                 lambda: supabase.table("complaints")
-                .select(WORKER_COMPLAINT_SELECT)
+                .select(WORKER_COMPLAINT_SELECT_FALLBACK)
                 .eq("assigned_worker_id", worker_id)
                 .order("created_at", desc=True)
                 .execute()
-            ),
-            asyncio.to_thread(
-                lambda: supabase.table("ticket_history")
-                .select("id, complaint_id, old_status, new_status, note, created_at")
-                .eq("changed_by", worker_id)
-                .order("created_at", desc=True)
-                .limit(10)
-                .execute()
-            ),
+            )
+        except Exception as fallback_error:
+            print(f"Worker dashboard complaints fallback failed: {fallback_error}")
+
+    try:
+        history_res = await asyncio.to_thread(
+            lambda: supabase.table("ticket_history")
+            .select("id, complaint_id, old_status, new_status, note, created_at")
+            .eq("changed_by", worker_id)
+            .order("created_at", desc=True)
+            .limit(10)
+            .execute()
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Worker dashboard fetch failed: {str(e)}")
+        print(f"Worker dashboard ticket_history fetch failed: {e}")
+
+    if not worker_profile_res and not complaints_res and not history_res:
+        raise HTTPException(status_code=500, detail="Worker dashboard fetch failed: no worker data could be loaded.")
 
     payload = {
         "workerId": worker_id,
-        "workerProfile": worker_profile_res.data,
-        "complaints": complaints_res.data or [],
-        "activityHistory": history_res.data or [],
+        "workerProfile": worker_profile_res.data if worker_profile_res and worker_profile_res.data else None,
+        "complaints": complaints_res.data if complaints_res and complaints_res.data else [],
+        "activityHistory": history_res.data if history_res and history_res.data else [],
     }
 
     # Cache for 2 minutes (worker data changes frequently with task updates)
