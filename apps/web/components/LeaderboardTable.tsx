@@ -5,7 +5,6 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useTheme } from "./ThemeProvider";
 import { Trophy, Medal, Award } from "lucide-react";
-import { supabase } from "@/src/lib/supabase";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(useGSAP);
@@ -23,16 +22,6 @@ type LeaderboardResponse = {
   items: LeaderboardRow[];
 };
 
-async function getAuthToken(): Promise<string | null> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (session?.access_token) return session.access_token;
-
-  const { data: refreshed } = await supabase.auth.refreshSession();
-  return refreshed.session?.access_token ?? null;
-}
-
 export default function LeaderboardTable() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -47,15 +36,10 @@ export default function LeaderboardTable() {
     const loadLeaderboard = async () => {
       setLoading(true);
       setError(null);
-      try {
-        const token = await getAuthToken();
-        if (!token) {
-          throw new Error("Please log in to view the leaderboard.");
-        }
 
+      try {
         const response = await fetch("/api/citizen/leaderboard", {
           method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
 
