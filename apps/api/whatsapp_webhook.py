@@ -118,11 +118,13 @@ async def receive_message(request: Request):
             if itype == "button_reply":
                 button_id = msg["interactive"]["button_reply"]["id"]
                 # Route button replies to handle_text to reuse existing logic
-                # IDs: "confirm_ticket", "cancel_ticket"
                 if button_id == "confirm_ticket":
                     await handle_text(from_, "confirm")
                 elif button_id == "cancel_ticket":
                     await handle_text(from_, "cancel")
+            elif itype == "list_reply":
+                list_id = msg["interactive"]["list_reply"]["id"]
+                await handle_list_selection(from_, list_id)
 
         else:
             await send_text(from_, "Sorry, I only understand text messages, images, and locations right now.")
@@ -142,13 +144,42 @@ async def handle_text(phone: str, text: str):
     session = SESSIONS.get(phone, {})
 
     # ── greeting ──────────────────────────────────────────────────────────────
-    if text in ("hi", "hello", "hey", "start", "namaste"):
+    if text in ("hi", "hello", "hey", "start", "namaste", "menu", "help"):
         SESSIONS[phone] = {}
-        await send_text(phone,
-            "🙏 *Namaste! Welcome to JanSamadhan.*\n\n"
-            "I help you report civic issues (potholes, garbage, broken lights, etc.).\n\n"
-            "👉 *Send a photo* of the issue to get started!\n"
-            "_(Make sure location is attached or send it separately.)_"
+        await send_list_message(
+            phone=phone,
+            body_text=(
+                "🙏 *Namaste! Welcome to JanSamadhan.*\n\n"
+                "I am your virtual civic assistant. How can I help you today?"
+            ),
+            button_text="Main Menu ☰",
+            sections=[
+                {
+                    "title": "Report an Issue",
+                    "rows": [
+                        {
+                            "id": "menu_report_issue",
+                            "title": "📸 Report Issue",
+                            "description": "Upload a photo to report a civic issue"
+                        }
+                    ]
+                },
+                {
+                    "title": "My Complaints",
+                    "rows": [
+                        {
+                            "id": "menu_recent_tickets",
+                            "title": "📋 Recent Tickets",
+                            "description": "Track the status of your complaints"
+                        },
+                        {
+                            "id": "menu_my_stats",
+                            "title": "📊 My Statistics",
+                            "description": "View your total reported issues"
+                        }
+                    ]
+                }
+            ]
         )
         return
 
@@ -172,17 +203,101 @@ async def handle_text(phone: str, text: str):
 
     # ── fallback ──────────────────────────────────────────────────────────────
     await send_text(phone,
-        "I didn't understand that. Try:\n"
-        "• Send *hi* to start\n"
-        "• Send a *photo* of the civic issue\n"
-        "• Reply *confirm* to submit a pending ticket\n"
-        "• Reply *status DL-2026-XXXXX* to check a ticket"
+        "I didn't understand that. Please use the Menu by sending *Hi* or send a *photo* to report an issue."
     )
+
+
+async def handle_list_selection(phone: str, list_id: str):
+    """Routes the selected list item ID from WhatsApp interactive lists."""
+    if list_id == "menu_report_issue":
+        await send_text(phone, "📸 *Report an Issue*\nPlease send a clear photo of the civic issue (pothole, garbage, etc.) to get started.")
+    elif list_id == "menu_recent_tickets":
+        await handle_action_recent_tickets(phone)
+    elif list_id == "menu_my_stats":
+        await handle_action_stats(phone)
+    elif list_id.startswith("view_ticket_"):
+        ticket_id = list_id.replace("view_ticket_", "")
+        await show_ticket_details(phone, ticket_id)
+    else:
+        await send_text(phone, "Invalid selection.")
+
+
+async def get_citizen_id(phone: str) -> str:
+    db_phone = f"+{phone}" if not phone.startswith("+") else phone
+    try:
+        resp = supabase.table("profiles").select("id").eq("phone", db_phone).execute()
+        if resp.data and len(resp.data) > 0:
+            return resp.data[0]["id"]
+    except Exception as e:
+        print("[auth error]", e)
+    return os.getenv("WHATSAPP_BOT_USER_ID", "00000000-0000-0000-0000-000000000000")
+
+async def handle_action_recent_tickets(phone: str):
+    citizen_id = await get_citizen_id(phone)
+    resp = supabase.table("complaints").select("id, ticket_id, title, status").eq("citizen_id", citizen_id).order("created_at", desc=True).limit(5).execute()
+    
+    if not resp.data:
+        await send_text(phone, "You don't have any recent tickets. Send a photo to report an issue!")
+        return
+
+    rows = []
+    for t in resp.data:
+        status_clean = str(t['status']).replace('_', ' ').title()
+        # Row layout: Title (Status), Description (Complaint title)
+        # Title limit is 24 chars, description is 72 chars
+        title_str = f"[{status_clean}]"[:24]
+        desc_str = str(t['title'])[:72]
+        
+        rows.append({
+            "id": f"view_ticket_{t['ticket_id']}",
+            "title": title_str,
+            "description": desc_str
+        })
+
+    await send_list_message(
+        phone=phone,
+        body_text="📋 *Your Recent Tickets*\nHere are your last 5 reports. Tap one to view details:",
+        button_text="View Tickets 🔽",
+        sections=[{"title": "Recent Complaints", "rows": rows}]
+    )
+
+async def handle_action_stats(phone: str):
+    citizen_id = await get_citizen_id(phone)
+    resp = supabase.table("complaints").select("id", count="exact").eq("citizen_id", citizen_id).execute()
+    count = resp.count or 0
+    await send_button_message(phone,
+        f"📊 *My Statistics*\n\nYou have reported a total of *{count}* civic issues.\nThank you for keeping your city clean and safe! 🙏",
+        [{"id": "menu_recent_tickets", "title": "🔙 Recent Tickets"}]
+    )
+
+async def show_ticket_details(phone: str, ticket_id_str: str):
+    resp = supabase.table("complaints").select("*").eq("ticket_id", ticket_id_str).execute()
+    if not resp.data:
+        await send_text(phone, "❌ Ticket not found.")
+        return
+        
+    t = resp.data[0]
+    status_clean = str(t['status']).replace('_', ' ').title()
+    body = (
+        f"🎫 *Ticket: {t['ticket_id']}*\n"
+        f"━━━━━━━━━━━━━━━━━\n"
+        f"📌 *Title:* {t['title']}\n"
+        f"🏛 *Authority:* {t.get('assigned_department') or 'Pending'}\n"
+        f"🚦 *Status:* {status_clean}\n"
+        f"🔴 *Severity:* {t['severity']}\n"
+        f"📅 *Reported:* {str(t['created_at'])[:10]}\n"
+    )
+    if t.get('resolution_note'):
+        body += f"📝 *Resolution:* {t['resolution_note']}\n"
+
+    body += "━━━━━━━━━━━━━━━━━"
+    await send_button_message(phone, body, [{"id": "menu_recent_tickets", "title": "🔙 Back to List"}])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. IMAGE HANDLER  –  download → Gemini analyze → send preview
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 async def handle_image(phone: str, image_id: str):
     await send_text(phone, "📸 Got your photo! Analyzing the issue... Please wait.")
@@ -326,19 +441,7 @@ async def confirm_ticket(phone: str, session: dict):
     timestamp_str = datetime.now(timezone.utc).isoformat()
 
     # Automatic Profile Lookup (Zero-Login)
-    # WhatsApp gives us the number as 91... but DB stores as +91...
-    db_phone = f"+{phone}"
-    citizen_id = os.getenv("WHATSAPP_BOT_USER_ID", "00000000-0000-0000-0000-000000000000")
-
-    try:
-        profile_resp = supabase.table("profiles").select("id").eq("phone", db_phone).execute()
-        if profile_resp.data and len(profile_resp.data) > 0:
-            citizen_id = profile_resp.data[0]["id"]
-            print(f"[auth] Matched WhatsApp user {phone} to profile {citizen_id}")
-        else:
-            print(f"[auth] No profile match for WhatsApp user {phone}, using fallback bot user.")
-    except Exception as ae:
-        print(f"[auth error] {ae}")
+    citizen_id = await get_citizen_id(phone)
 
     try:
         response = supabase.table("complaints").insert({
@@ -600,6 +703,37 @@ async def send_button_message(phone: str, body_text: str, buttons: list):
         resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
         if resp.status_code != 200:
             print(f"[send_button_message error] {resp.status_code}: {resp.text}")
+
+
+async def send_list_message(phone: str, body_text: str, button_text: str, sections: list):
+    """
+    Sends an interactive message of type 'list'.
+    Sections should be formatted according to WhatsApp Cloud API structure.
+    """
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "body": {
+                "text": body_text
+            },
+            "action": {
+                "button": button_text,
+                "sections": sections
+            }
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
+        if resp.status_code != 200:
+            print(f"[send_list_message error] {resp.status_code}: {resp.text}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
