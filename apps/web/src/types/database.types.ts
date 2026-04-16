@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       categories: {
@@ -409,6 +434,7 @@ export type Database = {
           role: string
           spam_strikes: number
           updated_at: string
+          whatsapp_link_code: string | null
         }
         Insert: {
           aadhar_hash?: string | null
@@ -425,6 +451,7 @@ export type Database = {
           role?: string
           spam_strikes?: number
           updated_at?: string
+          whatsapp_link_code?: string | null
         }
         Update: {
           aadhar_hash?: string | null
@@ -441,6 +468,7 @@ export type Database = {
           role?: string
           spam_strikes?: number
           updated_at?: string
+          whatsapp_link_code?: string | null
         }
         Relationships: []
       }
@@ -1181,6 +1209,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       complaint_source: ["citizen", "system"],
