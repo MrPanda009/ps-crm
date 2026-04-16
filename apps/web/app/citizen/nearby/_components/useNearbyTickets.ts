@@ -374,69 +374,79 @@ export function useNearbyTickets() {
   );
 
   async function handleUpvote(id: string) {
-    if (hasUpvoted.has(id)) return;
-
     const {
       data: { session },
       error: sessionError,
     } = await supabase.auth.getSession();
 
+    const userId = session?.user?.id;
     const token = session?.access_token ?? null;
-    if (sessionError || !token) {
+    if (sessionError || !token || !userId) {
       setError("Please sign in to upvote tickets");
       return;
     }
 
-    setHasUpvoted((prev) => new Set([...prev, id]));
-    setAllComplaints((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, upvote_count: c.upvote_count + 1 } : c))
-    );
-    setVisibleComplaints((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, upvote_count: c.upvote_count + 1 } : c))
-    );
+    const isUpvoted = hasUpvoted.has(id);
+    const target = allComplaints.find(c => c.id === id);
+    if (!target) return;
 
     try {
-      const res = await fetch("/api/complaints", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ complaint_id: id }),
-      });
-
-      const payload = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        complaint?: { upvote_count?: number };
-      };
-
-      if (!res.ok) {
-        throw new Error(payload.error || "Failed to upvote complaint");
-      }
-
-      const serverCount = payload.complaint?.upvote_count;
-      if (typeof serverCount === "number") {
+      if (isUpvoted) {
+        // Toggle OFF
+        setHasUpvoted((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         setAllComplaints((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, upvote_count: serverCount } : c))
+          prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, (c.upvote_count ?? 1) - 1) } : c))
         );
         setVisibleComplaints((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, upvote_count: serverCount } : c))
+          prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, (c.upvote_count ?? 1) - 1) } : c))
         );
+
+        // Sync with DB
+        const { error: delError } = await supabase
+          .from("upvotes")
+          .delete()
+          .eq("citizen_id", userId)
+          .eq("complaint_id", id);
+        
+        if (delError) throw delError;
+
+        const { error: updError } = await supabase
+          .from("complaints")
+          .update({ upvote_count: Math.max(0, (target.upvote_count ?? 1) - 1) })
+          .eq("id", id);
+        
+        if (updError) throw updError;
+
+      } else {
+        // Toggle ON
+        setHasUpvoted((prev) => new Set([...prev, id]));
+        setAllComplaints((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, upvote_count: (c.upvote_count ?? 0) + 1 } : c))
+        );
+        setVisibleComplaints((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, upvote_count: (c.upvote_count ?? 0) + 1 } : c))
+        );
+
+        // Sync with DB
+        const { error: insError } = await supabase
+          .from("upvotes")
+          .insert({ citizen_id: userId, complaint_id: id });
+        
+        if (insError) throw insError;
+
+        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: id });
+        if (rpcError) throw rpcError;
       }
+      setError(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to upvote complaint";
+      const msg = err instanceof Error ? err.message : "Failed to sync upvote";
       setError(msg);
-      setHasUpvoted((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      setAllComplaints((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, c.upvote_count - 1) } : c))
-      );
-      setVisibleComplaints((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, c.upvote_count - 1) } : c))
-      );
+      // Revert local state on error
+      await fetchComplaints();
     }
   }
 

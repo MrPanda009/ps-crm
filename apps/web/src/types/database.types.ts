@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       categories: {
@@ -102,6 +77,9 @@ export type Database = {
           longitude: number
           name: string
           road_type: string
+          verification_status: string | null
+          verified_at: string | null
+          verified_by: string | null
           video_url: string | null
         }
         Insert: {
@@ -113,6 +91,9 @@ export type Database = {
           longitude: number
           name: string
           road_type: string
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
           video_url?: string | null
         }
         Update: {
@@ -124,6 +105,9 @@ export type Database = {
           longitude?: number
           name?: string
           road_type?: string
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
           video_url?: string | null
         }
         Relationships: []
@@ -136,6 +120,8 @@ export type Database = {
           assigned_worker_id: string | null
           camera_id: string | null
           category_id: number
+          cctv_verification_status: string | null
+          cctv_verified_at: string | null
           citizen_id: string | null
           city: string
           created_at: string
@@ -174,6 +160,8 @@ export type Database = {
           assigned_worker_id?: string | null
           camera_id?: string | null
           category_id: number
+          cctv_verification_status?: string | null
+          cctv_verified_at?: string | null
           citizen_id?: string | null
           city?: string
           created_at?: string
@@ -212,6 +200,8 @@ export type Database = {
           assigned_worker_id?: string | null
           camera_id?: string | null
           category_id?: number
+          cctv_verification_status?: string | null
+          cctv_verified_at?: string | null
           citizen_id?: string | null
           city?: string
           created_at?: string
@@ -773,6 +763,62 @@ export type Database = {
             }[]
           }
       check_sla_breaches: { Args: never; Returns: number }
+      find_duplicate_complaints_v2: {
+        Args: {
+          p_active_statuses: string[]
+          p_category_id: number
+          p_digipin: string
+          p_lat: number
+          p_lng: number
+          p_radius: number
+        }
+        Returns: {
+          address_text: string | null
+          assigned_department: string | null
+          assigned_officer_id: string | null
+          assigned_worker_id: string | null
+          camera_id: string | null
+          category_id: number
+          cctv_verification_status: string | null
+          cctv_verified_at: string | null
+          citizen_id: string | null
+          city: string
+          created_at: string
+          description: string
+          digipin: string | null
+          effective_severity: Database["public"]["Enums"]["severity_level"]
+          escalation_level: number
+          id: string
+          is_spam: boolean
+          location: unknown
+          photo_count: number | null
+          photo_urls: string[] | null
+          pincode: string | null
+          possible_duplicate: boolean
+          rejection_reason: string | null
+          reopen_count: number
+          reopen_deadline: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          severity: Database["public"]["Enums"]["severity_level"]
+          sla_breached: boolean
+          sla_deadline: string | null
+          source: Database["public"]["Enums"]["complaint_source"] | null
+          status: Database["public"]["Enums"]["complaint_status"]
+          ticket_id: string
+          title: string
+          updated_at: string
+          upvote_boost: number
+          upvote_count: number
+          ward_name: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "complaints"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_category_breakdown: {
         Args: never
         Returns: {
@@ -850,11 +896,7 @@ export type Database = {
         Returns: undefined
       }
       update_complaint_status_citizen: {
-        Args: {
-          p_complaint_id: string
-          p_status: string
-          p_citizen_id: string
-        }
+        Args: { p_citizen_id: string; p_complaint_id: string; p_status: string }
         Returns: Json
       }
     }
@@ -997,9 +1039,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       complaint_source: ["citizen", "system"],

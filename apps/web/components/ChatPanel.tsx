@@ -687,7 +687,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
             }
           }
         } catch (err) {
-          console.error("Failed to fetch chat history:", err);
+          console.warn("[Backend] Could not fetch chat history, proceeding empty. Error:", err);
         }
       }
       
@@ -764,7 +764,11 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
           body: JSON.stringify({ messages }),
         });
       } catch (err) {
-        console.error("Failed to sync chat history:", err);
+        if (err instanceof TypeError && err.message === "Failed to fetch") {
+          console.warn("Backend API unreachable. Chat history sync suspended.");
+        } else {
+          console.error("Failed to sync chat history:", err);
+        }
       }
     };
 
@@ -1420,6 +1424,7 @@ export default function ChatPanel({ onClose: _onClose }: { onClose?: () => void 
           mediaRecorderRef.current.stop();
         }
       }, 30000);
+      addBotMessage(t(selectedLanguage, "mic_denied"));
     } catch (err) {
       console.error("Microphone access error:", err);
       addBotMessage(t(selectedLanguage, "mic_denied"));
