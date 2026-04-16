@@ -104,9 +104,7 @@ export async function GET(req: NextRequest) {
     updated_at: new Date().toISOString(),
   };
 
-  const redeemedRewardIds = Array.from(
-    new Set((redemptionsResult.data ?? []).map((row) => row.reward_id)),
-  );
+  const redeemedRewardIds = (redemptionsResult.data ?? []).map((row) => row.reward_id);
 
   return NextResponse.json(
     {
