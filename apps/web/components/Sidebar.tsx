@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   Flame,
   LayoutGrid,
@@ -174,6 +174,15 @@ const Sidebar: React.FC<SidebarConfig> = ({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleToggleTheme = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    toggleTheme({
+      originX: rect.left + rect.width / 2,
+      originY: rect.top + rect.height / 2,
+      source: 'pointer',
+    });
+  };
   useEffect(() => {
     // GSAP stagger animation - only runs when the sidebar is rendered/opened
     const ctx = gsap.context(() => {
@@ -297,7 +306,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
         <div className={`shrink-0 space-y-2 ${expanded ? "px-4" : "px-2"} transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
           <button
             type="button"
-            onClick={toggleTheme}
+            onClick={handleToggleTheme}
             className={`menu-item text-left flex w-full items-center ${expanded ? "justify-start px-4 gap-4" : "justify-center px-2 gap-0"} py-3 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#B48470] dark:focus:ring-[#C9A84C] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
             title={!expanded ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
           >

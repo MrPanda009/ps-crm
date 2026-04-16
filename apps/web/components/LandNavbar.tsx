@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { useTheme } from './ThemeProvider';
 import Link from 'next/link';
 
@@ -33,6 +33,15 @@ export default function LandNavbar() {
   const divider = isDark ? 'divide-white/10' : 'divide-black/10';
   const hoverRow = isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50';
 
+  const handleToggleTheme = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    toggleTheme({
+      originX: rect.left + rect.width / 2,
+      originY: rect.top + rect.height / 2,
+      source: 'pointer',
+    });
+  };
+
   return (
     <>
       {/* ── Fixed top bar ── */}
@@ -49,7 +58,7 @@ export default function LandNavbar() {
           {/* Desktop right actions — md and up */}
           <div className="hidden md:flex items-center gap-3">
             {/* Theme toggle */}
-            <button onClick={toggleTheme} aria-label="Toggle theme"
+            <button onClick={handleToggleTheme} aria-label="Toggle theme"
               className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs sm:text-sm font-medium border transition-all ${isDark
                 ? 'border-white/20 text-yellow-300 bg-white/5 hover:bg-white/10'
                 : 'border-black/10 text-gray-600 bg-black/5 hover:bg-black/10'
@@ -68,7 +77,7 @@ export default function LandNavbar() {
 
           {/* Mobile right — theme icon + hamburger */}
           <div className="flex items-center gap-1 md:hidden">
-            <button onClick={toggleTheme} aria-label="Toggle theme"
+            <button onClick={handleToggleTheme} aria-label="Toggle theme"
               className={`rounded-full p-2 transition-colors ${isDark ? 'text-yellow-300 hover:bg-white/10' : 'text-gray-600 hover:bg-black/5'
                 }`}>
               {isDark ? <SunIcon /> : <MoonIcon />}
@@ -118,7 +127,7 @@ export default function LandNavbar() {
                   className={`block rounded-lg px-3 py-2.5 text-sm font-semibold text-center transition-colors ${text} ${hoverRow}`}>
                   Log in
                 </Link>
-                <button onClick={toggleTheme}
+                <button onClick={handleToggleTheme}
                   className={`w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors ${isDark
                     ? 'border-white/20 text-yellow-300 bg-white/5 hover:bg-white/10'
                     : 'border-black/10 text-gray-600 bg-black/5 hover:bg-black/10'

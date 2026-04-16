@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import { useRef, type MouseEvent } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useTheme } from "./ThemeProvider";
@@ -47,6 +47,19 @@ export default function ThemeToggle({
   const nightElementsRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
 
+  const handleToggle = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      toggleTheme({
+        originX: rect.left + rect.width / 2,
+        originY: rect.top + rect.height / 2,
+        source: 'pointer',
+      });
+    } else {
+      toggleTheme({ source: 'pointer' });
+    }
+  };
+
   // 2. GSAP Animations for the toggle states
   useGSAP(() => {
     if (!containerRef.current || !knobRef.current) return;
@@ -92,7 +105,7 @@ export default function ThemeToggle({
   return (
     <button
       ref={containerRef}
-      onClick={toggleTheme}
+      onClick={handleToggle}
       className="relative w-32 h-12 rounded-full overflow-hidden p-1 border-4 shadow-inner transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
       style={{ borderColor: colors.border }}
       aria-label="Toggle Dark Mode"

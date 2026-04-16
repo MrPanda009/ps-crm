@@ -30,6 +30,11 @@
   --color-badge-in-progress-text: #6ee7b7;
 }
 
+:root {
+  --theme-overlay-light: #f8fafc;
+  --theme-overlay-dark: #111827;
+}
+
 /* ========== UTILITY CLASSES ========== */
 
 @layer components {
@@ -108,6 +113,27 @@
   /* Status Badge */
   .status-badge {
     @apply inline-block rounded-md px-2.5 py-1 text-xs font-medium transition-shadow duration-200;
+  }
+}
+
+.theme-sweep-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  background: var(--theme-sweep-overlay-bg, var(--theme-overlay-dark));
+  clip-path: circle(0 at var(--theme-sweep-x, 50vw) var(--theme-sweep-y, 50vh));
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: clip-path, opacity;
+  opacity: 1;
+  isolation: isolate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-sweep-overlay {
+    transition: none !important;
+    will-change: auto !important;
   }
 }
 
