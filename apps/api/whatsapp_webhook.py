@@ -325,9 +325,20 @@ async def confirm_ticket(phone: str, session: dict):
     address_text  = location.get("formatted_address", f"Lat {lat}, Lng {lng}")
     timestamp_str = datetime.now(timezone.utc).isoformat()
 
-    # WhatsApp users don't have a Supabase JWT — use a dedicated bot user ID
-    # Set WHATSAPP_BOT_USER_ID in your Render env to a valid Supabase user UUID
+    # Automatic Profile Lookup (Zero-Login)
+    # WhatsApp gives us the number as 91... but DB stores as +91...
+    db_phone = f"+{phone}"
     citizen_id = os.getenv("WHATSAPP_BOT_USER_ID", "00000000-0000-0000-0000-000000000000")
+
+    try:
+        profile_resp = supabase.table("profiles").select("id").eq("phone", db_phone).execute()
+        if profile_resp.data and len(profile_resp.data) > 0:
+            citizen_id = profile_resp.data[0]["id"]
+            print(f"[auth] Matched WhatsApp user {phone} to profile {citizen_id}")
+        else:
+            print(f"[auth] No profile match for WhatsApp user {phone}, using fallback bot user.")
+    except Exception as ae:
+        print(f"[auth error] {ae}")
 
     try:
         response = supabase.table("complaints").insert({
