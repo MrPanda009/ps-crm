@@ -214,7 +214,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
           ${disableInternalScroll ? "h-full py-4" : "min-h-screen py-8"}
           ${colors.background} ${colors.border} lg:border-r lg:relative lg:translate-x-0
           ${isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
-          ${expanded ? "w-64" : "w-20"}
+          ${expanded ? "w-56" : "w-16"}
         `}
       >
         {/* Desktop Collapse Toggle */}
@@ -230,14 +230,14 @@ const Sidebar: React.FC<SidebarConfig> = ({
         {/* make top part scrollable so bottom nav stays visible */}
         <div className={`flex min-h-0 flex-col flex-1 overflow-x-hidden ${disableInternalScroll ? "overflow-y-hidden" : "overflow-y-auto"}`}>
           {/* Logo & Mobile Close Button */}
-          <div className={`flex items-center ${expanded ? "justify-between px-8" : "justify-center px-2"} ${disableInternalScroll ? "mb-6" : "mb-10"} menu-item transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
+          <div className={`flex items-center ${expanded ? "justify-between px-6" : "justify-center px-2"} ${disableInternalScroll ? "mb-6" : "mb-10"} menu-item transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
             <div className={`flex items-center ${expanded ? "gap-3" : "justify-center gap-0"} transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
               <div className="shrink-0 flex items-center justify-center">
                 {branding.icon}
               </div>
               <div className={`grid transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${expanded ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0"}`}>
                 <div className="overflow-hidden">
-                  <div className={`w-[160px] whitespace-nowrap text-[21px] font-medium leading-tight ${colors.textMain}`}>
+                  <div className={`w-[130px] whitespace-nowrap text-[21px] font-medium leading-tight ${colors.textMain}`}>
                     {branding.title}
                   </div>
                 </div>
@@ -272,7 +272,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
                     <div className="shrink-0">{item.icon}</div>
                     <div className={`grid transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${expanded ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0"}`}>
                       <div className="overflow-hidden">
-                        <span className="block w-[150px] whitespace-nowrap">
+                        <span className="block w-[130px] whitespace-nowrap">
                           {item.name}
                         </span>
                       </div>
@@ -306,7 +306,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
             </div>
             <div className={`grid transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${expanded ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0"}`}>
               <div className="overflow-hidden">
-                <span className="block w-[150px] whitespace-nowrap">
+                <span className="block w-[130px] whitespace-nowrap">
                   {mounted && (isDark ? "Light Mode" : "Dark Mode")}
                 </span>
               </div>
@@ -328,7 +328,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
                   <div className="shrink-0">{item.icon}</div>
                   <div className={`grid transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${expanded ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0"}`}>
                     <div className="overflow-hidden">
-                      <span className="block w-[150px] whitespace-nowrap">
+                      <span className="block w-[130px] whitespace-nowrap">
                         {item.name}
                       </span>
                     </div>
