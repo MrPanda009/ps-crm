@@ -272,6 +272,34 @@ export default function ProfilePage() {
     setIsGeneratingWA(false)
   }
 
+  const handleUnlinkWA = async (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation()
+    handleInteraction(e)
+    if (!user || isGeneratingWA) return;
+
+    const confirmed = confirm("Are you sure you want to unlink your WhatsApp account? You will need to generate a new code and link again to continue reporting via message.")
+    if (!confirmed) return;
+
+    setIsGeneratingWA(true)
+    
+    // Clear phone and any old code from profiles table
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        phone: null, 
+        whatsapp_link_code: null 
+      })
+      .eq('id', user.id)
+    
+    if (!error) {
+      setWaLinkCode(null)
+      setProfile((prev: any) => ({ ...prev, phone: null, whatsapp_link_code: null }))
+    } else {
+      console.error("Failed to unlink WhatsApp", error)
+    }
+    setIsGeneratingWA(false)
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-full bg-[#fcfbf9] dark:bg-[#0c0c0c] font-mono">
@@ -571,6 +599,14 @@ export default function ProfilePage() {
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,1)]"></div>
                       ENCRYPTED CHANNEL VERIFIED
                     </div>
+
+                    <button 
+                      onClick={handleUnlinkWA}
+                      disabled={isGeneratingWA}
+                      className="w-full border border-red-500/50 text-red-500/80 hover:bg-red-500/10 px-4 py-2 font-bold tracking-widest text-[10px] uppercase transition-colors rounded mt-2"
+                    >
+                      {isGeneratingWA ? "[ PROCESSING... ]" : "[ UNLINK ACCOUNT ]"}
+                    </button>
                   </div>
                 ) : !waLinkCode ? (
                   <button 
