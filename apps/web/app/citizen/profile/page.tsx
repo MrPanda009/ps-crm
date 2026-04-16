@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/src/lib/supabase"
 import type { Database } from "@/src/types/database.types"
-import { User, Activity, Terminal } from "lucide-react"
+import { User, Activity, Terminal, MessageCircle } from "lucide-react"
 import gsap from "gsap"
 
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"]
@@ -20,6 +20,10 @@ export default function ProfilePage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [editData, setEditData] = useState({ fullName: "", username: "" })
   const [isSaving, setIsSaving] = useState(false)
+
+  // WhatsApp Linking States
+  const [waLinkCode, setWaLinkCode] = useState<string | null>(null)
+  const [isGeneratingWA, setIsGeneratingWA] = useState(false)
   
   const containerRef = useRef<HTMLDivElement>(null)
   const leftColRef = useRef<HTMLDivElement>(null)
@@ -210,6 +214,25 @@ export default function ProfilePage() {
       setIsEditingProfile(false)
       setIsSaving(false)
     }, 300)
+  }
+
+  const handleGenerateWACode = async (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation()
+    handleInteraction(e)
+    if (!user || isGeneratingWA) return;
+
+    setIsGeneratingWA(true)
+    const code = `LINK-${Math.floor(1000 + Math.random() * 9000)}`
+    
+    // Save to profiles table
+    const { error } = await supabase.from('profiles').update({ whatsapp_link_code: code }).eq('id', user.id)
+    
+    if (!error) {
+      setWaLinkCode(code)
+    } else {
+      console.error("Failed to generate WA link code", error)
+    }
+    setIsGeneratingWA(false)
   }
 
   if (!user) {
@@ -479,6 +502,48 @@ export default function ProfilePage() {
                 </div>
               </div>
             </button>
+
+            {/* WhatsApp Linking Box */}
+            <div className="glow-border p-5 rounded-lg bg-white dark:bg-black/40 backdrop-blur-md text-left w-full relative overflow-hidden group cursor-default mt-2">
+              <div className="absolute inset-0 bg-green-500/5 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 pointer-events-none"></div>
+              
+              <div className="relative z-10 flex justify-between items-center mb-4 border-b-2 border-gray-200 dark:border-green-500/40 pb-3">
+                <div className="flex items-center gap-3 font-bold text-lg sm:text-xl uppercase tracking-wider text-green-700 dark:text-green-500">
+                  <MessageCircle size={24} /> LINK WHATSAPP
+                </div>
+              </div>
+
+              <div className="relative z-10 space-y-4">
+                <p className="text-gray-600 dark:text-gray-300 text-sm md:text-base leading-relaxed">
+                  Connect your WhatsApp to sync reports directly to this dashboard.
+                </p>
+                
+                {!waLinkCode ? (
+                  <button 
+                    onClick={handleGenerateWACode}
+                    disabled={isGeneratingWA}
+                    className="w-full bg-green-600 text-white dark:text-[#0c0c0c] px-4 py-3 font-extrabold tracking-widest text-sm uppercase hover:scale-[1.02] transition-transform active:scale-95 disabled:opacity-50 rounded shadow-[0_0_15px_rgba(34,197,94,0.4)]"
+                  >
+                    {isGeneratingWA ? "[ GENERATING CODE... ]" : "[ GENERATE LINK CODE ]"}
+                  </button>
+                ) : (
+                  <div className="space-y-4 pt-2">
+                    <div className="p-4 border border-green-500/30 bg-green-600/10 dark:bg-green-500/10 rounded flex flex-col items-center justify-center text-center shadow-inner">
+                      <span className="text-gray-600 dark:text-gray-400 text-xs mb-1 uppercase tracking-widest opacity-80">YOUR SECRET CODE:</span>
+                      <span className="text-2xl sm:text-3xl font-black tracking-widest text-green-700 dark:text-green-400 drop-shadow-md">{waLinkCode}</span>
+                    </div>
+                    
+                    <a 
+                      href={`https://wa.me/15551234567?text=${waLinkCode}`} 
+                      target="_blank" rel="noreferrer"
+                      className="block w-full text-center bg-green-600 text-white dark:text-[#0c0c0c] px-4 py-3 font-extrabold tracking-widest text-sm uppercase hover:scale-[1.02] transition-transform active:scale-95 rounded shadow-[0_0_15px_rgba(34,197,94,0.4)]"
+                    >
+                      [ OPEN WHATSAPP ]
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
 
           </div>
         </div>

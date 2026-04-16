@@ -201,10 +201,42 @@ async def handle_text(phone: str, text: str):
         await check_status(phone, ticket_id)
         return
 
+    # ── account linking ───────────────────────────────────────────────────────
+    if text.startswith("link-"):
+        code = text.upper()
+        await link_whatsapp_account(phone, code)
+        return
+
     # ── fallback ──────────────────────────────────────────────────────────────
     await send_text(phone,
         "I didn't understand that. Please use the Menu by sending *Hi* or send a *photo* to report an issue."
     )
+
+
+async def link_whatsapp_account(phone: str, code: str):
+    """Links the WhatsApp phone number to the profile that matches the generated linking code."""
+    db_phone = f"+{phone}" if not phone.startswith("+") else phone
+    try:
+        # Find the profile with this code
+        resp = supabase.table("profiles").select("id, full_name").eq("whatsapp_link_code", code).execute()
+        if not resp.data:
+            await send_text(phone, f"❌ Invalid or expired linking code: *{code}*. Please generate a new one from the Web Portal.")
+            return
+
+        user_id = resp.data[0]["id"]
+        full_name = resp.data[0].get("full_name") or "Citizen"
+
+        # Update the profile with the phone number and clear the code to prevent reuse
+        update_resp = supabase.table("profiles").update({
+            "phone": db_phone,
+            "whatsapp_link_code": None
+        }).eq("id", user_id).execute()
+
+        await send_text(phone, f"✅ *Success!* Your WhatsApp number has been successfully linked to your JanSamadhan account, *{full_name}*.\nAll reports submitted here will now sync to your dashboard.")
+        
+    except Exception as e:
+        print(f"[link error] {e}")
+        await send_text(phone, "⚠️ Sorry, an error occurred while linking your account. Please try again later.")
 
 
 async def handle_list_selection(phone: str, list_id: str):
