@@ -200,12 +200,12 @@ async def handle_image(phone: str, image_id: str):
         "state": "awaiting_location",
     }
 
-    await send_text(phone,
+    await send_location_request(phone,
         f"✅ *Issue detected:* {result['issue_name']}\n"
         f"📋 *{result['title']}*\n"
         f"🔴 Severity: {result['severity']}\n\n"
-        "📍 Now please *share your location* so I can complete the ticket.\n"
-        "_(Tap the 📎 attachment icon → Location)_"
+        "📍 Please tap *Send Location* below to complete your ticket.\n"
+        "(Or reply *No* to cancel report)"
     )
 
 
@@ -501,6 +501,35 @@ async def send_text(phone: str, text: str):
         resp = await client.post(GRAPH_API_URL, json=payload, headers=headers)
         if resp.status_code != 200:
             print(f"[send_text error] {resp.status_code}: {resp.text}")
+
+
+async def send_location_request(phone: str, text: str):
+    """
+    Sends a native 'location_request_message' that triggers the mobile location picker.
+    """
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "location_request_message",
+            "body": {
+                "text": text
+            },
+            "action": {
+                "name": "send_location"
+            }
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(GRAPH_API_URL, json=payload, headers=headers)
+        if resp.status_code != 200:
+            print(f"[send_location_request error] {resp.status_code}: {resp.text}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
