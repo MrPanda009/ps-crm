@@ -15,7 +15,7 @@ import Link from "next/link";
 import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
 import { gsap } from "gsap";
-import { getTwitterHandleForDepartment } from "@/src/lib/twitter-handles";
+import { getTieredTwitterHandles, type AccountabilityHandles } from "@/src/lib/twitter-handles";
 
 type Complaint = Database["public"]["Tables"]["complaints"]["Row"];
 
@@ -104,7 +104,11 @@ export default function TicketDetailClient() {
     if (!ticket || !ticketId) return;
     
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      // Smooth UX: Redirect to login and come back here after
+      router.push(`/login?redirectTo=${encodeURIComponent(window.location.href)}`);
+      return;
+    }
 
     const wasUpvoted = hasUpvoted;
     
@@ -148,13 +152,38 @@ export default function TicketDetailClient() {
   const handleShareToX = async () => {
     if (!ticket) return;
     
-    const handle = getTwitterHandleForDepartment(ticket.assigned_department);
-    const shareUrl = window.location.href;
-    const shareTitle = `🚨 Urgent Civic Issue: ${ticket.title}`;
-    const shareText = `${shareTitle}\n📍 Locality: ${ticket.ward_name || 'Delhi'}\n🎫 Ref: ${ticket.ticket_id}\n\nPlease take action! ${handle} #JanSamadhan #CivicIssue`;
+    const { primary, escalated, tier } = getTieredTwitterHandles(
+      ticket.category_id, 
+      ticket.assigned_department, 
+      upvoteCount
+    );
     
-    // 1. Try Web Share API (Mobile Premium Flow)
-    // This attaches the ACTUAL file to the tweet
+    const handles = `${primary} ${escalated}`.trim();
+    const shareUrl = window.location.href;
+    
+    // Time-based urgency
+    const daysSince = Math.floor((new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60 * 24));
+    const urgencyMarker = (ticket.status === 'submitted' && daysSince >= 3) 
+      ? `⚠️ UNRESOLVED FOR ${daysSince} DAYS\n` 
+      : (tier >= 3) ? `📊 HIGH PUBLIC INTEREST\n` : "";
+
+    // Smart Truncation Logic for 280 characters
+    const locality = ticket.ward_name || "Delhi";
+    const ref = ticket.ticket_id || "N/A";
+    const hashtags = "#JanSamadhan #Delhi #Accountability";
+    
+    // Template pieces (excluding Title)
+    const baseText = `\n📍 ${locality}\n🎫 Ref: ${ref}\n📣 ${handles}\n\n🗳️ Upvote here: ${shareUrl}\n${hashtags}`;
+    
+    const maxTitleLen = 280 - (baseText.length + urgencyMarker.length + 15);
+    let title = ticket.title || "Civic Issue";
+    if (title.length > maxTitleLen) {
+      title = title.substring(0, maxTitleLen - 3) + "...";
+    }
+
+    const shareText = `${urgencyMarker}🚨 Issue: ${title}${baseText}`;
+    
+    // 1. Try Web Share API
     if (navigator.share && navigator.canShare && ticket.photo_urls?.[0]) {
       try {
         const imageUrl = ticket.photo_urls[0];
@@ -165,19 +194,18 @@ export default function TicketDetailClient() {
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
-            title: shareTitle,
+            title: `Issue: ${title}`,
             text: shareText,
           });
-          return; // Success
+          return;
         }
       } catch (err) {
         console.warn("Web Share failed, falling back to Intent:", err);
       }
     }
 
-    // 2. Fallback to Twitter Intent (Desktop / Legacy Flow)
-    // This relies on the 'summary_large_image' metadata we fixed
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    // 2. Fallback to Twitter Intent
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
     window.open(twitterUrl, "_blank");
   };
 
@@ -323,11 +351,38 @@ export default function TicketDetailClient() {
                 <span className="font-bold">{upvoteCount}</span>
               </button>
 
+              {/* Pressure Level Indicator */}
+              <div className="flex flex-col gap-1 min-w-[120px]">
+                <div className="flex justify-between text-[8px] font-bold text-gray-500 uppercase tracking-tighter">
+                  <span>Pressure Level</span>
+                  <span className="text-orange-500">Tier {getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier}</span>
+                </div>
+                <div className="h-1.5 w-full bg-[#333] rounded-full overflow-hidden flex">
+                  {[1, 2, 3, 4].map((t) => (
+                    <div 
+                      key={t}
+                      className={`h-full flex-1 border-r border-[#1e1e1e] last:border-0 transition-colors duration-500 ${
+                        getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier >= t 
+                          ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' 
+                          : 'bg-transparent'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
               <button 
                 onClick={handleShareToX}
-                className="flex h-[56px] w-[56px] items-center justify-center rounded-2xl bg-[#2a2a2a] text-gray-400 hover:bg-[#333] hover:text-white transition-all"
+                className="flex h-[56px] w-[56px] items-center justify-center rounded-2xl bg-[#2a2a2a] text-gray-400 hover:bg-orange-500/10 hover:text-orange-500 border border-[#333] hover:border-orange-500 transition-all group relative"
+                title="Escalate to Twitter"
               >
                 <Share2 size={20} />
+                {getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier >= 3 && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                  </span>
+                )}
               </button>
             </div>
           </div>
