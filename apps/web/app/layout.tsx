@@ -20,6 +20,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://jansamadhan.perkkk.dev"),
   title: "Jan Samadhan | Delhi's Public Grievance Portal | Jansamadhan",
   description:
     "Jan Samadhan (Jansamadhan) is Delhi's centralized public grievance platform. Report civic issues, track complaint status, and connect with local authorities in India.",

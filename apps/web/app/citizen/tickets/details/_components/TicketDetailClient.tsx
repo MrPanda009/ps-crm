@@ -63,6 +63,31 @@ export default function TicketDetailClient() {
     };
 
     fetchTicket();
+
+    // ─── Realtime Subscription for Live Upvote Updates ───────────────────────
+    const channel = supabase
+      .channel(`ticket-detail-${ticketId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "complaints",
+          filter: `id=eq.${ticketId}`,
+        },
+        (payload) => {
+          const newData = payload.new as Complaint;
+          if (newData && newData.upvote_count !== undefined) {
+            setUpvoteCount(newData.upvote_count);
+            setTicket(newData);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [ticketId]);
 
   // Entry animations
@@ -89,30 +114,70 @@ export default function TicketDetailClient() {
 
     try {
       if (wasUpvoted) {
-        await supabase.from("upvotes").delete().eq("citizen_id", user.id).eq("complaint_id", ticketId);
-        await supabase.from("complaints").update({ upvote_count: Math.max(0, upvoteCount - 1) }).eq("id", ticketId);
+        const { error: delError } = await supabase.from("upvotes").delete().eq("citizen_id", user.id).eq("complaint_id", ticketId);
+        // If it's already deleted, we don't treat it as a fatal error
+        if (delError && delError.code !== 'PGRST116') throw delError;
+        
+        const { error: rpcError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: ticketId });
+        if (rpcError) throw rpcError;
       } else {
-        await supabase.from("upvotes").insert({ citizen_id: user.id, complaint_id: ticketId });
-        await supabase.rpc('increment_upvote_count', { p_complaint_id: ticketId });
+        const { error: insError } = await supabase.from("upvotes").insert({ citizen_id: user.id, complaint_id: ticketId });
+        
+        // Error code 23505 is 'unique_violation' (duplicate key).
+        // If it already exists, we ignore and proceed to the RPC to ensure the count is synced.
+        if (insError && insError.code !== '23505') throw insError;
+        
+        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: ticketId });
+        if (rpcError) throw rpcError;
       }
-    } catch (err) {
-      console.error("Upvote failed:", err);
-      // Rollback
+      
+      // Verification: re-fetch from DB to ensure local state is synced after non-optimistic action
+      // (The realtime subscription will also handle this, but explicit fetch is safer)
+    } catch (err: any) {
+      console.error("Upvote persistence failed:", err);
+      // Rollback optimistic UI
       setHasUpvoted(wasUpvoted);
-      setUpvoteCount(upvoteCount);
+      setUpvoteCount(wasUpvoted ? upvoteCount + 1 : upvoteCount - 1);
+      
+      // Inform the user why it failed
+      const msg = err?.message || "Check your internet or permissions.";
+      alert(`Upvote failed: ${msg}`);
     }
   };
 
-  const handleShareToX = () => {
+  const handleShareToX = async () => {
     if (!ticket) return;
     
     const handle = getTwitterHandleForDepartment(ticket.assigned_department);
     const shareUrl = window.location.href;
+    const shareTitle = `🚨 Urgent Civic Issue: ${ticket.title}`;
+    const shareText = `${shareTitle}\n📍 Locality: ${ticket.ward_name || 'Delhi'}\n🎫 Ref: ${ticket.ticket_id}\n\nPlease take action! ${handle} #JanSamadhan #CivicIssue`;
     
-    const text = `🚨 Urgent Civic Issue: ${ticket.title}\n📍 Locality: ${ticket.ward_name || 'Delhi'}\n🎫 Ref: ${ticket.ticket_id}\n\nPlease take action! ${handle} #JanSamadhan #CivicIssue`;
-    
-    // Using the 'url' parameter ensures Twitter generates a rich card if metadata is present
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+    // 1. Try Web Share API (Mobile Premium Flow)
+    // This attaches the ACTUAL file to the tweet
+    if (navigator.share && navigator.canShare && ticket.photo_urls?.[0]) {
+      try {
+        const imageUrl = ticket.photo_urls[0];
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], "issue.jpg", { type: "image/jpeg" });
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: shareTitle,
+            text: shareText,
+          });
+          return; // Success
+        }
+      } catch (err) {
+        console.warn("Web Share failed, falling back to Intent:", err);
+      }
+    }
+
+    // 2. Fallback to Twitter Intent (Desktop / Legacy Flow)
+    // This relies on the 'summary_large_image' metadata we fixed
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(twitterUrl, "_blank");
   };
 

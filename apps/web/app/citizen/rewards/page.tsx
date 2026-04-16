@@ -9,9 +9,11 @@ import {
   CreditCard,
   Lock,
   ShoppingCart,
+  Sparkles,
   Ticket,
   TrainFront,
   TreePine,
+  X,
   Zap,
 } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
@@ -167,10 +169,12 @@ async function getAuthToken(): Promise<string | null> {
 export default function RewardsPage() {
   const [jsPoints, setJsPoints] = useState<number | null>(null);
   const [rewards, setRewards] = useState<RewardCatalogItem[]>([]);
-  const [redeemedRewardIds, setRedeemedRewardIds] = useState<Set<string>>(new Set());
+  const [redeemedRewardIds, setRedeemedRewardIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redeemingRewardId, setRedeemingRewardId] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastRedeemedItem, setLastRedeemedItem] = useState<RewardCatalogItem | null>(null);
 
   const progressPass = useMemo<PassTier[]>(() => {
     const balance = jsPoints ?? 0;
@@ -212,7 +216,7 @@ export default function RewardsPage() {
     const payload = data as WalletResponse;
     setJsPoints(payload.wallet.points_balance ?? 0);
     setRewards(payload.rewards ?? []);
-    setRedeemedRewardIds(new Set(payload.redeemedRewardIds ?? []));
+    setRedeemedRewardIds(payload.redeemedRewardIds ?? []);
     window.dispatchEvent(new CustomEvent("update-js-points", { detail: payload.wallet.points_balance ?? 0 }));
   }, []);
 
@@ -262,7 +266,8 @@ export default function RewardsPage() {
           throw new Error(payload?.error || "Failed to redeem reward");
         }
 
-        window.alert(`Successfully redeemed ${item.title}.`);
+        setLastRedeemedItem(item);
+        setShowSuccessModal(true);
         await fetchWallet();
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to redeem reward";
@@ -377,7 +382,8 @@ export default function RewardsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {rewards.map((item) => {
               const visual = rewardVisual(item.kind, item.title);
-              const isOwned = redeemedRewardIds.has(item.id);
+              const redemptionCount = redeemedRewardIds.filter(id => id === item.id).length;
+              const isLimitReached = redemptionCount >= item.per_user_limit;
               const hasStock = item.stock_remaining == null || item.stock_remaining > 0;
               const canAfford = jsPoints !== null && jsPoints >= item.points_cost;
               const isRedeeming = redeemingRewardId === item.id;
@@ -387,7 +393,7 @@ export default function RewardsPage() {
                   key={item.id}
                   className={`flex items-center gap-4 p-3 rounded-xl border transition-all
                     ${
-                      isOwned
+                      isLimitReached
                         ? "bg-green-50 border-green-200 opacity-90 dark:bg-[#1D2B24] dark:border-green-500/30 dark:opacity-80"
                         : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:bg-[#1e1e1e] dark:border-[#2a2a2a] dark:hover:bg-[#252525] dark:hover:border-gray-600"
                     }
@@ -396,16 +402,21 @@ export default function RewardsPage() {
                   <div className={`p-4 justify-center items-center flex rounded-lg ${visual.iconBg} ${visual.color}`}>{visual.icon}</div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{visual.category}</div>
+                    <div className="flex justify-between items-start mb-0.5">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{visual.category}</div>
+                      <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isLimitReached ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-gray-100 dark:bg-white/5 text-gray-500"}`}>
+                        {redemptionCount}/{item.per_user_limit} CLAIMED
+                      </div>
+                    </div>
                     <div className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 leading-tight mb-1">{item.title}</div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 mb-2 line-clamp-1">{visual.subtitle}</div>
 
                     <button
                       onClick={() => void handlePurchase(item)}
-                      disabled={isOwned || !canAfford || !hasStock || isRedeeming}
+                      disabled={isLimitReached || !canAfford || !hasStock || isRedeeming}
                       className={`flex items-center justify-between w-full px-2 py-1.5 rounded text-xs font-bold transition-colors
                         ${
-                          isOwned
+                          isLimitReached
                             ? "bg-transparent text-green-600 dark:text-green-500 cursor-default"
                             : canAfford && hasStock && !isRedeeming
                               ? "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-[#C9A84C]/10 dark:text-[#C9A84C] dark:hover:bg-[#C9A84C]/20 cursor-pointer"
@@ -414,10 +425,10 @@ export default function RewardsPage() {
                       `}
                     >
                       <div className="flex items-center gap-1.5">
-                        <Coins size={14} className={isOwned ? "text-green-600 dark:text-green-500" : "text-amber-600 dark:text-[#C9A84C]"} />
+                        <Coins size={14} className={isLimitReached ? "text-green-600 dark:text-green-500" : "text-amber-600 dark:text-[#C9A84C]"} />
                         <span>{item.points_cost} JS Points</span>
                       </div>
-                      {isOwned ? <CheckCircle2 size={14} className="text-green-600 dark:text-green-500" /> : null}
+                      {isLimitReached ? <CheckCircle2 size={14} className="text-green-600 dark:text-green-500" /> : null}
                     </button>
                     {!hasStock ? <p className="mt-1 text-[10px] text-red-500">Out of stock</p> : null}
                     {isRedeeming ? <p className="mt-1 text-[10px] text-gray-500">Processing...</p> : null}
@@ -439,9 +450,63 @@ export default function RewardsPage() {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
+        @keyframes modal-in {
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-modal-in {
+          animation: modal-in 0.3s ease-out forwards;
+        }
       `,
         }}
       />
+
+      {/* REDEMPTION SUCCESS MODAL */}
+      {showSuccessModal && lastRedeemedItem && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-gray-200 dark:border-white/10 animate-modal-in">
+            <div className="relative p-8 flex flex-col items-center text-center">
+              <button 
+                onClick={() => setShowSuccessModal(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="mb-6 relative">
+                <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full" />
+                <div className="relative bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 p-4 rounded-full">
+                  <CheckCircle2 size={48} strokeWidth={2.5} />
+                </div>
+                <div className="absolute -top-1 -right-1 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-lg">
+                  <Sparkles size={16} />
+                </div>
+              </div>
+
+              <h3 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white mb-2">REDEEMED!</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Successfully claimed <span className="font-bold text-gray-900 dark:text-gray-100">{lastRedeemedItem.title}</span>
+              </p>
+
+              <div className="w-full bg-gray-50 dark:bg-white/5 rounded-2xl p-4 mb-8">
+                <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">DEDUCTED</div>
+                <div className="flex items-center justify-center gap-1.5 text-amber-600 dark:text-[#C9A84C] font-bold text-lg">
+                  <Coins size={20} />
+                  <span>{lastRedeemedItem.points_cost.toLocaleString()} JS Points</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-sm tracking-wide hover:opacity-90 transition-opacity shadow-lg"
+              >
+                CONTINUE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
