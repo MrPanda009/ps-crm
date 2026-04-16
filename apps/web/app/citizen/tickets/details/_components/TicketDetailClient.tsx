@@ -28,6 +28,7 @@ export default function TicketDetailClient() {
   const [loading, setLoading] = useState(true);
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [upvoteCount, setUpvoteCount] = useState(0);
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     if (!ticketId) return;
@@ -149,6 +150,39 @@ export default function TicketDetailClient() {
     }
   };
 
+  const copyImageToClipboard = async (imageUrl: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // We need to ensure it's PNG for the Clipboard API in most browsers
+      // If it's JPEG, we convert it via canvas
+      let pngBlob = blob;
+      if (blob.type !== 'image/png') {
+        const img = new Image();
+        img.src = URL.createObjectURL(blob);
+        await new Promise((resolve) => (img.onload = resolve));
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0);
+        
+        pngBlob = await new Promise((resolve) => 
+          canvas.toBlob((b) => resolve(b!), 'image/png')
+        ) as Blob;
+      }
+      
+      const item = new ClipboardItem({ 'image/png': pngBlob });
+      await navigator.clipboard.write([item]);
+      return true;
+    } catch (err) {
+      console.error("Failed to copy image to clipboard:", err);
+      return false;
+    }
+  };
+
   const handleShareToX = async () => {
     if (!ticket) return;
     
@@ -170,7 +204,10 @@ export default function TicketDetailClient() {
     // Smart Truncation Logic for 280 characters
     const locality = ticket.ward_name || "Delhi";
     const ref = ticket.ticket_id || "N/A";
-    const hashtags = "#JanSamadhan #Delhi #Accountability";
+    
+    // Dynamic hashtags: Global + Hyper-local ward tag
+    const wardTag = ticket.ward_name ? `#${ticket.ward_name.replace(/\s+/g, '')} ` : "";
+    const hashtags = `${wardTag}#JanSamadhan #Delhi #Accountability`;
     
     // Template pieces (excluding Title)
     const baseText = `\n📍 ${locality}\n🎫 Ref: ${ref}\n📣 ${handles}\n\n🗳️ Upvote here: ${shareUrl}\n${hashtags}`;
@@ -183,7 +220,7 @@ export default function TicketDetailClient() {
 
     const shareText = `${urgencyMarker}🚨 Issue: ${title}${baseText}`;
     
-    // 1. Try Web Share API
+    // PATH A: Mobile / Native Share (Direct File Attachment)
     if (navigator.share && navigator.canShare && ticket.photo_urls?.[0]) {
       try {
         const imageUrl = ticket.photo_urls[0];
@@ -200,11 +237,19 @@ export default function TicketDetailClient() {
           return;
         }
       } catch (err) {
-        console.warn("Web Share failed, falling back to Intent:", err);
+        console.warn("Web Share failed, attempting Desktop fallback:", err);
       }
     }
 
-    // 2. Fallback to Twitter Intent
+    // PATH B: Desktop Fallback (Auto-Copy Image + Intent)
+    if (ticket.photo_urls?.[0]) {
+      const copied = await copyImageToClipboard(ticket.photo_urls[0]);
+      if (copied) {
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 5000);
+      }
+    }
+
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
     window.open(twitterUrl, "_blank");
   };
@@ -249,6 +294,30 @@ export default function TicketDetailClient() {
           </span>
         </div>
       </div>
+
+      {/* Copy Instruction Toast */}
+      {showToast && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-orange-500/50 bg-black/90 px-8 py-5 text-center shadow-[0_0_30px_rgba(249,115,22,0.3)] backdrop-blur-xl">
+            <div className="flex items-center gap-3 text-orange-500 font-black tracking-widest text-sm uppercase">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+              </span>
+              IMAGE COPIED TO CLIPBOARD
+            </div>
+            <p className="text-gray-400 text-xs font-medium">
+              Just press <span className="text-white font-bold bg-[#333] px-1.5 py-0.5 rounded">Cmd + V</span> (Paste) in your Twitter draft to attach!
+            </p>
+            <button 
+              onClick={() => setShowToast(false)}
+              className="mt-2 text-[10px] font-bold text-gray-500 hover:text-white transition-colors"
+            >
+              [ DISMISS ]
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto max-w-6xl p-6">
         <div className="grid grid-cols-1 overflow-hidden rounded-3xl border border-[#2a2a2a] bg-[#1e1e1e] shadow-2xl lg:grid-cols-12">
