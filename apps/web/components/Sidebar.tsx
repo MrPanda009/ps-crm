@@ -298,7 +298,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
           <button
             type="button"
             onClick={toggleTheme}
-            className={`menu-item flex w-full items-center ${expanded ? "justify-start px-4 gap-4" : "justify-center px-2 gap-0"} py-3 ml-2 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#B48470] dark:focus:ring-[#C9A84C] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
+            className={`menu-item text-left flex w-full items-center ${expanded ? "justify-start px-4 gap-4" : "justify-center px-2 gap-0"} py-3 ml-2 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#B48470] dark:focus:ring-[#C9A84C] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
             title={!expanded ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
           >
             <div className="shrink-0">
