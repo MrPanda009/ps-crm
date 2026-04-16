@@ -169,7 +169,7 @@ async function getAuthToken(): Promise<string | null> {
 export default function RewardsPage() {
   const [jsPoints, setJsPoints] = useState<number | null>(null);
   const [rewards, setRewards] = useState<RewardCatalogItem[]>([]);
-  const [redeemedRewardIds, setRedeemedRewardIds] = useState<Set<string>>(new Set());
+  const [redeemedRewardIds, setRedeemedRewardIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redeemingRewardId, setRedeemingRewardId] = useState<string | null>(null);
@@ -216,7 +216,7 @@ export default function RewardsPage() {
     const payload = data as WalletResponse;
     setJsPoints(payload.wallet.points_balance ?? 0);
     setRewards(payload.rewards ?? []);
-    setRedeemedRewardIds(new Set(payload.redeemedRewardIds ?? []));
+    setRedeemedRewardIds(payload.redeemedRewardIds ?? []);
     window.dispatchEvent(new CustomEvent("update-js-points", { detail: payload.wallet.points_balance ?? 0 }));
   }, []);
 
@@ -382,7 +382,8 @@ export default function RewardsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {rewards.map((item) => {
               const visual = rewardVisual(item.kind, item.title);
-              const isOwned = redeemedRewardIds.has(item.id);
+              const redemptionCount = redeemedRewardIds.filter(id => id === item.id).length;
+              const isLimitReached = redemptionCount >= item.per_user_limit;
               const hasStock = item.stock_remaining == null || item.stock_remaining > 0;
               const canAfford = jsPoints !== null && jsPoints >= item.points_cost;
               const isRedeeming = redeemingRewardId === item.id;
@@ -392,7 +393,7 @@ export default function RewardsPage() {
                   key={item.id}
                   className={`flex items-center gap-4 p-3 rounded-xl border transition-all
                     ${
-                      isOwned
+                      isLimitReached
                         ? "bg-green-50 border-green-200 opacity-90 dark:bg-[#1D2B24] dark:border-green-500/30 dark:opacity-80"
                         : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:bg-[#1e1e1e] dark:border-[#2a2a2a] dark:hover:bg-[#252525] dark:hover:border-gray-600"
                     }
@@ -401,16 +402,21 @@ export default function RewardsPage() {
                   <div className={`p-4 justify-center items-center flex rounded-lg ${visual.iconBg} ${visual.color}`}>{visual.icon}</div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{visual.category}</div>
+                    <div className="flex justify-between items-start mb-0.5">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{visual.category}</div>
+                      <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isLimitReached ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400" : "bg-gray-100 dark:bg-white/5 text-gray-500"}`}>
+                        {redemptionCount}/{item.per_user_limit} CLAIMED
+                      </div>
+                    </div>
                     <div className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 leading-tight mb-1">{item.title}</div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 mb-2 line-clamp-1">{visual.subtitle}</div>
 
                     <button
                       onClick={() => void handlePurchase(item)}
-                      disabled={isOwned || !canAfford || !hasStock || isRedeeming}
+                      disabled={isLimitReached || !canAfford || !hasStock || isRedeeming}
                       className={`flex items-center justify-between w-full px-2 py-1.5 rounded text-xs font-bold transition-colors
                         ${
-                          isOwned
+                          isLimitReached
                             ? "bg-transparent text-green-600 dark:text-green-500 cursor-default"
                             : canAfford && hasStock && !isRedeeming
                               ? "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-[#C9A84C]/10 dark:text-[#C9A84C] dark:hover:bg-[#C9A84C]/20 cursor-pointer"
@@ -419,10 +425,10 @@ export default function RewardsPage() {
                       `}
                     >
                       <div className="flex items-center gap-1.5">
-                        <Coins size={14} className={isOwned ? "text-green-600 dark:text-green-500" : "text-amber-600 dark:text-[#C9A84C]"} />
+                        <Coins size={14} className={isLimitReached ? "text-green-600 dark:text-green-500" : "text-amber-600 dark:text-[#C9A84C]"} />
                         <span>{item.points_cost} JS Points</span>
                       </div>
-                      {isOwned ? <CheckCircle2 size={14} className="text-green-600 dark:text-green-500" /> : null}
+                      {isLimitReached ? <CheckCircle2 size={14} className="text-green-600 dark:text-green-500" /> : null}
                     </button>
                     {!hasStock ? <p className="mt-1 text-[10px] text-red-500">Out of stock</p> : null}
                     {isRedeeming ? <p className="mt-1 text-[10px] text-gray-500">Processing...</p> : null}
