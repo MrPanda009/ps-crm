@@ -72,6 +72,32 @@ export default function WorkerTasksPage() {
   const [error,   setError]   = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<{ id: string; ticket_id: string; title: string } | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const taskId = urlParams.get("taskId");
+      if (taskId) {
+        setHighlightedTaskId(taskId);
+        
+        const attemptScroll = () => {
+          const element = document.getElementById(`task-${taskId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        };
+
+        // Try scroll immediately, and also after fetch to ensure it is rendered
+        setTimeout(attemptScroll, 100);
+        setTimeout(attemptScroll, 1000);
+
+        setTimeout(() => {
+          setHighlightedTaskId(null);
+        }, 3000);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -254,7 +280,12 @@ export default function WorkerTasksPage() {
                 {tasks.map((task) => (
                   <li
                     key={task.id}
-                    className="grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr_140px] gap-3 px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-gray-300 dark:hover:bg-[#1e1e1e]"
+                    id={`task-${task.id}`}
+                    className={`grid grid-cols-[150px_2fr_2fr_1.5fr_1fr_1fr_140px] gap-3 px-5 py-4 text-sm text-gray-700 dark:text-gray-300 transition-all duration-500 ease-out ${
+                      highlightedTaskId === task.id 
+                        ? 'bg-amber-100 dark:bg-[#f59e0b]/20 shadow-[inset_0_0_15px_rgba(245,158,11,0.3)] z-10 relative border-l-4 border-amber-500 dark:border-[#f59e0b]' 
+                        : 'hover:bg-gray-50 dark:hover:bg-[#1e1e1e] border-l-4 border-transparent'
+                    }`}
                   >
                       <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate dark:text-gray-200">
                         {task.ticket_id || "N/A"}
