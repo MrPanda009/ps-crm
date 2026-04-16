@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { 
   ChevronLeft, 
@@ -18,8 +18,7 @@ import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
-import { useRef } from "react";
-import { getTwitterHandleForDepartment } from "@/src/lib/twitter-handles";
+import { getTieredTwitterHandles } from "@/src/lib/twitter-handles";
 
 type Complaint = Database["public"]["Tables"]["complaints"]["Row"];
 
@@ -92,6 +91,7 @@ export default function TicketDetailClient({
   const [loading, setLoading] = useState(true);
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [upvoteCount, setUpvoteCount] = useState(0);
+  const [showToast, setShowToast] = useState(false);
   
   const [viewMode, setViewMode] = useState<"details" | "lifecycle">("details");
   const [history, setHistory] = useState<any[]>([]);
@@ -587,34 +587,37 @@ export default function TicketDetailClient({
               </button>
 
               {/* Pressure Level Indicator */}
-              <div className="flex flex-col gap-1 min-w-[120px]">
-                <div className="flex justify-between text-[8px] font-bold text-gray-500 uppercase tracking-tighter">
-                  <span>Pressure Level</span>
-                  <span className="text-orange-500">Tier {getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier}</span>
+              {ticket && (
+                <div className="flex flex-col gap-1 min-w-[100px]">
+                  <div className="flex justify-between text-[8px] font-bold text-gray-500 dark:text-gray-500 uppercase tracking-tighter">
+                    <span>Pressure</span>
+                    <span className="text-[#b48470]">Tier {getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-200 dark:bg-[#333] rounded-full overflow-hidden flex">
+                    {[1, 2, 3, 4].map((t) => (
+                      <div 
+                        key={t}
+                        className={`h-full flex-1 border-r border-white dark:border-[#161616] last:border-0 transition-colors duration-500 ${
+                          getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier >= t 
+                            ? 'bg-[#b48470]' 
+                            : 'bg-transparent'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="h-1.5 w-full bg-[#333] rounded-full overflow-hidden flex">
-                  {[1, 2, 3, 4].map((t) => (
-                    <div 
-                      key={t}
-                      className={`h-full flex-1 border-r border-[#1e1e1e] last:border-0 transition-colors duration-500 ${
-                        getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier >= t 
-                          ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]' 
-                          : 'bg-transparent'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
+              )}
 
               <button 
                 onClick={handleShareToX}
-                className="flex h-[52px] w-[52px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm hover:border-gray-300 hover:bg-gray-50 hover:text-black dark:border-[#333] dark:bg-[#2a2a2a] dark:text-gray-300 dark:hover:bg-[#444] dark:hover:text-white transition-all shrink-0"
+                className="flex h-[52px] w-[52px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm hover:border-gray-300 hover:bg-gray-50 hover:text-black dark:border-[#333] dark:bg-[#2a2a2a] dark:text-gray-300 dark:hover:bg-[#444] dark:hover:text-white transition-all shrink-0 relative"
+                title="Share to X / Twitter"
               >
                 <Share2 size={20} />
-                {getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier >= 3 && (
+                {ticket && getTieredTwitterHandles(ticket.category_id, ticket.assigned_department, upvoteCount).tier >= 3 && (
                   <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b48470] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[#b48470]"></span>
                   </span>
                 )}
               </button>
@@ -628,6 +631,29 @@ export default function TicketDetailClient({
   if (isModal) {
     return (
       <div ref={containerRef} className="modal-overlay fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 p-4 sm:p-6 lg:p-8 will-change-[opacity]">
+        {/* Copy Instruction Toast */}
+        {showToast && (
+          <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[3100] animate-fade-in">
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-[#b48470]/50 bg-white/95 dark:bg-[#161616]/95 px-8 py-5 text-center shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center gap-3 text-[#b48470] font-black tracking-widest text-sm uppercase">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b48470] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#b48470]"></span>
+                </span>
+                IMAGE COPIED TO CLIPBOARD
+              </div>
+              <p className="text-gray-500 dark:text-gray-400 text-xs font-medium">
+                Press <span className="text-gray-900 dark:text-white font-bold bg-gray-100 dark:bg-[#2a2a2a] px-1.5 py-0.5 rounded">Cmd + V</span> in your Twitter draft to attach!
+              </p>
+              <button 
+                onClick={() => setShowToast(false)}
+                className="mt-1 text-[10px] font-bold text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+              >
+                [ DISMISS ]
+              </button>
+            </div>
+          </div>
+        )}
         {renderContent()}
       </div>
     );
@@ -635,6 +661,29 @@ export default function TicketDetailClient({
 
   return (
     <div ref={containerRef} className="relative flex h-[calc(100vh-73px)] w-full flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+      {/* Copy Instruction Toast */}
+      {showToast && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-[#b48470]/50 bg-white/95 dark:bg-[#161616]/95 px-8 py-5 text-center shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center gap-3 text-[#b48470] font-black tracking-widest text-sm uppercase">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b48470] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#b48470]"></span>
+              </span>
+              IMAGE COPIED TO CLIPBOARD
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 text-xs font-medium">
+              Press <span className="text-gray-900 dark:text-white font-bold bg-gray-100 dark:bg-[#2a2a2a] px-1.5 py-0.5 rounded">Cmd + V</span> in your Twitter draft to attach!
+            </p>
+            <button 
+              onClick={() => setShowToast(false)}
+              className="mt-1 text-[10px] font-bold text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+            >
+              [ DISMISS ]
+            </button>
+          </div>
+        </div>
+      )}
       {renderContent()}
     </div>
   );
