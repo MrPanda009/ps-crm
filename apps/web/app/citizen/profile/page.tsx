@@ -12,6 +12,7 @@ type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"]
 export default function ProfilePage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [tickets, setTickets] = useState<ComplaintRow[]>([])
   const [loadingTickets, setLoadingTickets] = useState(true)
   const [ticketCount, setTicketCount] = useState(0)
@@ -50,6 +51,19 @@ export default function ProfilePage() {
             setLoadingTickets(false)
           })
 
+        // Fetch Profile on load (including wa_link_code and phone)
+        supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", currentUser.id)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              setProfile(data)
+              if (data.whatsapp_link_code) setWaLinkCode(data.whatsapp_link_code)
+            }
+          })
+
         // Real-time subscription to auto-update on new tickets
         const channel = supabase
           .channel(`profile-complaints-${currentUser.id}`)
@@ -82,8 +96,31 @@ export default function ProfilePage() {
           )
           .subscribe();
 
+        // Real-time subscription to profile changes (for WhatsApp linking)
+        const profileChannel = supabase
+          .channel(`profile-data-${currentUser.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "profiles",
+              filter: `id=eq.${currentUser.id}`,
+            },
+            (payload) => {
+              setProfile(payload.new)
+              if (payload.new.whatsapp_link_code) {
+                setWaLinkCode(payload.new.whatsapp_link_code)
+              } else if (payload.new.phone) {
+                setWaLinkCode(null)
+              }
+            }
+          )
+          .subscribe();
+
         return () => {
           supabase.removeChannel(channel)
+          supabase.removeChannel(profileChannel)
         }
       }
     })
@@ -231,6 +268,34 @@ export default function ProfilePage() {
       setWaLinkCode(code)
     } else {
       console.error("Failed to generate WA link code", error)
+    }
+    setIsGeneratingWA(false)
+  }
+
+  const handleUnlinkWA = async (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation()
+    handleInteraction(e)
+    if (!user || isGeneratingWA) return;
+
+    const confirmed = confirm("Are you sure you want to unlink your WhatsApp account? You will need to generate a new code and link again to continue reporting via message.")
+    if (!confirmed) return;
+
+    setIsGeneratingWA(true)
+    
+    // Clear phone and any old code from profiles table
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        phone: null, 
+        whatsapp_link_code: null 
+      })
+      .eq('id', user.id)
+    
+    if (!error) {
+      setWaLinkCode(null)
+      setProfile((prev: any) => ({ ...prev, phone: null, whatsapp_link_code: null }))
+    } else {
+      console.error("Failed to unlink WhatsApp", error)
     }
     setIsGeneratingWA(false)
   }
@@ -515,10 +580,35 @@ export default function ProfilePage() {
 
               <div className="relative z-10 space-y-4">
                 <p className="text-gray-600 dark:text-gray-300 text-sm md:text-base leading-relaxed">
-                  Connect your WhatsApp to sync reports directly to this dashboard.
+                  {profile?.phone 
+                    ? "Your WhatsApp is securely linked. You can report issues directly via message." 
+                    : "Connect your WhatsApp to sync reports directly to this dashboard."}
                 </p>
                 
-                {!waLinkCode ? (
+                {profile?.phone ? (
+                  <div className="space-y-4 pt-2">
+                    <div className="p-4 border border-green-500/30 bg-green-600/10 dark:bg-green-500/10 rounded flex flex-col items-center justify-center text-center shadow-inner relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-green-500/5 scanlines pointer-events-none opacity-20"></div>
+                      <span className="text-gray-600 dark:text-gray-400 text-xs mb-1 uppercase tracking-widest opacity-80">SECURE LINK ACTIVE</span>
+                      <span className="text-xl sm:text-2xl font-black tracking-widest text-green-700 dark:text-green-400 drop-shadow-md">
+                        {profile.phone.startsWith('+') ? profile.phone.slice(0, 3) : ''} **** {profile.phone.slice(-4)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-500 text-xs font-bold uppercase tracking-tighter">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,1)]"></div>
+                      ENCRYPTED CHANNEL VERIFIED
+                    </div>
+
+                    <button 
+                      onClick={handleUnlinkWA}
+                      disabled={isGeneratingWA}
+                      className="w-full border border-red-500/50 text-red-500/80 hover:bg-red-500/10 px-4 py-2 font-bold tracking-widest text-[10px] uppercase transition-colors rounded mt-2"
+                    >
+                      {isGeneratingWA ? "[ PROCESSING... ]" : "[ UNLINK ACCOUNT ]"}
+                    </button>
+                  </div>
+                ) : !waLinkCode ? (
                   <button 
                     onClick={handleGenerateWACode}
                     disabled={isGeneratingWA}
