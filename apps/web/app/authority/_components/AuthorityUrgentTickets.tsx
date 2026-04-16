@@ -39,9 +39,8 @@ function UrgentRow({
 }) {
   const sev = getSeverityConfig(c.effective_severity)
   const st  = STATUS_META[c.status] || {
-    label: "Unknown",
+    label: c.status,
     badge: "bg-gray-100 text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400",
-    step: 0
   }
 
   return (
