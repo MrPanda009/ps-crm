@@ -9,7 +9,9 @@ import {
   Tag, 
   Share2, 
   ArrowUp,
-  ShieldCheck
+  ShieldCheck,
+  Activity,
+  FileText
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/src/lib/supabase";
@@ -20,6 +22,58 @@ import { useRef } from "react";
 import { getTwitterHandleForDepartment } from "@/src/lib/twitter-handles";
 
 type Complaint = Database["public"]["Tables"]["complaints"]["Row"];
+
+// ── Workflow steps (adapted from authority panel) ─────────────────────────────
+const WORKFLOW_STEPS = [
+  { key: "submitted",    label: "Filed",        actor: "Citizen"   },
+  { key: "under_review", label: "Under Review", actor: "Admin"     },
+  { key: "assigned",     label: "Assigned",     actor: "Authority" },
+  { key: "in_progress",  label: "In Progress",  actor: "Worker"    },
+  { key: "resolved",     label: "Resolved",     actor: "Worker"    },
+] as const;
+
+function WorkflowStepper({ status }: { status: string }) {
+  const currentIdx = WORKFLOW_STEPS.findIndex(s => s.key === status);
+  const activeIdx  = currentIdx === -1 ? 0 : currentIdx;
+
+  return (
+    <div>
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-[#b48470] dark:text-gray-500">Workflow Progress</p>
+      <div className="flex items-start">
+        {WORKFLOW_STEPS.map((step, idx) => {
+          const done   = idx < activeIdx;
+          const active = idx === activeIdx;
+
+          return (
+            <div key={step.key} className="flex flex-1 flex-col items-center">
+              <div className="flex w-full items-center">
+                {idx > 0 && (
+                  <div className={`h-0.5 flex-1 transition-colors ${done || active ? "bg-[#b48470]" : "bg-gray-200 dark:bg-[#333]"}`} />
+                )}
+                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-colors
+                  ${active
+                    ? "bg-[#b48470] text-white shadow-sm shadow-[#b48470]/30"
+                    : done
+                    ? "bg-[#b48470]/20 text-[#b48470]"
+                    : "bg-gray-100 text-gray-400 dark:bg-[#2a2a2a] dark:text-gray-600"}`}
+                >
+                  {done ? "✓" : idx + 1}
+                </div>
+                {idx < WORKFLOW_STEPS.length - 1 && (
+                  <div className={`h-0.5 flex-1 transition-colors ${done ? "bg-[#b48470]" : "bg-gray-200 dark:bg-[#333]"}`} />
+                )}
+              </div>
+              <p className={`mt-1.5 text-center text-[9px] font-semibold leading-tight ${active || done ? "text-gray-700 dark:text-gray-300" : "text-gray-400 dark:text-gray-600"}`}>
+                {step.label}
+              </p>
+              <p className="text-[8px] text-gray-400 dark:text-gray-600">{step.actor}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function TicketDetailClient({
   ticketIdParam,
@@ -39,6 +93,10 @@ export default function TicketDetailClient({
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [upvoteCount, setUpvoteCount] = useState(0);
   
+  const [viewMode, setViewMode] = useState<"details" | "lifecycle">("details");
+  const [history, setHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -133,7 +191,39 @@ export default function TicketDetailClient({
         { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out", clearProps: "all" }
       );
     }
-  }, { scope: containerRef, dependencies: [loading, ticket, isModal] });
+  }, { scope: containerRef, dependencies: [loading, ticket, isModal, viewMode] });
+
+  const handleToggleLifecycle = async () => {
+    if (viewMode === "details") {
+      setViewMode("lifecycle");
+      if (history.length === 0) {
+        setLoadingHistory(true);
+        const { data, error } = await supabase
+          .from("ticket_history")
+          .select(`
+            id,
+            created_at,
+            old_status,
+            new_status,
+            note,
+            changed_by,
+            profiles(full_name, role)
+          `)
+          .eq("complaint_id", ticketId)
+          .eq("is_internal", false)
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          setHistory(data);
+        } else {
+          console.error("Error fetching history:", error);
+        }
+        setLoadingHistory(false);
+      }
+    } else {
+      setViewMode("details");
+    }
+  };
 
   const handleUpvote = async () => {
     if (!ticket || !ticketId) return;
@@ -356,56 +446,132 @@ export default function TicketDetailClient({
               </p>
             </div>
 
-            {/* Quick Metadata */}
-            <div className="mt-8 grid grid-cols-2 gap-4 animate-fade-in">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
-                  <ShieldCheck size={14} className="text-[#b48470] dark:text-gray-500" />
-                  DEPARTMENT
+            {viewMode === "details" ? (
+              <>
+                {/* Quick Metadata */}
+                <div className="mt-8 grid grid-cols-2 gap-4 animate-fade-in">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
+                      <ShieldCheck size={14} className="text-[#b48470] dark:text-gray-500" />
+                      DEPARTMENT
+                    </div>
+                    <div className="text-base font-bold text-gray-900 dark:text-white">
+                      {ticket.assigned_department || "UNASSIGNED"}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
+                      <Clock size={14} className="text-[#b48470] dark:text-gray-500" />
+                      REPORTED
+                    </div>
+                    <div className="text-base font-bold text-gray-900 dark:text-white">
+                      {new Date(ticket.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-base font-bold text-gray-900 dark:text-white">
-                  {ticket.assigned_department || "UNASSIGNED"}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
-                  <Clock size={14} className="text-[#b48470] dark:text-gray-500" />
-                  REPORTED
-                </div>
-                <div className="text-base font-bold text-gray-900 dark:text-white">
-                  {new Date(ticket.created_at).toLocaleDateString('en-US', { 
-                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-                  })}
-                </div>
-              </div>
-            </div>
 
-            {/* Full Address */}
-            <div className="mt-8 space-y-1.5 animate-fade-in">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
-                <MapPin size={14} className="text-[#b48470] dark:text-gray-500" />
-                FULL ADDRESS
-              </div>
-              <p className="text-sm font-bold leading-relaxed text-gray-700 dark:text-gray-200">
-                {ticket.address_text?.split('|')[0] || "Address unavailable"}
-              </p>
-            </div>
+                {/* Full Address */}
+                <div className="mt-8 space-y-1.5 animate-fade-in">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
+                    <MapPin size={14} className="text-[#b48470] dark:text-gray-500" />
+                    FULL ADDRESS
+                  </div>
+                  <p className="text-sm font-bold leading-relaxed text-gray-700 dark:text-gray-200">
+                    {ticket.address_text?.split('|')[0] || "Address unavailable"}
+                  </p>
+                </div>
 
-            {/* Description (Flex-1 shrinks but scrolls if needed gracefully, avoiding full page overflow) */}
-            <div className="mt-8 space-y-1.5 animate-fade-in flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
-                <Tag size={14} className="text-[#b48470] dark:text-gray-500" />
-                ISSUE DESCRIPTION
+                {/* Description */}
+                <div className="mt-8 space-y-1.5 animate-fade-in flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
+                    <Tag size={14} className="text-[#b48470] dark:text-gray-500" />
+                    ISSUE DESCRIPTION
+                  </div>
+                  <p className="text-sm font-medium leading-relaxed text-gray-600 dark:text-[#a1a1aa] whitespace-pre-wrap">
+                    {ticket.description || "No description provided."}
+                  </p>
+                </div>
+              </>
+            ) : (
+              /* ── Lifecycle View (from authority panel logic) ─────────────── */
+              <div className="mt-6 flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0 flex flex-col gap-6">
+                {/* Workflow Stepper */}
+                <div className="animate-fade-in">
+                  <WorkflowStepper status={ticket.status} />
+                </div>
+
+                <div className="h-px bg-gray-100 dark:bg-[#2a2a2a]" />
+
+                {/* Timeline History */}
+                <div className="animate-fade-in flex-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500 mb-4">
+                    <Activity size={14} className="text-[#b48470] dark:text-gray-500" />
+                    STATUS HISTORY
+                  </div>
+
+                  {loadingHistory ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#b48470]"></div>
+                    </div>
+                  ) : history.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center border-2 border-dashed border-gray-100 dark:border-[#2a2a2a] rounded-xl py-8 px-4">
+                      <Activity size={28} className="text-gray-300 dark:text-gray-600 mb-2" />
+                      <p className="text-sm font-bold text-gray-700 dark:text-gray-300">No activity yet</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Updates will appear here as your ticket is processed.</p>
+                    </div>
+                  ) : (
+                    <div className="relative pl-4 border-l-2 border-[#b48470]/20 dark:border-[#333] space-y-5">
+                      {history.map((item) => (
+                        <div key={item.id} className="relative animate-fade-in">
+                          <div className="absolute -left-[21px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#b48470] dark:border-[#161616]" />
+                          <div className="pl-1">
+                            <div className="text-[11px] font-bold uppercase text-gray-400 dark:text-gray-500">
+                              {new Date(item.created_at).toLocaleString('en-US', {
+                                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                              })}
+                            </div>
+                            <div className="mt-1 flex items-center flex-wrap gap-1.5">
+                              <span className="text-sm font-bold text-gray-900 dark:text-white capitalize">
+                                {item.new_status.replace(/_/g, ' ')}
+                              </span>
+                              {item.old_status && (
+                                <span className="text-[10px] text-gray-400">
+                                  ← {item.old_status.replace(/_/g, ' ')}
+                                </span>
+                              )}
+                              {item.profiles?.full_name && (
+                                <span className="text-[10px] font-medium text-gray-500 bg-gray-100 dark:bg-[#2a2a2a] dark:text-gray-400 px-1.5 py-0.5 rounded">
+                                  by {item.profiles.full_name}
+                                </span>
+                              )}
+                            </div>
+                            {item.note && (
+                              <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400 italic">
+                                "{item.note}"
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-sm font-medium leading-relaxed text-gray-600 dark:text-[#a1a1aa] whitespace-pre-wrap">
-                {ticket.description || "No description provided."}
-              </p>
-            </div>
+            )}
 
             {/* Bottom Actions */}
             <div className="mt-6 pt-6 animate-fade-in flex flex-wrap gap-3 items-center w-full shrink-0 border-t border-gray-100 dark:border-[#2a2a2a]">
-              <button className="flex-1 min-w-[160px] h-[52px] rounded-xl bg-[#b48470] hover:bg-[#a37562] text-[15px] font-bold text-white shadow-md shadow-[#b48470]/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
-                Track Lifecycle
+              <button 
+                onClick={handleToggleLifecycle}
+                className="flex-1 min-w-[160px] flex items-center justify-center gap-2 h-[52px] rounded-xl bg-[#b48470] hover:bg-[#a37562] text-[15px] font-bold text-white shadow-md shadow-[#b48470]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {viewMode === "details" ? (
+                  <><Activity size={18} /> Track Lifecycle</>
+                ) : (
+                  <><FileText size={18} /> View Details</>
+                )}
               </button>
               
               <button 
