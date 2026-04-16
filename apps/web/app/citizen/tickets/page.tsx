@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowUp, Search, X, ChevronDown, Star } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, Search, X, ChevronDown, Star, MessageSquare } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
 import Rating from "@/components/Rating";
@@ -31,22 +32,14 @@ function statusClasses(status: string): string {
   if (normalized === "rejected") return "bg-red-100 text-red-700";
   return "bg-gray-100 text-gray-600";
 }
-
 function formatReportedTime(timestamp: string): string {
   const date = new Date(timestamp);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) return "Just now";
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    hour12: true
   }).format(date);
 }
 
@@ -145,6 +138,7 @@ function CitizenTicketsPageContent() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const [hasUpvoted, setHasUpvoted] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (highlightedTicketId && !loading) {
@@ -176,6 +170,16 @@ function CitizenTicketsPageContent() {
       }
 
       setCitizenId(user.id);
+
+      // Fetch user's upvotes
+      const { data: upvotes } = await supabase
+        .from("upvotes")
+        .select("complaint_id")
+        .eq("citizen_id", user.id);
+      
+      if (upvotes) {
+        setHasUpvoted(new Set(upvotes.map(u => u.complaint_id)));
+      }
     };
 
     void bootstrapCitizen();
@@ -217,8 +221,8 @@ function CitizenTicketsPageContent() {
         // Use the latest ticket's created_at as the 'since' threshold for delta sync
         const lastSyncTime = localData.length > 0 ? localData[0].created_at : null;
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const url = new URL(`${apiUrl}/citizen/tickets`);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.jansamadhan.perkkk.dev";
+        const url = new URL(`${API_URL}/citizen/tickets`);
         if (lastSyncTime) {
           url.searchParams.set("since", lastSyncTime);
         }
@@ -263,7 +267,11 @@ function CitizenTicketsPageContent() {
           return updated;
         });
       } catch (err) {
-        console.error("Fetch sync error:", err);
+        if (err instanceof TypeError && err.message === "Failed to fetch") {
+          console.warn("Backend API unreachable. Using local data only.");
+        } else {
+          console.error("Fetch sync error:", err);
+        }
         // We only show a hard error if we don't even have local data
         if (!localData.length) {
           setError("Failed to sync tickets with server.");
@@ -359,12 +367,66 @@ function CitizenTicketsPageContent() {
 
     // PERFORMANCE OPTIMIZATION: Removed 12s polling.
     // Realtime sync via supabase.channel handles updates efficiently.
-
     return () => {
       isActive = false;
       void channel.unsubscribe();
     };
-  }, [citizenId]);
+  }, [citizenId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleUpvote = useCallback(async (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    if (!citizenId) return;
+
+    const isUpvoted = hasUpvoted.has(id);
+    const target = tickets.find(t => t.id === id);
+    if (!target) return;
+
+    try {
+      if (isUpvoted) {
+        // Toggle OFF locally
+        setHasUpvoted((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setTickets((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, upvote_count: Math.max(0, (t.upvote_count ?? 1) - 1) } : t))
+        );
+
+        // Sync with DB
+        await supabase
+          .from("upvotes")
+          .delete()
+          .eq("citizen_id", citizenId)
+          .eq("complaint_id", id);
+        
+        await supabase
+          .from("complaints")
+          .update({ upvote_count: Math.max(0, (target.upvote_count ?? 1) - 1) })
+          .eq("id", id);
+          
+      } else {
+        // Toggle ON locally
+        setHasUpvoted((prev) => new Set([...prev, id]));
+        setTickets((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, upvote_count: (t.upvote_count ?? 0) + 1 } : t))
+        );
+
+        // Sync with DB
+        await supabase
+          .from("upvotes")
+          .insert({ citizen_id: citizenId, complaint_id: id });
+        
+        await supabase.rpc('increment_upvote_count', { p_complaint_id: id });
+      }
+    } catch (err) {
+      console.error("Upvote toggle failed:", err);
+    }
+  }, [citizenId, hasUpvoted, tickets]);
 
   // Extract available statuses and departments whenever tickets change
   useEffect(() => {
@@ -539,15 +601,15 @@ function CitizenTicketsPageContent() {
 
         <div className="overflow-x-auto flex-1 min-h-0 flex flex-col">
           <div className="min-w-[980px] flex flex-col flex-1 min-h-0">
-            <div className="sticky top-0 z-10 grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px_150px] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400">
+            <div className="sticky top-0 z-10 grid grid-cols-[130px_2fr_2fr_1.2fr_1fr_1.5fr_100px_120px] gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400">
               <span>Ticket ID</span>
               <span>Issue Title</span>
               <span>Locality / Address</span>
-              <span>Assigned Department</span>
+              <span>Department</span>
               <span>Status</span>
               <span>Reported Time</span>
-              <span className="text-right">Upvotes</span>
-              <span className="text-center">Action / Rating</span>
+              <span className="text-center">Upvotes</span>
+              <span className="text-center">Action</span>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto">
@@ -570,149 +632,64 @@ function CitizenTicketsPageContent() {
               {!loading && !error && filteredTickets.length > 0 && (
                 <ul className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                   {filteredTickets.map((ticket) => (
-                    <li
-                      key={ticket.id}
-                      ref={ticket.id === activeHighlight ? highlightedRef : null}
-                      className={`grid grid-cols-[150px_2fr_2fr_1.2fr_1fr_1fr_100px_150px] gap-3 px-5 py-4 text-sm text-gray-700 transition-all duration-1000 dark:text-gray-300 dark:hover:bg-[#1e1e1e] ${ticket.id === activeHighlight
-                        ? "bg-purple-100/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] z-10 relative dark:bg-purple-900/40"
-                        : "hover:bg-gray-50"
-                        }`}
-                    >
-                      <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate dark:text-gray-200">
-                        {ticket.ticket_id || "N/A"}
-                      </span>
-
-                      <span className="text-gray-900 font-medium line-clamp-2 leading-snug dark:text-gray-200">
-                        {ticket.title || "Untitled issue"}
-                      </span>
-
-                      <span className="text-gray-600 line-clamp-1 leading-snug cursor-pointer dark:text-gray-400" title={ticket.address_text || "Address unavailable"}>
-                        {extractRelevantAddress(ticket.address_text) || "Address unavailable"}
-                      </span>
-
-                      <span className="text-gray-700 line-clamp-2 leading-snug dark:text-gray-300">
-                        {ticket.assigned_department || "Unassigned"}
-                      </span>
-
-                      <span>
-                        <span className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${statusClasses(ticket.status || "")}`}>
-                          {formatStatus(ticket.status || "submitted")}
+                      <li
+                        key={ticket.id}
+                        ref={ticket.id === activeHighlight ? highlightedRef : null}
+                        className={`grid grid-cols-[130px_2fr_2fr_1.2fr_1fr_1.5fr_100px_120px] gap-3 px-5 py-4 text-sm text-gray-700 transition-all duration-1000 dark:text-gray-300 dark:hover:bg-[#1e1e1e] ${ticket.id === activeHighlight
+                          ? "bg-purple-100/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] z-10 relative dark:bg-purple-900/40"
+                          : "hover:bg-gray-50 border-b border-gray-50 dark:border-[#2a2a2a]"
+                          }`}
+                      >
+                        <span className="font-medium text-gray-900 font-mono text-xs sm:text-sm truncate dark:text-gray-200">
+                          {ticket.ticket_id || "N/A"}
                         </span>
-                      </span>
 
-                      <span className="text-gray-500 text-xs sm:text-sm dark:text-gray-400">
-                        {formatReportedTime(ticket.created_at)}
-                      </span>
+                        <span className="text-gray-900 font-bold line-clamp-2 leading-snug dark:text-gray-200">
+                          {ticket.title || "Untitled issue"}
+                        </span>
 
-                      <span className="inline-flex items-center justify-end gap-1 text-gray-700 font-medium dark:text-gray-300">
-                        <ArrowUp size={14} className="text-gray-400 dark:text-gray-500" />
-                        {ticket.upvote_count ?? 0}
-                      </span>
+                        <span className="text-gray-600 line-clamp-1 leading-snug dark:text-gray-400" title={ticket.address_text || "Address unavailable"}>
+                          {extractRelevantAddress(ticket.address_text) || "Address unavailable"}
+                        </span>
 
-                      <div className="flex items-center justify-center">
-                        {ticket.status === "resolved" ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <Rating
-                              initialRating={ticket.rating ?? undefined}
-                              onRate={async (r) => {
-                                try {
-                                  // 1. Get token
-                                  const { data: { session } } = await supabase.auth.getSession();
-                                  const token = session?.access_token;
-                                  if (!token) throw new Error("No session");
+                        <span className="text-gray-900 font-medium line-clamp-2 leading-snug dark:text-gray-300">
+                          {ticket.assigned_department || "Unassigned"}
+                        </span>
 
-                                  // 2. POST to review endpoint
-                                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-                                  const res = await fetch(`${apiUrl}/api/complaints/review`, {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                      "Authorization": `Bearer ${token}`
-                                    },
-                                    body: JSON.stringify({
-                                      complaint_id: ticket.id,
-                                      rating: r
-                                    })
-                                  });
+                        <span>
+                          <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-tight ${statusClasses(ticket.status || "")}`}>
+                            {formatStatus(ticket.status || "submitted")}
+                          </span>
+                        </span>
 
-                                  if (res.ok) {
-                                    // Update locally for instant feedback
-                                    setTickets(prev => prev.map(t =>
-                                      t.id === ticket.id ? { ...t, rating: r } : t
-                                    ));
-                                  } else {
-                                    const err = await res.json();
-                                    alert(err.detail || "Failed to submit rating.");
-                                  }
-                                } catch (err) {
-                                  console.error("Rating submission error:", err);
-                                  alert("An error occurred. Check console for details.");
-                                }
-                              }}
-                            />
-                            <span className="text-[10px] text-gray-400">Rate your experience</span>
-                          </div>
-                        ) : (ticket.status as string) === "pending_closure" ? (
-                          <div className="flex w-full max-w-[120px] flex-col gap-1.5">
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const { data: { session } } = await supabase.auth.getSession();
-                                  if (!session?.access_token) throw new Error("No session");
-                                  const res = await fetch("/api/complaints", {
-                                    method: "PUT",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                      "Authorization": `Bearer ${session.access_token}`
-                                    },
-                                    body: JSON.stringify({ complaint_id: ticket.id, status: "resolved" })
-                                  });
-                                  if (res.ok) {
-                                    setTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, status: "resolved" } : t));
-                                  } else {
-                                    alert("Failed to confirm resolution.");
-                                  }
-                                } catch (e) {
-                                  console.error(e);
-                                }
-                              }}
-                              className="w-full rounded bg-green-500 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-600"
-                            >
-                              Confirm Resolved
-                            </button>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const { data: { session } } = await supabase.auth.getSession();
-                                  if (!session?.access_token) throw new Error("No session");
-                                  const res = await fetch("/api/complaints", {
-                                    method: "PUT",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                      "Authorization": `Bearer ${session.access_token}`
-                                    },
-                                    body: JSON.stringify({ complaint_id: ticket.id, status: "reopened" })
-                                  });
-                                  if (res.ok) {
-                                    setTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, status: "in_progress" } : t));
-                                  } else {
-                                    alert("Failed to reject resolution.");
-                                  }
-                                } catch (e) {
-                                  console.error(e);
-                                }
-                              }}
-                              className="w-full rounded border border-gray-300 bg-white py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-[#3a3a3a] dark:bg-[#1e1e1e] dark:text-gray-300 dark:hover:bg-[#2a2a2a]"
-                            >
-                              Not Resolved
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs italic text-gray-400">Pending resolution</span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
+                        <span className="text-gray-600 text-xs sm:text-sm dark:text-gray-400">
+                          {formatReportedTime(ticket.created_at)}
+                        </span>
+
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={(e) => handleUpvote(ticket.id, e)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${
+                              hasUpvoted.has(ticket.id)
+                                ? "bg-orange-50 border-orange-200 text-orange-600 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-400"
+                                : "bg-white border-gray-200 text-gray-500 hover:border-orange-200 hover:text-orange-500 dark:bg-[#1e1e1e] dark:border-[#333] dark:text-gray-400"
+                            }`}
+                          >
+                            <ArrowUp size={14} className={hasUpvoted.has(ticket.id) ? "fill-current" : ""} />
+                            <span className="font-bold text-xs">{ticket.upvote_count ?? 0}</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-center">
+                          <Link
+                            href={`/citizen/tickets/details?id=${ticket.id}`}
+                            className="text-orange-500 hover:text-orange-600 font-bold italic text-sm transition-colors"
+                          >
+                            View details
+                          </Link>
+                        </div>
+                      </li>
+                    ))}
                 </ul>
               )}
             </div>
