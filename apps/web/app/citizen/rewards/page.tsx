@@ -9,9 +9,11 @@ import {
   CreditCard,
   Lock,
   ShoppingCart,
+  Sparkles,
   Ticket,
   TrainFront,
   TreePine,
+  X,
   Zap,
 } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
@@ -171,6 +173,8 @@ export default function RewardsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redeemingRewardId, setRedeemingRewardId] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastRedeemedItem, setLastRedeemedItem] = useState<RewardCatalogItem | null>(null);
 
   const progressPass = useMemo<PassTier[]>(() => {
     const balance = jsPoints ?? 0;
@@ -262,7 +266,8 @@ export default function RewardsPage() {
           throw new Error(payload?.error || "Failed to redeem reward");
         }
 
-        window.alert(`Successfully redeemed ${item.title}.`);
+        setLastRedeemedItem(item);
+        setShowSuccessModal(true);
         await fetchWallet();
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to redeem reward";
@@ -439,9 +444,63 @@ export default function RewardsPage() {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
+        @keyframes modal-in {
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-modal-in {
+          animation: modal-in 0.3s ease-out forwards;
+        }
       `,
         }}
       />
+
+      {/* REDEMPTION SUCCESS MODAL */}
+      {showSuccessModal && lastRedeemedItem && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-gray-200 dark:border-white/10 animate-modal-in">
+            <div className="relative p-8 flex flex-col items-center text-center">
+              <button 
+                onClick={() => setShowSuccessModal(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="mb-6 relative">
+                <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full" />
+                <div className="relative bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 p-4 rounded-full">
+                  <CheckCircle2 size={48} strokeWidth={2.5} />
+                </div>
+                <div className="absolute -top-1 -right-1 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-lg">
+                  <Sparkles size={16} />
+                </div>
+              </div>
+
+              <h3 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white mb-2">REDEEMED!</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Successfully claimed <span className="font-bold text-gray-900 dark:text-gray-100">{lastRedeemedItem.title}</span>
+              </p>
+
+              <div className="w-full bg-gray-50 dark:bg-white/5 rounded-2xl p-4 mb-8">
+                <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">DEDUCTED</div>
+                <div className="flex items-center justify-center gap-1.5 text-amber-600 dark:text-[#C9A84C] font-bold text-lg">
+                  <Coins size={20} />
+                  <span>{lastRedeemedItem.points_cost.toLocaleString()} JS Points</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-sm tracking-wide hover:opacity-90 transition-opacity shadow-lg"
+              >
+                CONTINUE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
