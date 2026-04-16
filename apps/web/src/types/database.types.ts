@@ -897,6 +897,10 @@ export type Database = {
             }[]
           }
       check_sla_breaches: { Args: never; Returns: number }
+      decrement_upvote_count: {
+        Args: { p_complaint_id: string }
+        Returns: undefined
+      }
       find_duplicate_complaints_v2: {
         Args: {
           p_active_statuses: string[]
