@@ -534,7 +534,7 @@ export default function ProfilePage() {
                     </div>
                     
                     <a 
-                      href={`https://wa.me/15551234567?text=${waLinkCode}`} 
+                      href={`https://wa.me/918178465273?text=${waLinkCode}`} 
                       target="_blank" rel="noreferrer"
                       className="block w-full text-center bg-green-600 text-white dark:text-[#0c0c0c] px-4 py-3 font-extrabold tracking-widest text-sm uppercase hover:scale-[1.02] transition-transform active:scale-95 rounded shadow-[0_0_15px_rgba(34,197,94,0.4)]"
                     >
