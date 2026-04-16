@@ -46,10 +46,14 @@ from shared import (
 
 
 # ── config ────────────────────────────────────────────────────────────────────
-WHATSAPP_TOKEN           = os.getenv("WHATSAPP_TOKEN", "")
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
-WHATSAPP_VERIFY_TOKEN    = os.getenv("WHATSAPP_VERIFY_TOKEN", "jansamadhan_verify")
-GRAPH_API_URL            = f"https://graph.facebook.com/v22.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+WHATSAPP_TOKEN           = os.getenv("WHATSAPP_TOKEN", "").strip()
+WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "").strip()
+WHATSAPP_VERIFY_TOKEN    = os.getenv("WHATSAPP_VERIFY_TOKEN", "jansamadhan_verify").strip()
+
+def get_graph_api_url():
+    """Generates the URL dynamically to ensure environment changes are picked up."""
+    id_val = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "").strip()
+    return f"https://graph.facebook.com/v21.0/{id_val}/messages"
 
 # In-memory session store  { phone_number: { ...session data } }
 # For production, replace with Redis or Supabase table
@@ -108,6 +112,17 @@ async def receive_message(request: Request):
             lat = msg["location"]["latitude"]
             lng = msg["location"]["longitude"]
             await handle_location(from_, lat, lng)
+
+        elif mtype == "interactive":
+            itype = msg["interactive"]["type"]
+            if itype == "button_reply":
+                button_id = msg["interactive"]["button_reply"]["id"]
+                # Route button replies to handle_text to reuse existing logic
+                # IDs: "confirm_ticket", "cancel_ticket"
+                if button_id == "confirm_ticket":
+                    await handle_text(from_, "confirm")
+                elif button_id == "cancel_ticket":
+                    await handle_text(from_, "cancel")
 
         else:
             await send_text(from_, "Sorry, I only understand text messages, images, and locations right now.")
@@ -200,12 +215,12 @@ async def handle_image(phone: str, image_id: str):
         "state": "awaiting_location",
     }
 
-    await send_text(phone,
+    await send_location_request(phone,
         f"✅ *Issue detected:* {result['issue_name']}\n"
         f"📋 *{result['title']}*\n"
         f"🔴 Severity: {result['severity']}\n\n"
-        "📍 Now please *share your location* so I can complete the ticket.\n"
-        "_(Tap the 📎 attachment icon → Location)_"
+        "📍 Please tap *Send Location* below to complete your ticket.\n"
+        "(Or reply *No* to cancel report)"
     )
 
 
@@ -261,17 +276,22 @@ async def handle_location(phone: str, lat: float, lng: float):
     SESSIONS[phone] = {**session, "preview": preview, "state": "awaiting_confirm"}
 
     address_short = location.get("locality") or location.get("formatted_address", "")[:60]
-    await send_text(phone,
-        f"📋 *Ticket Preview*\n"
-        f"━━━━━━━━━━━━━━━━━\n"
-        f"🔖 Issue: {result['issue_name']}\n"
-        f"📌 Title: {result['title']}\n"
-        f"🏛 Authority: {result['authority']}\n"
-        f"🔴 Severity: {result['severity']}\n"
-        f"📍 Location: {address_short}\n"
-        f"━━━━━━━━━━━━━━━━━\n\n"
-        f"Reply *confirm* to submit this ticket ✅\n"
-        f"Reply *cancel* to discard ❌"
+    await send_button_message(phone,
+        (
+            f"📋 *Ticket Preview*\n"
+            f"━━━━━━━━━━━━━━━━━\n"
+            f"🔖 Issue: {result['issue_name']}\n"
+            f"📌 Title: {result['title']}\n"
+            f"🏛 Authority: {result['authority']}\n"
+            f"🔴 Severity: {result['severity']}\n"
+            f"📍 Location: {address_short}\n"
+            f"━━━━━━━━━━━━━━━━━\n\n"
+            f"Please tap a button below to proceed:"
+        ),
+        [
+            {"id": "confirm_ticket", "title": "Confirm ✅"},
+            {"id": "cancel_ticket", "title": "Cancel ❌"}
+        ]
     )
 
 
@@ -489,6 +509,7 @@ Return exactly:
 async def send_text(phone: str, text: str):
     payload = {
         "messaging_product": "whatsapp",
+        "recipient_type": "individual",
         "to": phone,
         "type": "text",
         "text": {"body": text},
@@ -498,9 +519,76 @@ async def send_text(phone: str, text: str):
         "Content-Type": "application/json",
     }
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(GRAPH_API_URL, json=payload, headers=headers)
+        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
         if resp.status_code != 200:
             print(f"[send_text error] {resp.status_code}: {resp.text}")
+
+
+async def send_location_request(phone: str, text: str):
+    """
+    Sends a native 'location_request_message' that triggers the mobile location picker.
+    """
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "location_request_message",
+            "body": {
+                "text": text
+            },
+            "action": {
+                "name": "send_location"
+            }
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
+        if resp.status_code != 200:
+            print(f"[send_location_request error] {resp.status_code}: {resp.text}")
+
+
+async def send_button_message(phone: str, body_text: str, buttons: list):
+    """
+    Sends an interactive message with up to 3 reply buttons.
+    Each button in the list should be a dict: {"id": "unique_id", "title": "Button Title"}
+    """
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {
+                "text": body_text
+            },
+            "action": {
+                "buttons": [
+                    {
+                        "type": "reply",
+                        "reply": {
+                            "id": b["id"],
+                            "title": b["title"]
+                        }
+                    } for b in buttons
+                ]
+            }
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(get_graph_api_url(), json=payload, headers=headers)
+        if resp.status_code != 200:
+            print(f"[send_button_message error] {resp.status_code}: {resp.text}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

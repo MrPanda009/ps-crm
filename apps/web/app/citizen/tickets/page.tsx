@@ -347,19 +347,8 @@ function CitizenTicketsPageContent() {
           setTickets((prev) => prev.filter((item) => item.id !== deletedId));
         }
       )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "upvotes",
-        },
-        () => {
-          void fetchTickets();
-        }
-      )
       .subscribe((status) => {
-        // Recover quickly from transient realtime channel issues to avoid stale upvote counts.
+        // Recover quickly from transient realtime channel issues.
         if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && isActive) {
           void fetchTickets();
         }
@@ -398,16 +387,16 @@ function CitizenTicketsPageContent() {
         );
 
         // Sync with DB
-        await supabase
+        const { error: delError } = await supabase
           .from("upvotes")
           .delete()
           .eq("citizen_id", citizenId)
           .eq("complaint_id", id);
         
-        await supabase
-          .from("complaints")
-          .update({ upvote_count: Math.max(0, (target.upvote_count ?? 1) - 1) })
-          .eq("id", id);
+        if (delError && delError.code !== 'PGRST116') throw delError;
+        
+        const { error: rpcError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: id });
+        if (rpcError) throw rpcError;
           
       } else {
         // Toggle ON locally
@@ -417,14 +406,30 @@ function CitizenTicketsPageContent() {
         );
 
         // Sync with DB
-        await supabase
+        const { error: insError } = await supabase
           .from("upvotes")
           .insert({ citizen_id: citizenId, complaint_id: id });
         
-        await supabase.rpc('increment_upvote_count', { p_complaint_id: id });
+        if (insError && insError.code !== '23505') throw insError;
+        
+        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: id });
+        if (rpcError) throw rpcError;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upvote toggle failed:", err);
+      // Immediate local rollback
+      const wasUpvoted = !hasUpvoted.has(id);
+      setHasUpvoted((prev) => {
+        const next = new Set(prev);
+        if (wasUpvoted) next.add(id); else next.delete(id);
+        return next;
+      });
+      setTickets((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, upvote_count: wasUpvoted ? t.upvote_count + 1 : Math.max(0, t.upvote_count - 1) } : t))
+      );
+      
+      const msg = err?.message || "Check your internet or permissions.";
+      alert(`Upvote failed: ${msg}`);
     }
   }, [citizenId, hasUpvoted, tickets]);
 

@@ -21,7 +21,10 @@ export async function generateMetadata(
 
   if (!ticket) return { title: "Ticket Not Found | JanSamadhan" };
 
-  const image = ticket.photo_urls?.[0] || "/icon.png";
+  const firstPhoto = ticket.photo_urls?.[0];
+  const image = firstPhoto && firstPhoto.startsWith("http") 
+    ? firstPhoto 
+    : "https://jansamadhan.perkkk.dev/icon.png";
   
   return {
     title: `${ticket.title} | JanSamadhan`,
@@ -29,7 +32,14 @@ export async function generateMetadata(
     openGraph: {
       title: ticket.title || "Civic Issue Details",
       description: ticket.description || "Track and upvote civic issues in Delhi.",
-      images: [image],
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: ticket.title || "Civic Issue",
+        }
+      ],
       type: "website",
     },
     twitter: {
