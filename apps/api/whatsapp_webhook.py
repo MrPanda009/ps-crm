@@ -264,6 +264,7 @@ async def get_citizen_id(phone: str) -> str:
         print("[auth error]", e)
     return os.getenv("WHATSAPP_BOT_USER_ID", "00000000-0000-0000-0000-000000000000")
 
+
 async def handle_action_recent_tickets(phone: str):
     citizen_id = await get_citizen_id(phone)
     resp = supabase.table("complaints").select("id, ticket_id, title, status").eq("citizen_id", citizen_id).order("created_at", desc=True).limit(5).execute()
@@ -293,6 +294,7 @@ async def handle_action_recent_tickets(phone: str):
         sections=[{"title": "Recent Complaints", "rows": rows}]
     )
 
+
 async def handle_action_stats(phone: str):
     citizen_id = await get_citizen_id(phone)
     resp = supabase.table("complaints").select("id", count="exact").eq("citizen_id", citizen_id).execute()
@@ -301,6 +303,7 @@ async def handle_action_stats(phone: str):
         f"📊 *My Statistics*\n\nYou have reported a total of *{count}* civic issues.\nThank you for keeping your city clean and safe! 🙏",
         [{"id": "menu_recent_tickets", "title": "🔙 Recent Tickets"}]
     )
+
 
 async def show_ticket_details(phone: str, ticket_id_str: str):
     resp = supabase.table("complaints").select("*").eq("ticket_id", ticket_id_str).execute()
