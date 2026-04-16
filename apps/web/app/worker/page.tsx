@@ -17,6 +17,7 @@ import {
   type DashboardTask,
 } from "@/components/worker-dashboard/dashboard-types"
 import CurrentTicketCard from "@/components/worker-dashboard/CurrentTicketCard"
+import PendingTicketCard from "@/components/worker-dashboard/PendingTicketCard"
 
 const WorkerTaskMapPanel = dynamic(() => import("@/components/worker-dashboard/WorkerTaskMapPanel"), {
   ssr: false,
@@ -302,6 +303,9 @@ export default function WorkerDashboardPage() {
 
   const currentTask = useMemo(() => tasks.find((task) => task.status === "in_progress") ?? null, [tasks])
   const urgentTask = useMemo(() => (sortedAssignedTasks.length > 0 ? sortedAssignedTasks[0] : null), [sortedAssignedTasks])
+  const pendingTask = useMemo(() => {
+    return currentTask ?? urgentTask ?? sortedAssignedTasks[0] ?? tasks.find((task) => task.status === "assigned" || task.status === "reopened") ?? null
+  }, [currentTask, sortedAssignedTasks, tasks, urgentTask])
 
   const updateTaskStatus = useCallback(
     async (complaintId: string, nextStatus: "in_progress" | "pending_closure" | "resolved" | "escalated", note?: string) => {
@@ -443,8 +447,8 @@ export default function WorkerDashboardPage() {
   }, [])
 
   const displayTask = useMemo(() => {
-    return selectedTask
-  }, [selectedTask])
+    return selectedTask ?? currentTask ?? urgentTask ?? sortedAssignedTasks[0] ?? tasks[0] ?? null
+  }, [currentTask, selectedTask, sortedAssignedTasks, tasks, urgentTask])
 
   const statsCards = useMemo(
     () => [
@@ -575,25 +579,7 @@ export default function WorkerDashboardPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-3 overflow-visible lg:gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">Worker Dashboard</h1>
-        
-        <div className="flex items-center gap-2">
-          {loading && (
-            <div className="flex items-center gap-2 rounded-full border border-gray-100 bg-white/80 px-2 py-1 text-[10px] font-medium text-gray-400 shadow-sm backdrop-blur-sm dark:border-[#2a2a2a] dark:bg-[#1a1a1a]/80">
-              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
-              Syncing...
-            </div>
-          )}
-          {error && (
-            <div className="shrink-0 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-medium text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
-              {error}
-            </div>
-          )}
-        </div>
-      </div>
-
+    <div className="flex h-full min-h-full flex-col gap-4 overflow-visible lg:gap-5">
       <section className="shrink-0 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         {statsCards.map((card) => {
           const Icon = card.icon
@@ -613,8 +599,8 @@ export default function WorkerDashboardPage() {
         })}
       </section>
 
-      <section className="grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-4">
-        <div className="min-h-0 space-y-4 overflow-visible xl:col-span-3 xl:pr-1">
+      <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-4">
+        <div className="min-h-0 h-full space-y-4 overflow-visible xl:col-span-3 xl:pr-1">
           <WorkerTaskMapPanel
             tasks={mapTasks}
             loading={loading}
@@ -624,40 +610,61 @@ export default function WorkerDashboardPage() {
           />
         </div>
 
-        {displayTask ? (
-          <aside className="min-h-0 overflow-visible xl:col-span-1 xl:pr-1">
-            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Ticket Details</h2>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTaskId(null)}
-                  className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-[#3a3a3a] dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
-                >
-                  Close
-                </button>
-              </div>
+        <aside className="min-h-0 h-full overflow-visible xl:col-span-1 xl:pr-1">
+          <div className="flex h-full flex-col gap-4">
+            {displayTask ? (
+              <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Urgent Ticket</h2>
+                </div>
 
-              <CurrentTicketCard
-                ticket={displayTask}
-                onNavigate={(latitude, longitude) => {
-                  window.open(
-                    `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
-                    "_blank",
-                    "noopener,noreferrer",
-                  )
-                }}
-                onUpdate={async (ticketId, note) => {
-                  await handleUpdateProgress(ticketId, note)
-                }}
-                onStatusChange={async (ticketId, newStatus) => {
-                  await updateTaskStatus(ticketId, newStatus as "in_progress" | "pending_closure" | "resolved" | "escalated")
-                }}
-                onMarkCompleted={(_ticketId) => setIsCompletionModalOpen(true)}
-              />
-            </section>
-          </aside>
-        ) : null}
+                <CurrentTicketCard
+                  ticket={displayTask}
+                  onNavigate={(latitude, longitude) => {
+                    window.open(
+                      `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }}
+                  onUpdate={async (ticketId, note) => {
+                    await handleUpdateProgress(ticketId, note)
+                  }}
+                  onStatusChange={async (ticketId, newStatus) => {
+                    await updateTaskStatus(ticketId, newStatus as "in_progress" | "pending_closure" | "resolved" | "escalated")
+                  }}
+                  onMarkCompleted={(_ticketId) => setIsCompletionModalOpen(true)}
+                />
+              </section>
+            ) : null}
+
+            {pendingTask ? (
+              <section className="flex flex-1 flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Pending Ticket</h2>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">Next up</span>
+                </div>
+                <PendingTicketCard
+                  ticket={pendingTask}
+                  onNavigate={(latitude, longitude) => {
+                    window.open(
+                      `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }}
+                  onUpdate={async (ticketId, note) => {
+                    await handleUpdateProgress(ticketId, note)
+                  }}
+                  onStatusChange={async (ticketId, newStatus) => {
+                    await updateTaskStatus(ticketId, newStatus as "in_progress" | "pending_closure" | "resolved" | "escalated")
+                  }}
+                  onMarkCompleted={(_ticketId) => setIsCompletionModalOpen(true)}
+                />
+              </section>
+            ) : null}
+          </div>
+        </aside>
       </section>
 
       {isCompletionModalOpen && displayTask ? (
@@ -679,10 +686,6 @@ export default function WorkerDashboardPage() {
                 Ticket {displayTask.ticketId} will be sent to the citizen for confirmation before final closure.
               </p>
             )}
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Complete Ticket</h3>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Ticket {displayTask.ticketId} will be sent to the citizen for confirmation before final closure.
-            </p>
 
             <label className="mt-4 block text-xs font-medium text-gray-600 dark:text-gray-300">
               Proof photo <span className="text-gray-400">(recommended)</span>
