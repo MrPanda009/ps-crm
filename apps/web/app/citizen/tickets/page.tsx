@@ -7,6 +7,7 @@ import { ArrowUp, Search, X, ChevronDown, Star, MessageSquare } from "lucide-rea
 import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
 import Rating from "@/components/Rating";
+import TicketDetailClient from "./details/_components/TicketDetailClient";
 
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
 type TicketListRow = Pick<
@@ -124,6 +125,7 @@ function CitizenTicketsPageContent() {
 
   const [activeHighlight, setActiveHighlight] = useState<string | null>(null);
   const highlightedRef = useRef<HTMLLIElement>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
 
   const [tickets, setTickets] = useState<TicketListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -464,7 +466,7 @@ function CitizenTicketsPageContent() {
               placeholder="Search by ticket id, title, or address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder:text-gray-500"
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm focus:border-[#b48470] focus:outline-none focus:ring-2 focus:ring-[#b48470]/20 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder:text-gray-500"
             />
           </div>
 
@@ -486,7 +488,7 @@ function CitizenTicketsPageContent() {
                       setSortBy("latest");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "latest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "latest" ? "bg-[#b48470]/10 text-[#b48470] font-medium dark:bg-[#b48470]/20 dark:text-[#c49a88]" : ""
                       }`}
                   >
                     Latest
@@ -496,7 +498,7 @@ function CitizenTicketsPageContent() {
                       setSortBy("upvotes");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "upvotes" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "upvotes" ? "bg-[#b48470]/10 text-[#b48470] font-medium dark:bg-[#b48470]/20 dark:text-[#c49a88]" : ""
                       }`}
                   >
                     Highest Upvote
@@ -506,7 +508,7 @@ function CitizenTicketsPageContent() {
                       setSortBy("oldest");
                       setSortDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "oldest" ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${sortBy === "oldest" ? "bg-[#b48470]/10 text-[#b48470] font-medium dark:bg-[#b48470]/20 dark:text-[#c49a88]" : ""
                       }`}
                   >
                     Oldest
@@ -531,7 +533,7 @@ function CitizenTicketsPageContent() {
                       setStatusFilter(null);
                       setStatusDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${statusFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${statusFilter === null ? "bg-[#b48470]/10 text-[#b48470] font-medium dark:bg-[#b48470]/20 dark:text-[#c49a88]" : ""
                       }`}
                   >
                     All
@@ -543,7 +545,7 @@ function CitizenTicketsPageContent() {
                         setStatusFilter(status);
                         setStatusDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${statusFilter === status ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${statusFilter === status ? "bg-[#b48470]/10 text-[#b48470] font-medium dark:bg-[#b48470]/20 dark:text-[#c49a88]" : ""
                         }`}
                     >
                       {formatStatus(status)}
@@ -569,7 +571,7 @@ function CitizenTicketsPageContent() {
                       setDepartmentFilter(null);
                       setDepartmentDropdownOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${departmentFilter === null ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${departmentFilter === null ? "bg-[#b48470]/10 text-[#b48470] font-medium dark:bg-[#b48470]/20 dark:text-[#c49a88]" : ""
                       }`}
                   >
                     All Departments
@@ -581,7 +583,7 @@ function CitizenTicketsPageContent() {
                         setDepartmentFilter(dept);
                         setDepartmentDropdownOpen(false);
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${departmentFilter === dept ? "bg-purple-50 text-purple-700 font-medium dark:bg-purple-900/30 dark:text-purple-300" : ""
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-[#2a2a2a] ${departmentFilter === dept ? "bg-[#b48470]/10 text-[#b48470] font-medium dark:bg-[#b48470]/20 dark:text-[#c49a88]" : ""
                         }`}
                     >
                       {dept}
@@ -641,7 +643,7 @@ function CitizenTicketsPageContent() {
                         key={ticket.id}
                         ref={ticket.id === activeHighlight ? highlightedRef : null}
                         className={`grid grid-cols-[130px_2fr_2fr_1.2fr_1fr_1.5fr_100px_120px] gap-3 px-5 py-4 text-sm text-gray-700 transition-all duration-1000 dark:text-gray-300 dark:hover:bg-[#1e1e1e] ${ticket.id === activeHighlight
-                          ? "bg-purple-100/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] z-10 relative dark:bg-purple-900/40"
+                          ? "bg-[#b48470]/10 shadow-[0_0_20px_rgba(180,132,112,0.3)] z-10 relative dark:bg-[#b48470]/20"
                           : "hover:bg-gray-50 border-b border-gray-50 dark:border-[#2a2a2a]"
                           }`}
                       >
@@ -676,8 +678,8 @@ function CitizenTicketsPageContent() {
                             onClick={(e) => handleUpvote(ticket.id, e)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${
                               hasUpvoted.has(ticket.id)
-                                ? "bg-orange-50 border-orange-200 text-orange-600 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-400"
-                                : "bg-white border-gray-200 text-gray-500 hover:border-orange-200 hover:text-orange-500 dark:bg-[#1e1e1e] dark:border-[#333] dark:text-gray-400"
+                                ? "bg-[#b48470]/10 border-[#b48470]/30 text-[#b48470] dark:bg-[#b48470]/20 dark:border-[#b48470]/40 dark:text-[#c49a88]"
+                                : "bg-white border-gray-200 text-gray-500 hover:border-[#b48470]/30 hover:text-[#b48470] dark:bg-[#1e1e1e] dark:border-[#333] dark:text-gray-400"
                             }`}
                           >
                             <ArrowUp size={14} className={hasUpvoted.has(ticket.id) ? "fill-current" : ""} />
@@ -686,12 +688,12 @@ function CitizenTicketsPageContent() {
                         </div>
 
                         <div className="flex items-center justify-center">
-                          <Link
-                            href={`/citizen/tickets/details?id=${ticket.id}`}
-                            className="text-orange-500 hover:text-orange-600 font-bold italic text-sm transition-colors"
+                          <button
+                            onClick={() => setSelectedTicketId(ticket.id)}
+                            className="text-[#b48470] hover:text-[#a37562] font-bold italic text-sm transition-colors"
                           >
                             View details
-                          </Link>
+                          </button>
                         </div>
                       </li>
                     ))}
@@ -701,6 +703,15 @@ function CitizenTicketsPageContent() {
           </div>
         </div>
       </section>
+
+      {/* Ticket Details Overlay */}
+      {selectedTicketId && (
+        <TicketDetailClient 
+          ticketIdParam={selectedTicketId} 
+          isModal 
+          onClose={() => setSelectedTicketId(null)} 
+        />
+      )}
     </div>
   );
 }
