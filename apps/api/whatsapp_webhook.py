@@ -793,18 +793,18 @@ async def download_whatsapp_media(media_id: str) -> bytes:
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-        # Step 1: get download URL
-        meta_resp = await client.get(
-            f"https://graph.facebook.com/v22.0/{media_id}",
-            headers=headers,
-        )
-        meta_resp.raise_for_status()
-        media_url = meta_resp.json()["url"]
+            # Step 1: get download URL
+            meta_resp = await client.get(
+                f"https://graph.facebook.com/v22.0/{media_id}",
+                headers=headers,
+            )
+            meta_resp.raise_for_status()
+            media_url = meta_resp.json()["url"]
 
-        # Step 2: download the actual bytes
-        file_resp = await client.get(media_url, headers=headers)
-        file_resp.raise_for_status()
-        return file_resp.content
+            # Step 2: download the actual bytes
+            file_resp = await client.get(media_url, headers=headers)
+            file_resp.raise_for_status()
+            return file_resp.content
     except Exception as e:
         print(f"[download_whatsapp_media exception] {e}")
         raise
