@@ -103,16 +103,39 @@ export default function TicketDetailClient() {
     }
   };
 
-  const handleShareToX = () => {
+  const handleShareToX = async () => {
     if (!ticket) return;
     
     const handle = getTwitterHandleForDepartment(ticket.assigned_department);
     const shareUrl = window.location.href;
+    const shareTitle = `🚨 Urgent Civic Issue: ${ticket.title}`;
+    const shareText = `${shareTitle}\n📍 Locality: ${ticket.ward_name || 'Delhi'}\n🎫 Ref: ${ticket.ticket_id}\n\nPlease take action! ${handle} #JanSamadhan #CivicIssue`;
     
-    const text = `🚨 Urgent Civic Issue: ${ticket.title}\n📍 Locality: ${ticket.ward_name || 'Delhi'}\n🎫 Ref: ${ticket.ticket_id}\n\nPlease take action! ${handle} #JanSamadhan #CivicIssue`;
-    
-    // Using the 'url' parameter ensures Twitter generates a rich card if metadata is present
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+    // 1. Try Web Share API (Mobile Premium Flow)
+    // This attaches the ACTUAL file to the tweet
+    if (navigator.share && navigator.canShare && ticket.photo_urls?.[0]) {
+      try {
+        const imageUrl = ticket.photo_urls[0];
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], "issue.jpg", { type: "image/jpeg" });
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: shareTitle,
+            text: shareText,
+          });
+          return; // Success
+        }
+      } catch (err) {
+        console.warn("Web Share failed, falling back to Intent:", err);
+      }
+    }
+
+    // 2. Fallback to Twitter Intent (Desktop / Legacy Flow)
+    // This relies on the 'summary_large_image' metadata we fixed
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(twitterUrl, "_blank");
   };
 
