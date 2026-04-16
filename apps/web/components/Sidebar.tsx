@@ -256,10 +256,10 @@ const Sidebar: React.FC<SidebarConfig> = ({
                 {item.isActive && (
                   <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-r-md ${colors.activeIndicator}`} />
                 )}
-                <Link
+                  <Link
                   href={item.href}
                   className={`
-                    flex items-center ${expanded ? "justify-start px-4" : "justify-center px-2"} py-3 ml-2 rounded-xl font-medium transition-all duration-200
+                    flex items-center ${expanded ? "justify-start px-4" : "justify-center px-2"} py-3 rounded-xl font-medium transition-all duration-200
                     focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#B48470] dark:focus:ring-[#C9A84C]
                     ${item.isActive
                       ? `${colors.activeBg} ${colors.activeText} font-semibold`
@@ -298,7 +298,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
           <button
             type="button"
             onClick={toggleTheme}
-            className={`menu-item text-left flex w-full items-center ${expanded ? "justify-start px-4 gap-4" : "justify-center px-2 gap-0"} py-3 ml-2 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#B48470] dark:focus:ring-[#C9A84C] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
+            className={`menu-item text-left flex w-full items-center ${expanded ? "justify-start px-4 gap-4" : "justify-center px-2 gap-0"} py-3 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#B48470] dark:focus:ring-[#C9A84C] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`}
             title={!expanded ? (isDark ? "Light Mode" : "Dark Mode") : undefined}
           >
             <div className="shrink-0">
@@ -314,7 +314,7 @@ const Sidebar: React.FC<SidebarConfig> = ({
           </button>
 
           {bottomNavigation.map((item) => {
-            const classes = `menu-item flex items-center ${expanded ? "justify-start px-4 gap-4" : "justify-center px-2 gap-0"} py-3 ml-2 rounded-xl font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`;
+            const classes = `menu-item flex items-center ${expanded ? "justify-start px-4 gap-4" : "justify-center px-2 gap-0"} py-3 rounded-xl font-medium transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${colors.textMuted} ${colors.textHover} ${colors.bgHover}`;
 
             if (item.onClick) {
               return (
