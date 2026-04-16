@@ -46,10 +46,10 @@ from shared import (
 
 
 # ── config ────────────────────────────────────────────────────────────────────
-WHATSAPP_TOKEN           = os.getenv("WHATSAPP_TOKEN", "")
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
-WHATSAPP_VERIFY_TOKEN    = os.getenv("WHATSAPP_VERIFY_TOKEN", "jansamadhan_verify")
-GRAPH_API_URL            = f"https://graph.facebook.com/v22.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+WHATSAPP_TOKEN           = os.getenv("WHATSAPP_TOKEN", "").strip()
+WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "").strip()
+WHATSAPP_VERIFY_TOKEN    = os.getenv("WHATSAPP_VERIFY_TOKEN", "jansamadhan_verify").strip()
+GRAPH_API_URL            = f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
 
 # In-memory session store  { phone_number: { ...session data } }
 # For production, replace with Redis or Supabase table
@@ -489,6 +489,7 @@ Return exactly:
 async def send_text(phone: str, text: str):
     payload = {
         "messaging_product": "whatsapp",
+        "recipient_type": "individual",
         "to": phone,
         "type": "text",
         "text": {"body": text},
