@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowUp, Search, X, ChevronDown, Star, MessageSquare } from "lucide-react";
+import { ArrowUp, Search, X, ChevronDown, Star, MessageSquare, MapPin, ExternalLink } from "lucide-react";
 import { supabase } from "@/src/lib/supabase";
 import type { Database } from "@/src/types/database.types";
 import Rating from "@/components/Rating";
@@ -12,8 +12,59 @@ import TicketDetailClient from "./details/_components/TicketDetailClient";
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
 type TicketListRow = Pick<
   ComplaintRow,
-  "id" | "ticket_id" | "title" | "address_text" | "assigned_department" | "status" | "created_at" | "upvote_count"
+  "id" | "ticket_id" | "title" | "address_text" | "assigned_department" | "status" | "created_at" | "upvote_count" | "location"
 > & { rating?: number | null; reviews?: { rating: number } | { rating: number }[] | null };
+
+// ─── Location Parser (EWKB/Hex) ──────────────────────────────────────────────────────────
+
+function parseEwkbHexPoint(hex: string): { lat: number; lng: number } | null {
+  const normalized = hex.trim();
+  if (!/^[0-9a-fA-F]+$/.test(normalized) || normalized.length < 42) return null;
+  try {
+    const bytes = new Uint8Array(normalized.length / 2);
+    for (let i = 0; i < normalized.length; i += 2)
+      bytes[i / 2] = parseInt(normalized.slice(i, i + 2), 16);
+    const view = new DataView(bytes.buffer);
+    const littleEndian = view.getUint8(0) === 1;
+    const typeWithFlags = view.getUint32(1, littleEndian);
+    const hasSrid = (typeWithFlags & 0x20000000) !== 0;
+    const geomType = typeWithFlags & 0x000000ff;
+    if (geomType !== 1) return null;
+    const coordOffset = hasSrid ? 9 : 5;
+    if (bytes.byteLength < coordOffset + 16) return null;
+    const lng = view.getFloat64(coordOffset, littleEndian);
+    const lat = view.getFloat64(coordOffset + 8, littleEndian);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+function parseLocation(location: unknown): { lat: number; lng: number } | null {
+  if (!location) return null;
+  if (typeof location === "object") {
+    const o = location as Record<string, unknown>;
+    if (Array.isArray(o.coordinates) && o.coordinates.length >= 2) {
+      const lng = Number(o.coordinates[0]);
+      const lat = Number(o.coordinates[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+    const latVal = o.lat ?? o.latitude;
+    const lngVal = o.lng ?? o.lon ?? o.longitude;
+    if (latVal !== undefined && lngVal !== undefined) {
+      const lat = Number(latVal); const lng = Number(lngVal);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+  }
+  if (typeof location === "string") {
+    const ewkb = parseEwkbHexPoint(location);
+    if (ewkb) return ewkb;
+    const m = location.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+    if (m) return { lng: Number(m[1]), lat: Number(m[2]) };
+  }
+  return null;
+}
 
 function formatStatus(status: string): string {
   return status
@@ -292,6 +343,7 @@ function CitizenTicketsPageContent() {
       status: row.status,
       created_at: row.created_at,
       upvote_count: row.upvote_count,
+      location: row.location,
     });
 
     const upsertTicket = (prev: TicketListRow[], incoming: TicketListRow): TicketListRow[] => {
@@ -655,9 +707,29 @@ function CitizenTicketsPageContent() {
                           {ticket.title || "Untitled issue"}
                         </span>
 
-                        <span className="text-gray-600 line-clamp-1 leading-snug dark:text-gray-400" title={ticket.address_text || "Address unavailable"}>
-                          {extractRelevantAddress(ticket.address_text) || "Address unavailable"}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-gray-600 line-clamp-1 leading-snug dark:text-gray-400" title={ticket.address_text || "Address unavailable"}>
+                            {extractRelevantAddress(ticket.address_text) || "Address unavailable"}
+                          </span>
+                          {ticket.address_text && (() => {
+                            const coords = parseLocation(ticket.location);
+                            return (
+                              <a 
+                                href={coords 
+                                  ? `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`
+                                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.address_text.split('|')[0])}`
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 text-[10px] font-bold text-[#b48470] hover:underline whitespace-nowrap"
+                              >
+                                <ExternalLink size={10} />
+                                Open in Maps
+                              </a>
+                            );
+                          })()}
+                        </div>
 
                         <span className="text-gray-900 font-medium line-clamp-2 leading-snug dark:text-gray-300">
                           {ticket.assigned_department || "Unassigned"}
