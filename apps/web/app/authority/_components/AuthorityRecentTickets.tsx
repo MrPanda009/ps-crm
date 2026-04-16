@@ -37,6 +37,10 @@ function stageInfo(c: AuthorityComplaintRow, workers: WorkerOption[]): { label: 
       return { label: "Resolved ✓", color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" }
     case "escalated":
       return { label: "Escalated ⚠", color: "text-purple-600 bg-purple-50 dark:bg-purple-900/20" }
+    case "pending_closure":
+      return { label: "Pending Verification", color: "text-purple-600 bg-purple-50 dark:bg-purple-900/20" }
+    case "closed":
+      return { label: "Closed", color: "text-gray-900 bg-gray-100 dark:bg-gray-800" }
     default:
       return { label: c.status, color: "text-gray-500 bg-gray-50" }
   }
@@ -110,9 +114,8 @@ export default function AuthorityRecentTickets({ complaints, workers, loading, e
               ) : rows.map(c => {
                 const sev         = getSeverityConfig(c.effective_severity)
                 const st          = STATUS_META[c.status] || {
-                  label: "Unknown",
+                  label: c.status,
                   badge: "bg-gray-100 text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400",
-                  step: 0
                 }
                 const stage       = stageInfo(c, workers)
                 const slaBreached = isBreached(c.sla_deadline, c.status)

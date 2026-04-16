@@ -9,7 +9,7 @@ import { getSeverityConfig, getStatusMeta } from "../_components/dashboard-types
 
 const MapComponent = dynamic(() => import("@/app/MapComponent"), { ssr: false })
 
-type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated"
+type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated" | "pending_closure" | "closed"
 type Sev    = string
 
 type Complaint = {
@@ -26,9 +26,8 @@ const SEV_RANK: Record<string, number> = {
   critical: 4, high: 3, medium: 2, low: 1,
 }
 
-
 const TERMINAL_STATUSES: Status[] = ["resolved", "rejected"]
-const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated"]
+const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated", "pending_closure"]
 const SEV_FILTER_OPTIONS = [
   { key: "L4", label: "Critical" },
   { key: "L3", label: "High" },
