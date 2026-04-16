@@ -194,6 +194,7 @@ export default function TicketDetailClient({
   }, { scope: containerRef, dependencies: [loading, ticket, isModal, viewMode] });
 
   const handleToggleLifecycle = async () => {
+    if (!ticketId) return;
     if (viewMode === "details") {
       setViewMode("lifecycle");
       if (history.length === 0) {
@@ -308,7 +309,7 @@ export default function TicketDetailClient({
   };
 
   const handleShareToX = async () => {
-    if (!ticket) return;
+    if (!ticket || !ticketId) return;
     
     const { primary, escalated, tier } = getTieredTwitterHandles(
       ticket.category_id, 
