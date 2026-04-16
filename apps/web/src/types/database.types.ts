@@ -303,6 +303,38 @@ export type Database = {
           },
         ]
       }
+      gamification_wallets: {
+        Row: {
+          lifetime_earned: number
+          lifetime_spent: number
+          points_balance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          lifetime_earned?: number
+          lifetime_spent?: number
+          points_balance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          lifetime_earned?: number
+          lifetime_spent?: number
+          points_balance?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gamification_wallets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       material_requests: {
         Row: {
           complaint_id: string
@@ -461,6 +493,87 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "worker_profiles"
             referencedColumns: ["worker_id"]
+          },
+        ]
+      }
+      reward_catalog: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          kind: string
+          per_user_limit: number
+          points_cost: number
+          stock_remaining: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          kind: string
+          per_user_limit?: number
+          points_cost: number
+          stock_remaining?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          kind?: string
+          per_user_limit?: number
+          points_cost?: number
+          stock_remaining?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      reward_redemptions: {
+        Row: {
+          created_at: string
+          id: string
+          points_spent: number
+          reward_id: string
+          status: string
+          user_id: string
+          voucher_code: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          points_spent: number
+          reward_id: string
+          status?: string
+          user_id: string
+          voucher_code?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          points_spent?: number
+          reward_id?: string
+          status?: string
+          user_id?: string
+          voucher_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reward_redemptions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "reward_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reward_redemptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -728,7 +841,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      leaderboard_all_time: {
+        Row: {
+          avatar_url: string | null
+          full_name: string | null
+          points: number | null
+          rank: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gamification_wallets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       assign_worker_to_complaint: {
@@ -737,6 +867,10 @@ export type Database = {
           p_complaint_id: string
           p_worker_id: string
         }
+        Returns: Json
+      }
+      award_points: {
+        Args: { p_points: number; p_user_id: string }
         Returns: Json
       }
       check_for_duplicate_report:
@@ -894,6 +1028,10 @@ export type Database = {
       recalculate_severity: {
         Args: { p_complaint_id: string }
         Returns: undefined
+      }
+      redeem_reward: {
+        Args: { p_reward_id: string; p_user_id: string }
+        Returns: Json
       }
       update_complaint_status_citizen: {
         Args: { p_citizen_id: string; p_complaint_id: string; p_status: string }
