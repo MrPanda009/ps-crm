@@ -317,7 +317,7 @@ export default function TicketDetailClient({
     );
     
     const handles = `${primary} ${escalated}`.trim();
-    const shareUrl = window.location.href;
+    const shareUrl = `${window.location.protocol}//${window.location.host}/citizen/tickets/details?id=${ticketId}`;
     
     // Time-based urgency
     const daysSince = Math.floor((new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60 * 24));
