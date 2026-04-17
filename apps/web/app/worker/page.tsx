@@ -385,6 +385,49 @@ export default function WorkerDashboardPage() {
     [],
   )
 
+  const notifyComplaintEmail = useCallback(
+    async (params: { complaintId: string; status: string; workerIdOverride?: string | null }) => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+        const response = await fetch(`${apiUrl}/api/notifications/complaint-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            complaint_id: params.complaintId,
+            event_type: "status_changed",
+            status: params.status,
+            worker_id_override: params.workerIdOverride ?? undefined,
+          }),
+        })
+
+        if (!response.ok) {
+          const bodyText = await response.text().catch(() => "")
+          console.error("[WORKER] complaint email notification failed", {
+            complaintId: params.complaintId,
+            status: params.status,
+            responseStatus: response.status,
+            bodyText,
+          })
+        }
+      } catch (err) {
+        console.error("[WORKER] complaint email notification error", {
+          complaintId: params.complaintId,
+          status: params.status,
+          err,
+        })
+      }
+    },
+    [],
+  )
+
   const handleMarkAbsent = useCallback(
     async (complaintId: string) => {
       if (!workerId) return
@@ -416,6 +459,12 @@ export default function WorkerDashboardPage() {
         new_status: "rejected",
         note: "Worker marked ticket absent/no issue detected on site.",
         is_internal: false,
+      })
+
+      await notifyComplaintEmail({
+        complaintId,
+        status: "rejected",
+        workerIdOverride: workerId,
       })
 
       if (task.cameraId) {
@@ -450,7 +499,7 @@ export default function WorkerDashboardPage() {
 
       fetchDashboardData()
     },
-    [emitSupervisedSampleEvent, fetchDashboardData, tasks, workerId],
+    [emitSupervisedSampleEvent, fetchDashboardData, notifyComplaintEmail, tasks, workerId],
   )
 
   const updateTaskStatus = useCallback(
@@ -485,6 +534,12 @@ export default function WorkerDashboardPage() {
       if (historyError) {
         setError("Task updated, but activity log write failed.")
       }
+
+      await notifyComplaintEmail({
+        complaintId,
+        status: nextStatus,
+        workerIdOverride: workerId,
+      })
 
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -533,7 +588,7 @@ export default function WorkerDashboardPage() {
 
       fetchDashboardData()
     },
-    [emitSupervisedSampleEvent, fetchDashboardData, tasks, workerId],
+    [emitSupervisedSampleEvent, fetchDashboardData, notifyComplaintEmail, tasks, workerId],
   )
 
   const handleCompleteTask = useCallback(
@@ -777,6 +832,12 @@ export default function WorkerDashboardPage() {
           is_internal: false,
         })
       }
+
+      await notifyComplaintEmail({
+        complaintId: displayTask.id,
+        status: nextStatus,
+        workerIdOverride: workerId,
+      })
 
       if (proofPhotoUrl && resolvedCameraId) {
         await emitSupervisedSampleEvent({

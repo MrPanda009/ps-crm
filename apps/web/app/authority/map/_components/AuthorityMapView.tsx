@@ -243,7 +243,7 @@ function AssignDropdown({
 }: {
   ticket: MapTicket
   workers: WorkerOption[]
-  onAssigned: (ticketId: string) => void
+  onAssigned: (ticketId: string, workerId: string) => void
 }) {
   const [open,   setOpen]   = useState(false)
   const [chosen, setChosen] = useState("")
@@ -254,13 +254,40 @@ function AssignDropdown({
   async function confirm() {
     if (!chosen) return
     setSaving(true)
-    await supabase
-      .from("complaints")
-      .update({ assigned_worker_id: chosen, status: "assigned" })
-      .eq("id", ticket.id)
-    setSaving(false)
-    setOpen(false)
-    onAssigned(ticket.id)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error("Not authenticated")
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const response = await fetch(`${apiUrl}/api/authority/assign`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          complaint_id: ticket.id,
+          worker_id: chosen,
+          status: "assigned",
+        }),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData?.detail || "Failed to assign worker")
+      }
+
+      setOpen(false)
+      onAssigned(ticket.id, chosen)
+    } catch (err) {
+      console.error("[AuthorityMap] Assignment failed:", err)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -343,7 +370,7 @@ function TicketDetailPanel({
   ticket: MapTicket
   workers: WorkerOption[]
   onClose: () => void
-  onAssigned: (id: string) => void
+  onAssigned: (id: string, workerId: string) => void
 }) {
   const canAssign =
     !ticket.assigned_worker_id &&
@@ -648,17 +675,17 @@ export default function AuthorityMapView() {
     })
   }
 
-  function handleAssigned(ticketId: string) {
+  function handleAssigned(ticketId: string, workerId: string) {
     setTickets(prev =>
       prev.map(t =>
         t.id === ticketId
-          ? { ...t, assigned_worker_id: "assigned", status: "assigned" as ComplaintStatus }
+          ? { ...t, assigned_worker_id: workerId, status: "assigned" as ComplaintStatus }
           : t
       )
     )
     setSelectedTicket(prev =>
       prev?.id === ticketId
-        ? { ...prev, assigned_worker_id: "assigned", status: "assigned" as ComplaintStatus }
+        ? { ...prev, assigned_worker_id: workerId, status: "assigned" as ComplaintStatus }
         : prev
     )
   }

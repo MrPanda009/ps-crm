@@ -340,6 +340,29 @@ export const CameraCard: React.FC<CameraCardProps> = ({
             return;
           }
 
+          try {
+            const notifyResponse = await fetch(`${apiUrl}/api/notifications/complaint-email`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+              },
+              body: JSON.stringify({
+                complaint_id: result.complaint_id,
+                event_type: 'status_changed',
+                status: nextTicketStatus,
+                worker_id_override: result.assigned_worker_id ?? undefined,
+              }),
+            });
+
+            if (!notifyResponse.ok) {
+              const notifyBody = await notifyResponse.text().catch(() => '');
+              console.error('CCTV verification status email trigger failed:', notifyResponse.status, notifyBody);
+            }
+          } catch (notifyErr) {
+            console.error('CCTV verification status email request failed:', notifyErr);
+          }
+
           if (result.assigned_worker_id) {
             const { error: workerReleaseError } = await supabase
               .from('worker_profiles')
