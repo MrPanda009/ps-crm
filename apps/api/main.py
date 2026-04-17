@@ -1580,7 +1580,11 @@ async def assign_complaint(
         )
         old_worker_id = (pre_assignment.data or {}).get("assigned_worker_id")
 
-        # Update complaint
+        # Validate requested status before applying assignment
+        if payload.status not in ALLOWED_STATUSES:
+            raise HTTPException(status_code=400, detail=f"Invalid status '{payload.status}'")
+
+        # Update complaint assignment
         print(f"DEBUG: Authority {user_id} assigning worker {payload.worker_id} to complaint {payload.complaint_id}")
         
         res = await asyncio.to_thread(
@@ -1595,8 +1599,18 @@ async def assign_complaint(
             print(f"DEBUG: Assignment DB Error: {res.error}")
             raise Exception(str(res.error))
 
+        # Apply the requested complaint status after assignment.
+        status_res = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .update({"status": payload.status})
+            .eq("id", payload.complaint_id)
+            .execute()
+        )
+        if hasattr(status_res, 'error') and status_res.error:
+            print(f"DEBUG: Status update error: {status_res.error}")
+            raise Exception(str(status_res.error))
+
         # Invalidate Redis Caches
-        if redis_client:
             try:
                 # 1. Dashboard for THIS user (authority)
                 redis_client.delete(f"authority:dashboard:{user_id}")
