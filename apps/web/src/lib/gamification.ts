@@ -24,10 +24,14 @@ export type GamificationReason =
 export const gamificationService = {
   /**
    * Awards points to a user via the award_points RPC.
+   * Ensures the user has a wallet first.
    */
   async awardPoints(userId: string, points: number, reason: GamificationReason = 'other') {
     try {
       console.log(`[Gamification] Awarding ${points} points to ${userId} for reason: ${reason}`);
+      
+      // Ensure the wallet exists before awarding points
+      await this.ensureWalletExists(userId);
       
       const { data, error } = await supabase.rpc('award_points', {
         p_points: points,
@@ -35,14 +39,40 @@ export const gamificationService = {
       });
 
       if (error) {
-        console.error(`[Gamification] RPC Error awarding points to ${userId}:`, error);
+        console.error(`[Gamification] RPC Error awarding points to ${userId}:`, JSON.stringify(error, null, 2));
         return { success: false, error };
       }
 
+      console.log(`[Gamification] Successfully awarded ${points} points to ${userId}. Result:`, JSON.stringify(data, null, 2));
       return { success: true, data };
     } catch (err) {
       console.error(`[Gamification] Unexpected error awarding points to ${userId}:`, err);
       return { success: false, error: err };
+    }
+  },
+
+  /**
+   * Ensures a row exists in the gamification_wallets table for the user.
+   */
+  async ensureWalletExists(userId: string) {
+    try {
+      console.log(`[Gamification] Checking/Creating wallet for ${userId}`);
+      const { error } = await supabase
+        .from('gamification_wallets')
+        .upsert({ 
+          user_id: userId,
+          points_balance: 0,
+          lifetime_earned: 0,
+          lifetime_spent: 0
+        }, { onConflict: 'user_id' });
+
+      if (error) {
+        console.warn(`[Gamification] Error in upsert wallet for ${userId}:`, error.message);
+      } else {
+        console.log(`[Gamification] Wallet ensured for ${userId}`);
+      }
+    } catch (err) {
+      console.error(`[Gamification] Unexpected error ensuring wallet for ${userId}:`, err);
     }
   },
 
