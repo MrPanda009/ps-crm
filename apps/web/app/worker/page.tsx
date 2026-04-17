@@ -43,6 +43,7 @@ type ComplaintWithCategory = {
   resolved_at: string | null
   location: unknown
   categories: { name: string } | null
+  is_spam: boolean
   camera_id: string | null  // present on CCTV auto-generated tickets
 }
 
@@ -91,6 +92,7 @@ function transformPayload(payload: WorkerDashboardPayload) {
         longitude: complaintLocation?.lng ?? null,
         distanceKm,
         cameraId: complaint.camera_id ?? null,
+        isSpam: complaint.is_spam || false,
       } satisfies DashboardTask
     })
 
@@ -295,7 +297,7 @@ export default function WorkerDashboardPage() {
       tasksToday: tasks.filter((task) => new Date(task.createdAt).getTime() >= startOfDay).length,
       pending: tasks.filter((task) => task.status === "assigned" || task.status === "reopened").length,
       completedToday: tasks.filter(
-        (task) => task.status === "resolved" && task.resolvedAt && new Date(task.resolvedAt).getTime() >= startOfDay,
+        (task) => task.status === "resolved" && !task.isSpam && task.resolvedAt && new Date(task.resolvedAt).getTime() >= startOfDay,
       ).length,
       urgent: tasks.filter((task) => task.status !== "resolved" && (task.severity === "L3" || task.severity === "L4")).length,
     } satisfies DashboardStats

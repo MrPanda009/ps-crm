@@ -686,7 +686,7 @@ export type Database = {
       }
       ticket_history: {
         Row: {
-          changed_by: string
+          changed_by: string | null
           complaint_id: string
           created_at: string
           id: string
@@ -696,7 +696,7 @@ export type Database = {
           old_status: string | null
         }
         Insert: {
-          changed_by: string
+          changed_by?: string | null
           complaint_id: string
           created_at?: string
           id?: string
@@ -706,7 +706,7 @@ export type Database = {
           old_status?: string | null
         }
         Update: {
-          changed_by?: string
+          changed_by?: string | null
           complaint_id?: string
           created_at?: string
           id?: string
@@ -1085,6 +1085,7 @@ export type Database = {
         | "rejected"
         | "escalated"
         | "reopened"
+        | "spam"
       severity_level: "L1" | "L2" | "L3" | "L4"
       worker_availability: "available" | "busy" | "inactive"
     }
@@ -1228,6 +1229,7 @@ export const Constants = {
         "rejected",
         "escalated",
         "reopened",
+        "spam",
       ],
       severity_level: ["L1", "L2", "L3", "L4"],
       worker_availability: ["available", "busy", "inactive"],

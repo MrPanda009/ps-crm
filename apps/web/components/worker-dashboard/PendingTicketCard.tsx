@@ -48,8 +48,10 @@ export default function PendingTicketCard({
           <span className={`h-2.5 w-2.5 rounded-full ${getSeverityDotColor(ticket.severity)}`} />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{ticket.ticketId}</span>
         </div>
-        <span className={`whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium ${statusClasses(ticket.status)}`}>
-          {formatStatus(ticket.status)}
+        <span className="flex items-center gap-1.5">
+          <span className={`whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium ${ticket.isSpam ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" : statusClasses(ticket.status)}`}>
+            {ticket.isSpam ? "SPAM" : formatStatus(ticket.status)}
+          </span>
         </span>
       </div>
 

@@ -830,7 +830,7 @@ async def get_citizen_tickets(
     
     # Always fetch fresh data from Supabase to avoid stale status when workers update tickets directly
     query = supabase.table("complaints").select(
-        "id, ticket_id, title, address_text, assigned_department, status, created_at, updated_at, upvote_count, reviews(rating)"
+        "id, ticket_id, title, address_text, assigned_department, status, is_spam, created_at, updated_at, upvote_count, reviews(rating)"
     ).eq("citizen_id", citizen_id).order("created_at", desc=True)
 
     if since:
@@ -949,10 +949,10 @@ async def get_admin_dashboard_stats(
         ] = await asyncio.gather(
             asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").execute()),
             asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").in_("status", ["submitted", "under_review", "assigned", "in_progress", "escalated", "reopened"]).execute()),
-            asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").eq("status", "resolved").execute()),
+            asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").eq("status", "resolved").eq("is_spam", False).execute()),
             asyncio.to_thread(lambda: supabase.table("complaints").select("id", count="exact").eq("status", "escalated").execute()),
             asyncio.to_thread(lambda: supabase.table("profiles").select("id", count="exact").eq("role", "authority").eq("is_blocked", False).execute()),
-            asyncio.to_thread(lambda: supabase.table("complaints").select("created_at, resolved_at").eq("status", "resolved").execute())
+            asyncio.to_thread(lambda: supabase.table("complaints").select("created_at, resolved_at").eq("status", "resolved").eq("is_spam", False).execute())
         )
 
         # Calculate Average Resolution Days
@@ -1511,12 +1511,12 @@ async def get_admin_complaints_list(
 # =========================================================
 
 COMPLAINT_DASHBOARD_SELECT = (
-    "id, ticket_id, title, status, effective_severity, sla_deadline, "
+    "id, ticket_id, title, status, is_spam, effective_severity, sla_deadline, "
     "escalation_level, created_at, resolved_at, address_text, assigned_worker_id, "
     "upvote_count, categories(name)"
 )
 
-TREND_SELECT = "status, created_at, resolved_at"
+TREND_SELECT = "status, is_spam, created_at, resolved_at"
 
 
 @app.get("/api/authority/dashboard")
@@ -1743,12 +1743,12 @@ async def get_authority_workers(
 
 WORKER_COMPLAINT_SELECT = (
     "id, ticket_id, title, assigned_worker_id, description, address_text, "
-    "severity, status, created_at, resolved_at, location, categories(name)"
+    "severity, status, is_spam, created_at, resolved_at, location, categories(name)"
 )
 
 WORKER_COMPLAINT_SELECT_FALLBACK = (
     "id, ticket_id, title, assigned_worker_id, description, address_text, "
-    "severity, status, created_at, resolved_at, location"
+    "severity, status, is_spam, created_at, resolved_at, location"
 )
 
 

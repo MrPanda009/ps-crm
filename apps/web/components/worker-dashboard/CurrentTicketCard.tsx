@@ -61,12 +61,8 @@ export default function CurrentTicketCard({
               {ticket.ticketId}
             </span>
           </div>
-          <span
-            className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${statusClasses(
-              ticket.status
-            )}`}
-          >
-            {formatStatus(ticket.status)}
+          <span className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${ticket.isSpam ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" : statusClasses(ticket.status)}`}>
+            {ticket.isSpam ? "SPAM" : formatStatus(ticket.status)}
           </span>
         </div>
 
