@@ -27,6 +27,7 @@ export type TicketRecord = {
   authority: string
   worker: string
   citizenId: string
+  isSpam: boolean
 }
 
 export const PAGE_SIZE = 20

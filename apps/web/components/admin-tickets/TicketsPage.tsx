@@ -36,6 +36,7 @@ type ComplaintRow = {
   assigned_worker_id: string | null
   assigned_officer_id: string | null
   citizen_id: string
+  is_spam: boolean
   categories: CategoryRelation | CategoryRelation[] | null
 }
 
@@ -101,6 +102,7 @@ function normalizeTicket(row: ComplaintRow, profilesById: Record<string, Profile
     authority,
     worker: workerProfile?.full_name ?? "Unassigned",
     citizenId: row.citizen_id,
+    isSpam: row.is_spam,
   }
 }
 
@@ -521,6 +523,7 @@ export default function TicketsPage() {
               <p><span className="font-semibold">Authority:</span> {selectedTicket.authority}</p>
               <p><span className="font-semibold">Worker:</span> {selectedTicket.worker}</p>
               <p><span className="font-semibold">Created:</span> {new Date(selectedTicket.createdAt).toLocaleString("en-IN")}</p>
+              <p><span className="font-semibold">Is Spam:</span> {selectedTicket.isSpam ? "Yes" : "No"}</p>
               <p className="sm:col-span-2"><span className="font-semibold">Location:</span> {selectedTicket.location}</p>
             </div>
           </div>

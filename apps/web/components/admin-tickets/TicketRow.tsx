@@ -28,7 +28,14 @@ export default function TicketRow({ ticket, actionLoading = false, onView, onAss
   return (
     <tr className={`border-t border-[#ded6cb] align-top dark:border-[#2a2a2a] ${highlightClass}`}>
       <td className="px-3 py-4 text-sm font-medium text-[#332d28] dark:text-gray-300">
-        <span className="block w-full" style={clamp3Lines}>{ticket.ticketId}</span>
+        <span className="block w-full" style={clamp3Lines}>
+          {ticket.ticketId}
+          {ticket.isSpam && (
+            <span className="ml-2 inline-flex items-center rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 dark:bg-red-900/40 dark:text-red-400">
+              Spam
+            </span>
+          )}
+        </span>
       </td>
       <td className="px-3 py-4 text-sm font-semibold text-[#29231f] dark:text-gray-100">
         <span style={clamp3Lines}>{ticket.title}</span>
