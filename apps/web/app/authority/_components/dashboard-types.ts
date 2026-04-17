@@ -11,6 +11,7 @@ export type ComplaintStatus =
   | "escalated"
   | "closed"
   | "reopened"
+  | "spam"
 
 export type SeverityLevel = "L1" | "L2" | "L3" | "L4"
 
@@ -129,6 +130,7 @@ export const STATUS_META: Record<ComplaintStatus, { label: string; badge: string
   escalated:    { label: "Escalated",    badge: "bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-900/30 dark:text-purple-300",   step: 6 },
   closed:       { label: "Closed",       badge: "bg-gray-100 text-gray-800 ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-200",                 step: 6 },
   reopened:     { label: "Reopened",     badge: "bg-red-100 text-red-700 ring-1 ring-red-200 font-bold dark:bg-red-900/40 dark:text-red-300 animate-pulse", step: 4 },
+  spam:         { label: "Spam",         badge: "bg-gray-100 text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400",              step: 0 },
 }
 
 export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
@@ -142,6 +144,7 @@ export const STATUS_CHART_COLOR: Record<ComplaintStatus, string> = {
   escalated:    "#a855f7",
   closed:       "#6b7280",
   reopened:     "#ef4444",
+  spam:         "#64748b",
 }
 
 export const UNKNOWN_STATUS_META = {
@@ -158,7 +161,7 @@ export function getStatusMeta(status: string | ComplaintStatus) {
 
 export function isBreached(deadline: string | null, status: ComplaintStatus): boolean {
   if (!deadline) return false
-  if (status === "resolved" || status === "rejected" || status === "closed") return false
+  if (status === "resolved" || status === "rejected" || status === "spam" || status === "closed") return false
   return new Date(deadline) < new Date()
 }
 
@@ -211,6 +214,16 @@ export function getUrgentTickets(
   limit = 8
 ): AuthorityComplaintRow[] {
   return complaints
+    .filter(c =>
+      c.status !== "resolved" &&
+      c.status !== "rejected" &&
+      c.status !== "spam" &&
+      c.status !== "closed" &&
+      (ESCALATED_STATUSES.includes(c.status) ||
+        URGENT_SEVERITIES.includes(c.effective_severity) ||
+        // also catch string-format high/critical from DB
+        ["high","critical","l3","l4"].includes((c.effective_severity ?? "").toLowerCase()))
+    )
     .filter(c => isBreached(c.sla_deadline, c.status))
     .sort((a, b) => {
       const aDeadline = a.sla_deadline ? new Date(a.sla_deadline).getTime() : Number.POSITIVE_INFINITY

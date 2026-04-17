@@ -9,11 +9,27 @@ import { getSeverityConfig, getStatusMeta } from "../_components/dashboard-types
 
 const MapComponent = dynamic(() => import("@/app/MapComponent"), { ssr: false })
 
-type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated" | "pending_closure" | "closed"
-type Sev    = string
+type LocalStatus = 
+  | "submitted" 
+  | "under_review" 
+  | "assigned" 
+  | "in_progress" 
+  | "resolved" 
+  | "rejected" 
+  | "escalated" 
+  | "pending_closure" 
+  | "closed" 
+  | "spam" 
+  | "reopened"
+
+type Sev = string
 
 type Complaint = {
-  id: string; ticket_id: string; title: string; status: Status; is_spam: boolean
+  id: string; 
+  ticket_id: string; 
+  title: string; 
+  status: LocalStatus; 
+  is_spam: boolean
   effective_severity: Sev; sla_deadline: string | null
   escalation_level: number; created_at: string; resolved_at: string | null
   address_text: string | null; assigned_worker_id: string | null; upvote_count: number
@@ -26,8 +42,18 @@ const SEV_RANK: Record<string, number> = {
   critical: 4, high: 3, medium: 2, low: 1,
 }
 
-const TERMINAL_STATUSES: Status[] = ["resolved", "rejected"]
-const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated", "pending_closure"]
+const TERMINAL_STATUSES: LocalStatus[] = ["resolved", "rejected", "spam", "closed"]
+const ALL_STATUSES: LocalStatus[] = [
+  "submitted", 
+  "under_review", 
+  "assigned", 
+  "in_progress", 
+  "resolved", 
+  "escalated", 
+  "pending_closure", 
+  "reopened", 
+  "spam"
+]
 const SEV_FILTER_OPTIONS = [
   { key: "L4", label: "Critical" },
   { key: "L3", label: "High" },
@@ -39,9 +65,9 @@ const COMPLAINT_SELECT =
   "id,ticket_id,title,status,is_spam,effective_severity,sla_deadline," +
   "escalation_level,created_at,resolved_at,address_text,assigned_worker_id,upvote_count,categories(name)"
 
-function slaStatus(deadline: string | null, status: Status): { breached: boolean; text: string; pill: string } {
+function slaStatus(deadline: string | null, status: LocalStatus): { breached: boolean; text: string; pill: string } {
   if (!deadline) return { breached: false, text: "—", pill: "text-gray-300" }
-  if (status === "resolved" || status === "rejected") {
+  if (status === "resolved" || status === "rejected" || status === "spam" || status === "closed") {
     return { breached: false, text: "Met", pill: "bg-emerald-50 text-emerald-600" }
   }
   const diff  = new Date(deadline).getTime() - Date.now()
@@ -450,7 +476,7 @@ export default function TrackPage() {
           <div className="relative">
             <button onClick={() => { setIsStatOpen(o => !o); setIsSortOpen(false); setIsSevOpen(false) }}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              {statusFilter === "all" ? "All statuses" : getStatusMeta(statusFilter as Status).label}
+              {statusFilter === "all" ? "All statuses" : getStatusMeta(statusFilter as LocalStatus).label}
               <span className="text-[10px] opacity-60">▼</span>
             </button>
             <div className={`absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 transition-all duration-200 ${isStatOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
