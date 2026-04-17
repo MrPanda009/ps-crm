@@ -570,9 +570,7 @@ export async function POST(req: NextRequest) {
 
   // Award points for ticket creation
   try {
-    console.log(`[API/Complaints] Attempting to award creation points to ${citizen_id}`);
-    const res = await gamificationService.awardPoints(citizen_id, GAMIFICATION_CONFIG.POINTS_TICKET_CREATION, 'ticket_creation');
-    console.log(`[API/Complaints] Point award result for ${citizen_id}:`, JSON.stringify(res, null, 2));
+    await gamificationService.awardPoints(citizen_id, GAMIFICATION_CONFIG.POINTS_TICKET_CREATION, 'ticket_creation');
   } catch (err) {
     console.error("[API/Complaints] Failed to award points for ticket creation:", err);
   }

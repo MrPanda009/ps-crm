@@ -43,7 +43,6 @@ export const gamificationService = {
         return { success: false, error };
       }
 
-      console.log(`[Gamification] Successfully awarded ${points} points to ${userId}. Result:`, JSON.stringify(data, null, 2));
       return { success: true, data };
     } catch (err) {
       console.error(`[Gamification] Unexpected error awarding points to ${userId}:`, err);
@@ -56,7 +55,6 @@ export const gamificationService = {
    */
   async ensureWalletExists(userId: string) {
     try {
-      console.log(`[Gamification] Checking/Creating wallet for ${userId}`);
       const { error } = await supabase
         .from('gamification_wallets')
         .upsert({ 
@@ -68,8 +66,6 @@ export const gamificationService = {
 
       if (error) {
         console.warn(`[Gamification] Error in upsert wallet for ${userId}:`, error.message);
-      } else {
-        console.log(`[Gamification] Wallet ensured for ${userId}`);
       }
     } catch (err) {
       console.error(`[Gamification] Unexpected error ensuring wallet for ${userId}:`, err);
