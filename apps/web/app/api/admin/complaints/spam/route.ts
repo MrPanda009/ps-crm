@@ -11,9 +11,11 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log("[Spam API] Received request body:", JSON.stringify(body, null, 2));
     const { complaint_id, citizen_id } = body;
 
     if (!complaint_id || !citizen_id) {
+      console.warn("[Spam API] Validation failed: missing IDs", { complaint_id, citizen_id });
       return NextResponse.json({ error: "complaint_id and citizen_id are required" }, { status:400 });
     }
 
@@ -28,18 +30,7 @@ export async function POST(req: NextRequest) {
     // 2. Award penalty points and increment strikes
     await gamificationService.handleSpamPenalty(citizen_id);
 
-    // 3. Log to history
-    const { data: { user } } = await supabase.auth.getUser(req.headers.get("authorization")?.split(" ")[1] ?? "");
-    
-    await supabase.from("ticket_history").insert({
-      complaint_id,
-      changed_by: user?.id ?? citizen_id, // Fallback to citizen if admin id not found
-      old_status: 'unknown',
-      new_status: 'resolved',
-      note: "Marked as spam by admin. Points deducted.",
-    });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, citizen_id });
   } catch (err: any) {
     console.error("[Spam API] Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -238,8 +238,7 @@ export default function TicketsPage() {
     })
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      const response = await fetch(`${apiUrl}/api/admin/complaints?${query.toString()}`, {
+      const response = await fetch(`/api/admin/complaints?${query.toString()}`, {
         method: "GET",
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
