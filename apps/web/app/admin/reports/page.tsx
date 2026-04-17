@@ -118,6 +118,7 @@ export default function AdminReportsPage() {
   const [error, setError] = useState<string | null>(null)
   const [complaints, setComplaints] = useState<ComplaintAssignmentRow[]>([])
   const [profiles, setProfiles] = useState<AuthorityProfileRow[]>([])
+  const [workers, setWorkers] = useState<WorkerProfileRow[]>([])
   const [selectedDept, setSelectedDept] = useState<string>("All Departments")
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false)
   const [deptSearch, setDeptSearch] = useState("")
@@ -151,6 +152,7 @@ export default function AdminReportsPage() {
     }
     if (payload.complaints) setComplaints(payload.complaints)
     if (payload.profiles) setProfiles(payload.profiles)
+    if (payload.workers) setWorkers(payload.workers)
     setLoading(false)
   }, [])
 
@@ -224,12 +226,19 @@ export default function AdminReportsPage() {
 
   /* ─── resolution speed table ──────────────────────────────────── */
   const resolutionTable = useMemo(() => {
+    const workerMap = Object.fromEntries(workers.map((w) => [w.worker_id, w]))
     const authorityMap: Record<string, { name: string; totalDays: number; count: number }> = {}
-    complaints.filter((c) => c.resolved_at && c.assigned_officer_id).forEach((c) => {
-      const id = c.assigned_officer_id!
+    complaints.filter((c) => c.resolved_at && (c.assigned_officer_id || c.assigned_worker_id)).forEach((c) => {
+      const id = c.assigned_officer_id || c.assigned_worker_id!
       if (!authorityMap[id]) {
         const profile = profiles.find((p) => p.id === id)
-        authorityMap[id] = { name: profile?.full_name || profile?.email || "Unknown", totalDays: 0, count: 0 }
+        const worker = workerMap[id]
+        const workerName = worker?.profiles?.full_name || worker?.profiles?.email
+        authorityMap[id] = {
+          name: profile?.full_name || profile?.email || workerName || "Unknown",
+          totalDays: 0,
+          count: 0,
+        }
       }
       const days = (new Date(c.resolved_at!).getTime() - new Date(c.created_at).getTime()) / 86400000
       if (days >= 0 && days < 3650) {
@@ -242,7 +251,7 @@ export default function AdminReportsPage() {
       .map((a) => ({ name: a.name, avgDays: a.totalDays / a.count }))
       .sort((a, b) => a.avgDays - b.avgDays)
       .slice(0, 8)
-  }, [complaints, profiles])
+  }, [complaints, profiles, workers])
 
   const maxAvgDays = resolutionTable[resolutionTable.length - 1]?.avgDays || 1
 
