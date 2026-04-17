@@ -221,6 +221,22 @@ class DashcamResolveRequest(BaseModel):
     size_bytes: Optional[int] = None
 
 
+class WorkerSupervisedSampleEventRequest(BaseModel):
+    complaint_id: str
+    event_type: str  # present | absent | repair_complete
+    proof_photo_url: Optional[str] = None
+    camera_id: Optional[str] = None
+    source: Optional[str] = "worker_dashboard"
+
+
+VALID_SUPERVISED_EVENT_TYPES = {"present", "absent", "repair_complete"}
+SUPERVISED_BUCKET_BY_EVENT = {
+    "present": "positive_real_pothole",
+    "absent": "negative_no_pothole",
+    "repair_complete": "negative_post_repair_clean_patch",
+}
+
+
 def _read_json_file(path: Path) -> Optional[Dict[str, Any]]:
     if not path.exists():
         return None
@@ -2101,6 +2117,299 @@ async def invalidate_worker_dashboard_cache(
         except Exception as e:
             print(f"Redis invalidation failed: {e}")
     return {"status": "success"}
+
+
+@app.post("/api/worker/supervised-samples")
+async def emit_worker_supervised_sample_event(
+    body: WorkerSupervisedSampleEventRequest,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Best-effort supervised-learning sample capture endpoint.
+    This endpoint is safe to call before DB provisioning; it will return a skipped
+    status if learning_collector_samples is not yet created in Supabase.
+    """
+    worker_id = get_citizen_id_from_token(authorization)
+    event_type = (body.event_type or "").strip().lower()
+
+    if event_type not in VALID_SUPERVISED_EVENT_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported event_type: {body.event_type}")
+
+    try:
+        complaint_res = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .select(
+                "id, ticket_id, camera_id, digipin, category_id, severity, "
+                "proof_photo_url, assigned_worker_id, location, city, status"
+            )
+            .eq("id", body.complaint_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch complaint context: {str(e)}")
+
+    complaint = complaint_res.data or {}
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    assigned_worker_id = complaint.get("assigned_worker_id")
+    if assigned_worker_id and assigned_worker_id != worker_id:
+        raise HTTPException(status_code=403, detail="Worker does not own this complaint")
+
+    resolved_camera_id = body.camera_id or complaint.get("camera_id")
+    resolved_proof_photo_url = body.proof_photo_url or complaint.get("proof_photo_url")
+    target_bucket = SUPERVISED_BUCKET_BY_EVENT[event_type]
+    label_source = "worker_action"
+
+    source_image_ref = resolved_proof_photo_url
+    if not source_image_ref and resolved_camera_id:
+        source_image_ref = f"camera:{resolved_camera_id}"
+    if not source_image_ref:
+        source_image_ref = f"complaint:{body.complaint_id}"
+
+    dedup_input = f"{body.complaint_id}:{event_type}:{source_image_ref}"
+    dedup_key = hashlib.sha256(dedup_input.encode("utf-8")).hexdigest()
+
+    metadata = {
+        "source": body.source or "worker_dashboard",
+        "city": complaint.get("city"),
+        "location": complaint.get("location"),
+        "status_at_capture": complaint.get("status"),
+    }
+
+    payload = {
+        "complaint_id": body.complaint_id,
+        "ticket_id": complaint.get("ticket_id"),
+        "camera_id": resolved_camera_id,
+        "event_type": event_type,
+        "target_bucket": target_bucket,
+        "source_image_ref": source_image_ref,
+        "proof_photo_url": resolved_proof_photo_url,
+        "label_source": label_source,
+        "actor_id": worker_id,
+        "digipin": complaint.get("digipin"),
+        "category_id": complaint.get("category_id"),
+        "severity": complaint.get("severity"),
+        "dedup_key": dedup_key,
+        "is_active": True,
+        "metadata": metadata,
+    }
+
+    # Step 1: Dedup check (if table exists)
+    try:
+        duplicate_res = await asyncio.to_thread(
+            lambda: supabase.table("learning_collector_samples")
+            .select("id")
+            .eq("dedup_key", dedup_key)
+            .maybe_single()
+            .execute()
+        )
+        duplicate_row = duplicate_res.data
+        if duplicate_row:
+            return {
+                "status": "duplicate_skipped",
+                "event_type": event_type,
+                "target_bucket": target_bucket,
+                "dedup_key": dedup_key,
+                "existing_id": duplicate_row.get("id"),
+            }
+    except Exception as e:
+        err_text = str(e)
+        if "learning_collector_samples" in err_text and ("does not exist" in err_text or "Could not find" in err_text):
+            return {
+                "status": "skipped_missing_table",
+                "event_type": event_type,
+                "target_bucket": target_bucket,
+                "dedup_key": dedup_key,
+                "reason": "learning_collector_samples is not provisioned yet",
+            }
+        raise HTTPException(status_code=500, detail=f"Sample dedup check failed: {err_text}")
+
+    # Step 2: Insert sample metadata
+    try:
+        insert_res = await asyncio.to_thread(
+            lambda: supabase.table("learning_collector_samples").insert(payload).execute()
+        )
+    except Exception as e:
+        err_text = str(e)
+        if "learning_collector_samples" in err_text and ("does not exist" in err_text or "Could not find" in err_text):
+            return {
+                "status": "skipped_missing_table",
+                "event_type": event_type,
+                "target_bucket": target_bucket,
+                "dedup_key": dedup_key,
+                "reason": "learning_collector_samples is not provisioned yet",
+            }
+        raise HTTPException(status_code=500, detail=f"Sample insert failed: {err_text}")
+
+    inserted = (insert_res.data or [{}])[0]
+    return {
+        "status": "captured",
+        "event_type": event_type,
+        "target_bucket": target_bucket,
+        "dedup_key": dedup_key,
+        "sample_id": inserted.get("id"),
+    }
+
+
+@app.get("/api/supervised-samples/metrics")
+async def get_supervised_samples_metrics(
+    authorization: Optional[str] = Header(None),
+):
+    """Return operational counters for supervised sample collection."""
+    await require_admin(authorization)
+
+    def _count_with_filters(filters: Dict[str, Any]) -> int:
+        query = supabase.table("learning_collector_samples").select("id", count="exact")
+        for key, value in filters.items():
+            query = query.eq(key, value)
+        res = query.execute()
+        return int(res.count or 0)
+
+    try:
+        total = await asyncio.to_thread(lambda: _count_with_filters({}))
+        active = await asyncio.to_thread(lambda: _count_with_filters({"is_active": True}))
+        invalidated = await asyncio.to_thread(lambda: _count_with_filters({"is_active": False}))
+        exported = await asyncio.to_thread(lambda: _count_with_filters({"is_exported": True}))
+        pending_export = await asyncio.to_thread(
+            lambda: _count_with_filters({"is_active": True, "is_exported": False})
+        )
+        present_count = await asyncio.to_thread(
+            lambda: _count_with_filters({"event_type": "present", "is_active": True})
+        )
+        absent_count = await asyncio.to_thread(
+            lambda: _count_with_filters({"event_type": "absent", "is_active": True})
+        )
+        repair_complete_count = await asyncio.to_thread(
+            lambda: _count_with_filters({"event_type": "repair_complete", "is_active": True})
+        )
+    except Exception as e:
+        err_text = str(e)
+        if "learning_collector_samples" in err_text and ("does not exist" in err_text or "Could not find" in err_text):
+            return {
+                "status": "skipped_missing_table",
+                "reason": "learning_collector_samples is not provisioned yet",
+            }
+        raise HTTPException(status_code=500, detail=f"Failed to compute supervised sample metrics: {err_text}")
+
+    return {
+        "status": "ok",
+        "counters": {
+            "created_total": total,
+            "active_total": active,
+            "invalidated_total": invalidated,
+            "exported_total": exported,
+            "pending_export_total": pending_export,
+            "by_event": {
+                "present": present_count,
+                "absent": absent_count,
+                "repair_complete": repair_complete_count,
+            },
+        },
+    }
+
+
+@app.get("/api/supervised-samples/export")
+async def export_supervised_samples(
+    authorization: Optional[str] = Header(None),
+    dry_run: bool = True,
+    limit: int = 500,
+):
+    """
+    Export connector for supervised-learning samples.
+    - dry_run=true: preview rows and summary without changing DB.
+    - dry_run=false: mark selected rows as exported in one batch.
+    """
+    await require_admin(authorization)
+
+    safe_limit = max(1, min(limit, 2000))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    export_batch_id = f"sl_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+
+    try:
+        query = (
+            supabase.table("learning_collector_samples")
+            .select(
+                "id, complaint_id, ticket_id, camera_id, event_type, target_bucket, "
+                "source_image_ref, proof_photo_url, label_source, actor_id, digipin, "
+                "category_id, severity, dedup_key, is_active, is_exported, created_at"
+            )
+            .eq("is_active", True)
+            .eq("is_exported", False)
+            .order("created_at", desc=False)
+            .limit(safe_limit)
+        )
+        rows_res = await asyncio.to_thread(query.execute)
+        rows = rows_res.data or []
+    except Exception as e:
+        err_text = str(e)
+        if "learning_collector_samples" in err_text and ("does not exist" in err_text or "Could not find" in err_text):
+            return {
+                "status": "skipped_missing_table",
+                "reason": "learning_collector_samples is not provisioned yet",
+            }
+        raise HTTPException(status_code=500, detail=f"Failed to read export rows: {err_text}")
+
+    summary_by_bucket: Dict[str, int] = {}
+    summary_by_event: Dict[str, int] = {}
+    for row in rows:
+        bucket = str(row.get("target_bucket") or "unknown")
+        event = str(row.get("event_type") or "unknown")
+        summary_by_bucket[bucket] = summary_by_bucket.get(bucket, 0) + 1
+        summary_by_event[event] = summary_by_event.get(event, 0) + 1
+
+    if dry_run:
+        return {
+            "status": "dry_run",
+            "count": len(rows),
+            "limit": safe_limit,
+            "summary": {
+                "by_bucket": summary_by_bucket,
+                "by_event": summary_by_event,
+            },
+            "rows": rows,
+        }
+
+    if not rows:
+        return {
+            "status": "exported",
+            "count": 0,
+            "batch_id": export_batch_id,
+            "summary": {
+                "by_bucket": {},
+                "by_event": {},
+            },
+            "rows": [],
+        }
+
+    row_ids = [row.get("id") for row in rows if row.get("id") is not None]
+    try:
+        await asyncio.to_thread(
+            lambda: supabase.table("learning_collector_samples")
+            .update(
+                {
+                    "is_exported": True,
+                    "exported_at": now_iso,
+                    "export_batch_id": export_batch_id,
+                }
+            )
+            .in_("id", row_ids)
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to mark rows exported: {str(e)}")
+
+    return {
+        "status": "exported",
+        "count": len(rows),
+        "batch_id": export_batch_id,
+        "summary": {
+            "by_bucket": summary_by_bucket,
+            "by_event": summary_by_event,
+        },
+        "rows": rows,
+    }
 
 
 @app.get("/api/worker/profile")

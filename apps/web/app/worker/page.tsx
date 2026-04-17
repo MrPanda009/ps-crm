@@ -328,6 +328,63 @@ export default function WorkerDashboardPage() {
 
   const pendingTask = useMemo(() => sortedAssignedTasks[0] ?? null, [sortedAssignedTasks])
 
+  const emitSupervisedSampleEvent = useCallback(
+    async (params: {
+      complaintId: string
+      eventType: "present" | "absent" | "repair_complete"
+      cameraId?: string | null
+      proofPhotoUrl?: string | null
+    }) => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+        const response = await fetch(`${apiUrl}/api/worker/supervised-samples`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            complaint_id: params.complaintId,
+            event_type: params.eventType,
+            camera_id: params.cameraId ?? null,
+            proof_photo_url: params.proofPhotoUrl ?? null,
+            source: "worker_dashboard",
+          }),
+        })
+
+        if (!response.ok) {
+          const bodyText = await response.text().catch(() => "")
+          console.warn("[WORKER][SAMPLE_EVENT] API returned non-200", {
+            complaintId: params.complaintId,
+            eventType: params.eventType,
+            status: response.status,
+            bodyText,
+          })
+          return
+        }
+
+        const result = await response.json().catch(() => null)
+        console.info("[WORKER][SAMPLE_EVENT] emitted", {
+          complaintId: params.complaintId,
+          eventType: params.eventType,
+          result,
+        })
+      } catch (err) {
+        console.warn("[WORKER][SAMPLE_EVENT] emission failed", {
+          complaintId: params.complaintId,
+          eventType: params.eventType,
+          err,
+        })
+      }
+    },
+    [],
+  )
+
   const handleMarkAbsent = useCallback(
     async (complaintId: string) => {
       if (!workerId) return
@@ -361,6 +418,14 @@ export default function WorkerDashboardPage() {
         is_internal: false,
       })
 
+      if (task.cameraId) {
+        await emitSupervisedSampleEvent({
+          complaintId,
+          eventType: "absent",
+          cameraId: task.cameraId,
+        })
+      }
+
       try {
         const {
           data: { session },
@@ -385,7 +450,7 @@ export default function WorkerDashboardPage() {
 
       fetchDashboardData()
     },
-    [fetchDashboardData, tasks, workerId],
+    [emitSupervisedSampleEvent, fetchDashboardData, tasks, workerId],
   )
 
   const updateTaskStatus = useCallback(
@@ -439,6 +504,14 @@ export default function WorkerDashboardPage() {
           .from("worker_profiles")
           .update({ current_complaint_id: complaintId, availability: "busy" })
           .eq("worker_id", workerId)
+
+        if (task.cameraId) {
+          await emitSupervisedSampleEvent({
+            complaintId,
+            eventType: "present",
+            cameraId: task.cameraId,
+          })
+        }
       }
 
       // pending_closure: worker stays busy, ticket is awaiting citizen confirmation
@@ -460,7 +533,7 @@ export default function WorkerDashboardPage() {
 
       fetchDashboardData()
     },
-    [fetchDashboardData, tasks, workerId],
+    [emitSupervisedSampleEvent, fetchDashboardData, tasks, workerId],
   )
 
   const handleCompleteTask = useCallback(
@@ -702,6 +775,15 @@ export default function WorkerDashboardPage() {
           new_status: nextStatus,
           note: completionNote || (resolvedCameraId ? 'Worker marked repair complete. Awaiting CCTV verification.' : 'Worker marked complete. Awaiting citizen confirmation.'),
           is_internal: false,
+        })
+      }
+
+      if (proofPhotoUrl && resolvedCameraId) {
+        await emitSupervisedSampleEvent({
+          complaintId: displayTask.id,
+          eventType: "repair_complete",
+          cameraId: resolvedCameraId,
+          proofPhotoUrl,
         })
       }
 
