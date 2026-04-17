@@ -41,6 +41,8 @@ function stageInfo(c: AuthorityComplaintRow, workers: WorkerOption[]): { label: 
       return { label: "Pending Verification", color: "text-purple-600 bg-purple-50 dark:bg-purple-900/20" }
     case "closed":
       return { label: "Closed", color: "text-gray-900 bg-gray-100 dark:bg-gray-800" }
+    case "spam":
+      return { label: "Spam", color: "text-gray-400 bg-gray-50 dark:bg-gray-800/30" }
     default:
       return { label: c.status, color: "text-gray-500 bg-gray-50" }
   }

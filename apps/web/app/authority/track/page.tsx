@@ -9,7 +9,7 @@ import { getSeverityConfig, getStatusMeta } from "../_components/dashboard-types
 
 const MapComponent = dynamic(() => import("@/app/MapComponent"), { ssr: false })
 
-type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated" | "pending_closure" | "closed"
+type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resolved" | "rejected" | "escalated" | "pending_closure" | "closed" | "spam"
 type Sev    = string
 
 type Complaint = {
@@ -26,8 +26,8 @@ const SEV_RANK: Record<string, number> = {
   critical: 4, high: 3, medium: 2, low: 1,
 }
 
-const TERMINAL_STATUSES: Status[] = ["resolved", "rejected"]
-const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated", "pending_closure"]
+const TERMINAL_STATUSES: Status[] = ["resolved", "rejected", "spam", "closed"]
+const ALL_STATUSES: Status[] = ["submitted", "under_review", "assigned", "in_progress", "resolved", "escalated", "pending_closure", "reopened", "spam"]
 const SEV_FILTER_OPTIONS = [
   { key: "L4", label: "Critical" },
   { key: "L3", label: "High" },
@@ -41,7 +41,7 @@ const COMPLAINT_SELECT =
 
 function slaStatus(deadline: string | null, status: Status): { breached: boolean; text: string; pill: string } {
   if (!deadline) return { breached: false, text: "—", pill: "text-gray-300" }
-  if (status === "resolved" || status === "rejected") {
+  if (status === "resolved" || status === "rejected" || status === "spam" || status === "closed") {
     return { breached: false, text: "Met", pill: "bg-emerald-50 text-emerald-600" }
   }
   const diff  = new Date(deadline).getTime() - Date.now()

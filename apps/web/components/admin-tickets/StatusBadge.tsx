@@ -15,6 +15,7 @@ const statusStyles: Record<ComplaintStatus, string> = {
   escalated: "bg-red-100 text-red-800 border-red-200 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300",
   reopened: "bg-red-100 text-red-800 border-red-200 font-semibold dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300",
   pending_closure: "bg-purple-100 text-purple-800 border-purple-200 dark:border-purple-900/50 dark:bg-purple-900/20 dark:text-purple-300",
+  spam: "bg-slate-100 text-slate-600 border-slate-200 dark:border-slate-800/50 dark:bg-slate-900/40 dark:text-slate-400",
 }
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
