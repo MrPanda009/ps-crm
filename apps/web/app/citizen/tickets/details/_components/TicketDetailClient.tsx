@@ -460,10 +460,10 @@ export default function TicketDetailClient({
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.address_text || "")}`;
 
     return (
-      <div className="modal-box relative z-10 flex h-[85vh] min-h-[600px] max-h-[800px] w-[95%] max-w-[1024px] overflow-hidden rounded-[2.5rem] border border-gray-200 bg-white shadow-xl dark:border-[#2a2a2a] dark:bg-[#161616] will-change-[transform,opacity]">
+      <div className="modal-box relative z-10 flex h-[90vh] sm:h-[85vh] sm:min-h-[600px] max-h-[800px] w-[95%] sm:w-[90%] max-w-[1024px] overflow-hidden rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-200 bg-white shadow-xl dark:border-[#2a2a2a] dark:bg-[#161616] will-change-[transform,opacity]">
         <div className="flex h-full w-full flex-col lg:flex-row">
           {/* Image Section */}
-          <div className="relative h-64 lg:h-full lg:w-[45%] shrink-0 bg-gray-100 dark:bg-[#111] overflow-hidden">
+          <div className="relative h-52 sm:h-64 lg:h-full lg:w-[45%] shrink-0 bg-gray-100 dark:bg-[#111] overflow-hidden">
             {ticket.photo_urls?.[0] ? (
               <img 
                 src={ticket.photo_urls[0]} 
@@ -486,21 +486,21 @@ export default function TicketDetailClient({
           </div>
 
           {/* Content Section */}
-          <div className="relative flex flex-1 flex-col p-6 lg:p-10">
+          <div className="relative flex flex-1 flex-col p-5 sm:p-6 lg:p-10 min-h-0">
             {/* Close Button X */}
             <button 
               onClick={() => onClose ? onClose() : router.back()}
-              className="absolute top-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-900 dark:bg-[#2a2a2a] dark:text-gray-400 dark:hover:bg-[#333] dark:hover:text-white z-20"
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-900 dark:bg-[#2a2a2a] dark:text-gray-400 dark:hover:bg-[#333] dark:hover:text-white z-20"
               aria-label="Close"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
 
-            <div className="animate-fade-in pr-12">
-              <h1 className="text-2xl font-black leading-tight text-gray-900 dark:text-white lg:text-[28px] text-balance">
+            <div className="animate-fade-in pr-10 md:pr-12">
+              <h1 className="text-xl md:text-2xl font-black leading-tight text-gray-900 dark:text-white lg:text-[28px] text-balance">
                 {ticket.title}
               </h1>
-              <p className="mt-3 text-sm font-medium tracking-wide text-gray-500 dark:text-[#888]">
+              <p className="mt-1.5 md:mt-3 text-xs md:text-sm font-medium tracking-wide text-gray-500 dark:text-[#888]">
                 Ref: {ticket.ticket_id}
               </p>
             </div>
@@ -508,7 +508,7 @@ export default function TicketDetailClient({
             {viewMode === "details" ? (
               <>
                 {/* Quick Metadata */}
-                <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-4 animate-fade-in">
+                <div className="mt-4 md:mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4 animate-fade-in">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
                       <ShieldCheck size={14} className="text-[#b48470] dark:text-gray-500" />
@@ -541,7 +541,7 @@ export default function TicketDetailClient({
                 </div>
 
                 {/* Full Address */}
-                <div className="mt-8 space-y-1.5 animate-fade-in">
+                <div className="mt-4 md:mt-8 space-y-1.5 animate-fade-in">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
                       <MapPin size={14} className="text-[#b48470] dark:text-gray-500" />
@@ -564,7 +564,7 @@ export default function TicketDetailClient({
                 </div>
 
                 {/* Description */}
-                <div className="mt-8 space-y-1.5 animate-fade-in flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
+                <div className="mt-4 md:mt-8 space-y-1.5 animate-fade-in flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0">
                   <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
                     <Tag size={14} className="text-[#b48470] dark:text-gray-500" />
                     ISSUE DESCRIPTION
@@ -576,7 +576,7 @@ export default function TicketDetailClient({
               </>
             ) : (
               /* ── Lifecycle View (from authority panel logic) ─────────────── */
-              <div className="mt-6 flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0 flex flex-col gap-6">
+              <div className="mt-4 md:mt-6 flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0 flex flex-col gap-4 md:gap-6">
                 {/* Workflow Stepper */}
                 <div className="animate-fade-in">
                   <WorkflowStepper status={ticket.status} />
@@ -642,10 +642,10 @@ export default function TicketDetailClient({
             )}
 
             {/* Bottom Actions */}
-            <div className="mt-6 pt-6 animate-fade-in flex flex-wrap gap-3 items-center w-full shrink-0 border-t border-gray-100 dark:border-[#2a2a2a]">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-6 animate-fade-in flex flex-wrap gap-2 md:gap-3 items-center w-full shrink-0 border-t border-gray-100 dark:border-[#2a2a2a]">
               <button 
                 onClick={handleToggleLifecycle}
-                className="flex-1 min-w-[160px] flex items-center justify-center gap-2 h-[52px] rounded-xl bg-[#b48470] hover:bg-[#a37562] text-[15px] font-bold text-white shadow-md shadow-[#b48470]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="flex-1 min-w-[140px] flex items-center justify-center gap-2 h-11 md:h-[52px] rounded-xl bg-[#b48470] hover:bg-[#a37562] text-[13px] md:text-[15px] font-bold text-white shadow-md shadow-[#b48470]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 {viewMode === "details" ? (
                   <><Activity size={18} /> Track Lifecycle</>
@@ -656,7 +656,7 @@ export default function TicketDetailClient({
               
               <button 
                 onClick={handleUpvote}
-                className={`flex h-[52px] min-w-[80px] justify-center items-center gap-2 rounded-xl border px-4 transition-all font-bold text-base ${
+                className={`flex h-11 md:h-[52px] min-w-[60px] md:min-w-[80px] justify-center items-center gap-1.5 md:gap-2 rounded-xl border px-3 md:px-4 transition-all font-bold text-sm md:text-base ${
                   hasUpvoted 
                     ? 'border-[#b48470] bg-[#b48470] text-white shadow-md shadow-[#b48470]/40 hover:bg-[#a37562]' 
                     : 'border-gray-200 bg-white text-gray-700 shadow-sm hover:border-gray-300 hover:bg-gray-50 dark:border-[#333] dark:bg-[#2a2a2a] dark:text-gray-300 dark:hover:bg-[#444]'
@@ -690,7 +690,7 @@ export default function TicketDetailClient({
 
               <button 
                 onClick={handleShareToX}
-                className="flex h-[52px] w-[52px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm hover:border-gray-300 hover:bg-gray-50 hover:text-black dark:border-[#333] dark:bg-[#2a2a2a] dark:text-gray-300 dark:hover:bg-[#444] dark:hover:text-white transition-all shrink-0 relative"
+                className="flex h-11 w-11 md:h-[52px] md:w-[52px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm hover:border-gray-300 hover:bg-gray-50 hover:text-black dark:border-[#333] dark:bg-[#2a2a2a] dark:text-gray-300 dark:hover:bg-[#444] dark:hover:text-white transition-all shrink-0 relative"
                 title="Share to X / Twitter"
               >
                 <Share2 size={20} />
