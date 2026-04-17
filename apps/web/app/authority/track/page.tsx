@@ -1,7 +1,7 @@
 // apps/web/app/authority/track/page.tsx
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import { supabase } from "@/src/lib/supabase"
 import { AssignDropdown, ComplaintDetailPanel } from "../_components/ComplaintDetailPanel"
@@ -144,7 +144,6 @@ export default function TrackPage() {
   const [expandedId,   setExpandedId]   = useState<string | null>(null)
   const [dept,         setDept]         = useState("")
   const [recenterTrigger, setRecenterTrigger] = useState(0)
-  const detailRef = useRef<HTMLDivElement>(null)
 
   async function applyLiveUpvoteCounts(rows: Complaint[]): Promise<Complaint[]> {
     if (rows.length === 0) return rows
@@ -269,12 +268,6 @@ export default function TrackPage() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [dept])
-
-  useEffect(() => {
-    if (expandedId && detailRef.current) {
-      setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50)
-    }
-  }, [expandedId])
 
   const hasWorkers = workers.length > 0
 
@@ -609,15 +602,13 @@ export default function TrackPage() {
         </div>
 
         {expandedComplaint && (
-          <div ref={detailRef} className="mt-4">
-            <ComplaintDetailPanel
-              complaint={expandedComplaint as any}
-              workers={workers}
-              onClose={() => setExpandedId(null)}
-              onAssigned={() => { void fetchData(); setExpandedId(null) }}
-              inline
-            />
-          </div>
+          <ComplaintDetailPanel
+            complaint={expandedComplaint as any}
+            workers={workers}
+            onClose={() => setExpandedId(null)}
+            onAssigned={() => { void fetchData(); setExpandedId(null) }}
+            modal
+          />
         )}
         </div>
       </div>

@@ -452,12 +452,14 @@ export function ComplaintDetailPanel({
   onClose,
   onAssigned,
   inline = false,
+  modal = false,
 }: {
   complaint: AuthorityComplaintRow
   workers?: WorkerOption[]
   onClose: () => void
   onAssigned?: () => void
   inline?: boolean
+  modal?: boolean
 }) {
   // getSeverityConfig — reads effective_severity directly, no silent Medium fallback
   const sev = getSeverityConfig(complaint.effective_severity)
@@ -511,8 +513,8 @@ export function ComplaintDetailPanel({
   )
 
   // ── Body ────────────────────────────────────────────────────────────────────
-  const body = inline ? (
-    // Inline mode: two-column layout with text on left, image on right
+  const body = inline || modal ? (
+    // Inline/modal mode: two-column layout with text on left, image on right
     <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
       <WorkflowStepper status={complaint.status} escalationLevel={complaint.escalation_level} />
       
@@ -725,16 +727,26 @@ export function ComplaintDetailPanel({
           />
         </>
       )}
-      {!inline && (
-        <a
-          href="/authority/track"
-          className="flex w-full items-center justify-center rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-900"
-        >
-          Open in Track Complaints →
-        </a>
-      )}
     </div>
   )
+
+  if (modal) {
+    return (
+      <>
+        <div className="fixed inset-0 z-[2150] bg-black/30 backdrop-blur-sm" onClick={onClose} />
+        <div className="fixed inset-0 z-[2200] flex items-center justify-center p-4">
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-5xl h-[min(90vh,calc(100vh-4rem))] overflow-hidden rounded-3xl border border-white/10 bg-white/95 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/10 dark:bg-[#111111]/95 flex flex-col"
+          >
+            {header}
+            {body}
+            {footer}
+          </div>
+        </div>
+      </>
+    )
+  }
 
   if (inline) {
     return (
