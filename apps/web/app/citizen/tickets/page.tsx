@@ -12,7 +12,7 @@ import TicketDetailClient from "./details/_components/TicketDetailClient";
 type ComplaintRow = Database["public"]["Tables"]["complaints"]["Row"];
 type TicketListRow = Pick<
   ComplaintRow,
-  "id" | "ticket_id" | "title" | "address_text" | "assigned_department" | "status" | "created_at" | "upvote_count" | "location"
+  "id" | "ticket_id" | "title" | "address_text" | "assigned_department" | "status" | "is_spam" | "created_at" | "upvote_count" | "location"
 > & { rating?: number | null; reviews?: { rating: number } | { rating: number }[] | null };
 
 // ─── Location Parser (EWKB/Hex) ──────────────────────────────────────────────────────────
@@ -66,14 +66,16 @@ function parseLocation(location: unknown): { lat: number; lng: number } | null {
   return null;
 }
 
-function formatStatus(status: string): string {
+function formatStatus(status: string, is_spam: boolean = false): string {
+  if (is_spam) return "Spam";
   return status
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
 }
 
-function statusClasses(status: string): string {
+function statusClasses(status: string, is_spam: boolean = false): string {
+  if (is_spam) return "bg-red-100 text-red-700";
   const normalized = status.trim().toLowerCase();
   if (normalized === "submitted") return "bg-amber-100 text-amber-700";
   if (normalized === "assigned") return "bg-blue-100 text-blue-700";
@@ -341,6 +343,7 @@ function CitizenTicketsPageContent() {
       address_text: row.address_text,
       assigned_department: row.assigned_department,
       status: row.status,
+      is_spam: row.is_spam,
       created_at: row.created_at,
       upvote_count: row.upvote_count,
       location: row.location,
@@ -739,11 +742,11 @@ function CitizenTicketsPageContent() {
                           {ticket.assigned_department || "Unassigned"}
                         </span>
 
-                        <span>
-                          <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-tight ${statusClasses(ticket.status || "")}`}>
-                            {formatStatus(ticket.status || "submitted")}
+                          <span>
+                            <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-tight ${statusClasses(ticket.status || "", ticket.is_spam)}`}>
+                              {formatStatus(ticket.status || "submitted", ticket.is_spam)}
+                            </span>
                           </span>
-                        </span>
 
                         <span className="text-gray-600 text-xs sm:text-sm dark:text-gray-400">
                           {formatReportedTime(ticket.created_at)}

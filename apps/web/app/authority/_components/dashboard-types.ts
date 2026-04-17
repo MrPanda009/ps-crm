@@ -27,6 +27,7 @@ export type AuthorityComplaintRow = {
   address_text: string | null
   assigned_worker_id: string | null
   upvote_count: number
+  is_spam: boolean
   categories: { name: string } | null
 }
 
@@ -199,7 +200,7 @@ export function computeStats(complaints: AuthorityComplaintRow[]): DashboardStat
     pendingAction:     complaints.filter(c => PENDING_STATUSES.includes(c.status)).length,
     inProgress:        complaints.filter(c => ACTIVE_STATUSES.includes(c.status)).length,
     resolvedThisMonth: complaints.filter(
-      c => c.status === "resolved" && new Date(c.created_at).getTime() >= monthStart
+      c => c.status === "resolved" && !c.is_spam && new Date(c.created_at).getTime() >= monthStart
     ).length,
     slaBreached: complaints.filter(c => isBreached(c.sla_deadline, c.status)).length,
   }

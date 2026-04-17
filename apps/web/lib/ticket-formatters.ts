@@ -79,7 +79,7 @@ export function statusClasses(status: string): string {
   if (normalized === "reopened") {
     return "bg-red-100 text-red-700 animate-pulse font-bold dark:bg-red-900/40 dark:text-red-300 ring-2 ring-red-500/20";
   }
-  if (normalized === "rejected") {
+  if (normalized === "rejected" || normalized === "spam") {
     return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
   }
   return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";

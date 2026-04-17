@@ -501,7 +501,7 @@ export default function TicketDetailClient({
             {viewMode === "details" ? (
               <>
                 {/* Quick Metadata */}
-                <div className="mt-8 grid grid-cols-2 gap-4 animate-fade-in">
+                <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-4 animate-fade-in">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
                       <ShieldCheck size={14} className="text-[#b48470] dark:text-gray-500" />
@@ -520,6 +520,15 @@ export default function TicketDetailClient({
                       {new Date(ticket.created_at).toLocaleDateString('en-US', { 
                         month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
                       })}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
+                      < ShieldCheck size={14} className="text-[#b48470] dark:text-gray-500" />
+                      SPAM STATUS
+                    </div>
+                    <div className={`text-base font-bold ${ticket.is_spam ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-500"}`}>
+                      {ticket.is_spam ? "SPAM" : "LEGIT"}
                     </div>
                   </div>
                 </div>
