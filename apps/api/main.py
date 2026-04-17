@@ -207,6 +207,13 @@ class ClosureConfirmationRequest(BaseModel):
     complaint_id: str
 
 
+class ComplaintEmailNotificationRequest(BaseModel):
+    complaint_id: str
+    event_type: str = "status_changed"
+    status: Optional[str] = None
+    worker_id_override: Optional[str] = None
+
+
 class CameraAnalyzeRequest(BaseModel):
     camera_id: str
 
@@ -971,7 +978,7 @@ async def confirm(
     complaint_record["id"] = inserted["id"]
     complaint_record["created_at"] = inserted.get("created_at") or datetime.now(timezone.utc).isoformat()
 
-    return TicketCreated(
+    response_obj = TicketCreated(
         ticket_id=inserted.get("ticket_id", "PENDING"),
         complaint_id=inserted["id"],
         child_id=child_id,
@@ -1000,7 +1007,11 @@ async def confirm(
         severity=severity_db,
         ward=derived_ward_name,
         city=complaint_record.get("city", "Delhi"),
-        address=address_text
+        address=address_text,
+        citizen_id=citizen_id,
+        worker_id=None,
+        event_type="complaint_created",
+        status="submitted",
     ))
 
     return response_obj
@@ -1549,6 +1560,15 @@ async def assign_complaint(
 
 
     try:
+        pre_assignment = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .select("assigned_worker_id")
+            .eq("id", payload.complaint_id)
+            .maybe_single()
+            .execute()
+        )
+        old_worker_id = (pre_assignment.data or {}).get("assigned_worker_id")
+
         # Update complaint
         print(f"DEBUG: Authority {user_id} assigning worker {payload.worker_id} to complaint {payload.complaint_id}")
         
@@ -1575,6 +1595,34 @@ async def assign_complaint(
                     redis_client.delete(key)
             except Exception as e:
                 print(f"Redis invalidation failed: {e}")
+
+        if payload.worker_id and payload.worker_id != old_worker_id:
+            event_type = "worker_reassigned" if old_worker_id else "worker_assigned"
+            latest_res = await asyncio.to_thread(
+                lambda: supabase.table("complaints")
+                .select(
+                    "ticket_id, title, severity, assigned_department, ward_name, city, "
+                    "address_text, citizen_id, assigned_worker_id, status"
+                )
+                .eq("id", payload.complaint_id)
+                .maybe_single()
+                .execute()
+            )
+            latest = latest_res.data or {}
+            if latest:
+                asyncio.create_task(send_resend_email(
+                    ticket_id=latest.get("ticket_id") or payload.complaint_id,
+                    title=latest.get("title") or "Complaint Update",
+                    authority=latest.get("assigned_department") or "UNASSIGNED",
+                    severity=latest.get("severity") or "L1",
+                    ward=latest.get("ward_name") or "Unknown",
+                    city=latest.get("city") or "Delhi",
+                    address=latest.get("address_text") or "Not provided",
+                    citizen_id=latest.get("citizen_id"),
+                    worker_id=latest.get("assigned_worker_id"),
+                    event_type=event_type,
+                    status=latest.get("status") or "assigned",
+                ))
 
         return {"status": "success"}
     except Exception as e:
@@ -2727,6 +2775,55 @@ async def allot_material(
 # =========================================================
 # NOTIFICATIONS (WhatsApp triggers)
 # =========================================================
+
+@app.post("/api/notifications/complaint-email")
+async def notify_complaint_email(
+    request: ComplaintEmailNotificationRequest,
+    authorization: Optional[str] = Header(None),
+    x_notification_key: Optional[str] = Header(None, alias="x-notification-key"),
+):
+    """Dispatch complaint notification emails via Python backend sender."""
+    internal_call = bool(x_notification_key and x_notification_key == SUPABASE_SERVICE_KEY)
+    if not internal_call:
+        if authorization:
+            get_citizen_id_from_token(authorization)
+        else:
+            print("[EmailNotify] Missing auth/internal key; allowing compatibility mode request")
+
+    allowed_events = {"complaint_created", "worker_assigned", "worker_reassigned", "status_changed"}
+    if request.event_type not in allowed_events:
+        raise HTTPException(status_code=400, detail="Invalid event_type")
+
+    complaint_res = await asyncio.to_thread(
+        lambda: supabase.table("complaints")
+        .select(
+            "ticket_id, title, severity, assigned_department, ward_name, city, "
+            "address_text, citizen_id, assigned_worker_id, status"
+        )
+        .eq("id", request.complaint_id)
+        .maybe_single()
+        .execute()
+    )
+
+    complaint = complaint_res.data or {}
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    email_result = await send_resend_email(
+        ticket_id=complaint.get("ticket_id") or request.complaint_id,
+        title=complaint.get("title") or "Complaint Update",
+        authority=complaint.get("assigned_department") or "UNASSIGNED",
+        severity=complaint.get("severity") or "L1",
+        ward=complaint.get("ward_name") or "Unknown",
+        city=complaint.get("city") or "Delhi",
+        address=complaint.get("address_text") or "Not provided",
+        citizen_id=complaint.get("citizen_id"),
+        worker_id=complaint.get("assigned_worker_id"),
+        event_type=request.event_type,
+        status=request.status or complaint.get("status"),
+        worker_id_override=request.worker_id_override,
+    )
+    return {"status": "ok", "email": email_result}
 
 @app.post("/api/notify/closure-confirmation")
 async def notify_closure_confirmation(

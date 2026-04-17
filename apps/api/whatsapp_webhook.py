@@ -535,7 +535,11 @@ async def confirm_ticket(phone: str, session: dict):
         severity=preview["severity_db"],
         ward=location.get("locality") or "Unknown",
         city=location.get("city") or "Delhi",
-        address=address_text
+        address=address_text,
+        citizen_id=citizen_id,
+        worker_id=None,
+        event_type="complaint_created",
+        status="submitted",
     ))
 
 
@@ -806,7 +810,7 @@ async def send_list_message(phone: str, body_text: str, button_text: str, sectio
         }
     }
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Authorization": f"Bearer {get_whatsapp_token()}",
         "Content-Type": "application/json",
     }
     async with httpx.AsyncClient(timeout=10) as client:
