@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
 import type { Tables } from "@/src/types/database.types";
+import { useTheme } from "@/components/ThemeProvider";
 
 type ComplaintRow = Tables<"complaints">;
 
@@ -290,6 +291,8 @@ export default function MapComponent({
     });
   };
 
+  const { theme } = useTheme();
+
   return (
     <div style={{ position: "relative", height: "100%", width: "100%" }}>
       <div className="absolute right-4 top-4 z-[1000] flex items-center gap-3 pointer-events-none">
@@ -312,18 +315,22 @@ export default function MapComponent({
       >
         <TileLayer
           attribution={
-            highQuality
+            theme === "dark"
+              ? '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://stadiamaps.com/">Stadia Maps</a>'
+              : highQuality
               ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               : "© OpenStreetMap contributors"
           }
           url={
-            highQuality
+            theme === "dark"
+              ? "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
+              : highQuality
               ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
               : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           }
-          detectRetina={Boolean(highQuality)}
-          maxNativeZoom={highQuality ? 20 : 19}
-          subdomains={highQuality ? "abcd" : "abc"}
+          detectRetina={theme === "dark" || Boolean(highQuality)}
+          maxNativeZoom={theme === "dark" || highQuality ? 20 : 19}
+          subdomains={theme === "dark" || highQuality ? "abcd" : "abc"}
         />
         <ZoomToComplaint
           complaints={complaints}
