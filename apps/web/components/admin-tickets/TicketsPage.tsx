@@ -35,6 +35,7 @@ type ComplaintRow = {
   assigned_department: string | null
   assigned_worker_id: string | null
   assigned_officer_id: string | null
+  citizen_id: string
   categories: CategoryRelation | CategoryRelation[] | null
 }
 
@@ -99,6 +100,7 @@ function normalizeTicket(row: ComplaintRow, profilesById: Record<string, Profile
     createdAt: row.created_at,
     authority,
     worker: workerProfile?.full_name ?? "Unassigned",
+    citizenId: row.citizen_id,
   }
 }
 
@@ -320,6 +322,43 @@ export default function TicketsPage() {
     [fetchTickets],
   )
 
+  const handleMarkSpam = useCallback(
+    async (ticket: TicketRecord) => {
+      const confirmed = window.confirm(`Mark ticket ${ticket.ticketId} as spam? Points will be deducted from the user.`)
+      if (!confirmed) return
+
+      setActionLoading(true)
+      setError(null)
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const response = await fetch('/api/admin/complaints/spam', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`
+          },
+          body: JSON.stringify({ 
+            complaint_id: ticket.id,
+            citizen_id: ticket.citizenId
+          })
+        })
+
+        if (!response.ok) {
+          const payload = await response.json()
+          throw new Error(payload.error || "Failed to mark as spam")
+        }
+
+        await fetchTickets()
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setActionLoading(false)
+      }
+    },
+    [fetchTickets]
+  )
+
   const handleAssignWorker = useCallback(async () => {
     if (!selectedTicket || !assignWorkerId) return
 
@@ -444,6 +483,7 @@ export default function TicketsPage() {
         onView={handleView}
         onAssign={handleOpenAssign}
         onEscalate={handleEscalate}
+        onSpam={handleMarkSpam}
         highlightTicketId={highlightTicketId}
       />
 

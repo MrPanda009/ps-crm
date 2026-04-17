@@ -11,10 +11,11 @@ type TicketRowProps = {
   onView: (ticket: TicketRecord) => void
   onAssign: (ticket: TicketRecord) => void
   onEscalate: (ticket: TicketRecord) => void
+  onSpam: (ticket: TicketRecord) => void
   isHighlighted?: boolean
 }
 
-export default function TicketRow({ ticket, actionLoading = false, onView, onAssign, onEscalate, isHighlighted = false }: TicketRowProps) {
+export default function TicketRow({ ticket, actionLoading = false, onView, onAssign, onEscalate, onSpam, isHighlighted = false }: TicketRowProps) {
   const clamp3Lines: CSSProperties = {
     display: "-webkit-box",
     WebkitLineClamp: 3,
@@ -56,6 +57,7 @@ export default function TicketRow({ ticket, actionLoading = false, onView, onAss
           onView={() => onView(ticket)}
           onAssign={() => onAssign(ticket)}
           onEscalate={() => onEscalate(ticket)}
+          onSpam={() => onSpam(ticket)}
         />
       </td>
     </tr>

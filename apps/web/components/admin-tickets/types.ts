@@ -26,6 +26,7 @@ export type TicketRecord = {
   createdAt: string
   authority: string
   worker: string
+  citizenId: string
 }
 
 export const PAGE_SIZE = 20

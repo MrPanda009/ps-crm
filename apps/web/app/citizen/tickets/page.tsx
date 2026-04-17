@@ -440,17 +440,18 @@ function CitizenTicketsPageContent() {
           prev.map((t) => (t.id === id ? { ...t, upvote_count: Math.max(0, (t.upvote_count ?? 1) - 1) } : t))
         );
 
-        // Sync with DB
-        const { error: delError } = await supabase
-          .from("upvotes")
-          .delete()
-          .eq("citizen_id", citizenId)
-          .eq("complaint_id", id);
+        // Sync with DB via centralized API
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch('/api/complaints', {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`
+          },
+          body: JSON.stringify({ complaint_id: id, action: 'downvote' })
+        });
         
-        if (delError && delError.code !== 'PGRST116') throw delError;
-        
-        const { error: rpcError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: id });
-        if (rpcError) throw rpcError;
+        if (!response.ok) throw new Error("Failed to remove upvote");
           
       } else {
         // Toggle ON locally
@@ -459,15 +460,18 @@ function CitizenTicketsPageContent() {
           prev.map((t) => (t.id === id ? { ...t, upvote_count: (t.upvote_count ?? 0) + 1 } : t))
         );
 
-        // Sync with DB
-        const { error: insError } = await supabase
-          .from("upvotes")
-          .insert({ citizen_id: citizenId, complaint_id: id });
+        // Sync with DB via centralized API
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch('/api/complaints', {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`
+          },
+          body: JSON.stringify({ complaint_id: id, action: 'upvote' })
+        });
         
-        if (insError && insError.code !== '23505') throw insError;
-        
-        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: id });
-        if (rpcError) throw rpcError;
+        if (!response.ok) throw new Error("Failed to upvote");
       }
     } catch (err: any) {
       console.error("Upvote toggle failed:", err);

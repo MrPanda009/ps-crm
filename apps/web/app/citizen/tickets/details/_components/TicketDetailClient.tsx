@@ -294,26 +294,21 @@ export default function TicketDetailClient({
     setUpvoteCount(prev => wasUpvoted ? Math.max(0, prev - 1) : prev + 1);
 
     try {
-      if (wasUpvoted) {
-        const { error: delError } = await supabase.from("upvotes").delete().eq("citizen_id", user.id).eq("complaint_id", ticketId);
-        // If it's already deleted, we don't treat it as a fatal error
-        if (delError && delError.code !== 'PGRST116') throw delError;
-        
-        const { error: rpcError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: ticketId });
-        if (rpcError) throw rpcError;
-      } else {
-        const { error: insError } = await supabase.from("upvotes").insert({ citizen_id: user.id, complaint_id: ticketId });
-        
-        // Error code 23505 is 'unique_violation' (duplicate key).
-        // If it already exists, we ignore and proceed to the RPC to ensure the count is synced.
-        if (insError && insError.code !== '23505') throw insError;
-        
-        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: ticketId });
-        if (rpcError) throw rpcError;
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/complaints', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ 
+          complaint_id: ticketId, 
+          action: wasUpvoted ? 'downvote' : 'upvote' 
+        })
+      });
       
-      // Verification: re-fetch from DB to ensure local state is synced after non-optimistic action
-      // (The realtime subscription will also handle this, but explicit fetch is safer)
+      if (!response.ok) throw new Error("Failed to sync upvote");
+      
     } catch (err: any) {
       console.error("Upvote persistence failed:", err);
       // Rollback optimistic UI
