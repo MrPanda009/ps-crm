@@ -22,6 +22,8 @@ import {
   TrendingUp,
   ChevronDown,
   BarChart2,
+  Download,
+  FileJson,
 } from "lucide-react"
 import type {
   AuthorityProfileRow,
@@ -255,6 +257,69 @@ export default function AdminReportsPage() {
 
   const maxAvgDays = resolutionTable[resolutionTable.length - 1]?.avgDays || 1
 
+  /* ─── export actions ───────────────────────────────────────────── */
+  const generateExportPayload = useCallback(() => {
+    return {
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        departmentContext: selectedDept,
+      },
+      overview: {
+        totalComplaints: statCards.totalComplaints,
+        totalResolved: statCards.totalResolved,
+        totalActive: statCards.totalActive,
+        averageResolutionDays: statCards.avgDays,
+      },
+      weeklyTrend: weeklyData,
+      departmentLoad: deptBarData,
+      resolutionRanking: resolutionTable,
+    }
+  }, [selectedDept, statCards, weeklyData, deptBarData, resolutionTable])
+
+  const exportJSON = useCallback(() => {
+    const payload = generateExportPayload()
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `admin-reports-${selectedDept.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [generateExportPayload, selectedDept])
+
+  const exportCSV = useCallback(() => {
+    const payload = generateExportPayload()
+    const sections: string[] = []
+    
+    sections.push("--- Metadata ---")
+    sections.push(`Generated At,${payload.metadata.generatedAt}`)
+    sections.push(`Department Context,"${payload.metadata.departmentContext}"`)
+    sections.push("\n--- Overview ---")
+    sections.push("Total Complaints,Total Resolved,Total Active,Avg Resolution Days")
+    sections.push(`${payload.overview.totalComplaints},${payload.overview.totalResolved},${payload.overview.totalActive},${payload.overview.averageResolutionDays.toFixed(2)}`)
+    sections.push("\n--- Weekly Trend ---")
+    sections.push("Week,Issues Solved")
+    payload.weeklyTrend.forEach((w) => sections.push(`${w.week},${w.solved}`))
+    sections.push("\n--- Department Load ---")
+    sections.push("Department,Resolved,Active")
+    payload.departmentLoad.forEach((d) => sections.push(`"${d.name}",${d.resolved},${d.active}`))
+    sections.push("\n--- Resolution Ranking ---")
+    sections.push("Rank,Authority,Avg Days")
+    payload.resolutionRanking.forEach((r, i) => sections.push(`${i + 1},"${r.name}",${r.avgDays.toFixed(2)}`))
+    
+    const blob = new Blob([sections.join("\n")], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `admin-reports-${selectedDept.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [generateExportPayload, selectedDept])
+
   /* ─── render ──────────────────────────────────────────────────── */
   return (
     <div className="min-h-full p-4 sm:p-6 lg:p-8 bg-[#f4efe5] dark:bg-[#111111]">
@@ -469,13 +534,34 @@ export default function AdminReportsPage() {
               </div>
             )}
           </div>
-
+          
+          {/* Export Section */}
+          <div className="rounded-2xl p-5 bg-white border border-[#d8cfbe] shadow-sm dark:bg-[#1a1a1a] dark:border-[#2a2a2a] dark:shadow-none">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold text-[#27221d] dark:text-white">Export Aggregated Data</h2>
+                <p className="text-sm text-gray-500">Download current statistics for {selectedDept === "All Departments" ? "all departments" : selectedDept}.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={exportCSV}
+                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-all bg-[#b48470] hover:bg-[#8c6757] dark:bg-[#C9A84C] dark:text-black dark:hover:bg-[#b8993f]"
+                >
+                  <Download size={16} />
+                  Export CSV
+                </button>
+                <button
+                  onClick={exportJSON}
+                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-[#b48470] transition-all border border-[#d8cfbe] bg-white hover:bg-gray-50 dark:text-white dark:border-[#2a2a2a] dark:bg-[#252525] dark:hover:bg-[#333]"
+                >
+                  <FileJson size={16} />
+                  Export JSON
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
-      <div className="p-2 sm:p-4">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Reports</h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Generate and review administrative reports here.</p>
-      </div>
     </div>
   )
 }
