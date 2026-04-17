@@ -33,23 +33,24 @@
 
 1. [Problem Statement](#-problem-statement)
 2. [Why JanSamadhan is Different](#-why-jansamadhan-is-different)
-3. [The 4 Major Portals](#-the-4-major-portals)
-4. [Setup Guide](#-setup-guide)
-5. [Citizen Flow — Filing a Complaint](#-citizen-flow--filing-a-complaint)
+3. [April 2026 Feature Update](#-april-2026-feature-update)
+4. [The 4 Major Portals](#-the-4-major-portals)
+5. [Setup Guide](#-setup-guide)
+6. [Citizen Flow — Filing a Complaint](#-citizen-flow--filing-a-complaint)
    - [Seva Chatbot (Gemini AI — Primary Path)](#-seva-chatbot--gemini-ai--primary-path)
    - [Manual Submission (Secondary Path)](#-manual-submission-secondary-path)
    - [Location Pin & DIGIPIN](#-location-pin--digipin)
    - [How a Ticket is Generated](#-how-a-ticket-is-generated)
-6. [Complaint Categories (42+ across 9 Delhi Zones)](#-complaint-categories-42-across-9-delhi-zones)
-7. [Authority Flow](#-authority-flow--department-scoped-no-overlap)
-8. [Worker Flow](#-worker-flow)
-9. [Admin Flow](#️-admin-flow)
-10. [SLA & Escalation Engine](#-sla--escalation-engine)
-11. [Application Architecture](#️-application-architecture)
-12. [API Reference](#-api-reference)
-13. [Security Design](#-security-design)
-14. [Compatibility](#-compatibility)
-15. [Roadmap](#-roadmap)
+7. [Complaint Categories (42+ across 9 Delhi Zones)](#-complaint-categories-42-across-9-delhi-zones)
+8. [Authority Flow](#-authority-flow--department-scoped-no-overlap)
+9. [Worker Flow](#-worker-flow)
+10. [Admin Flow](#️-admin-flow)
+11. [SLA & Escalation Engine](#-sla--escalation-engine)
+12. [Application Architecture](#️-application-architecture)
+13. [API Reference](#-api-reference)
+14. [Security Design](#-security-design)
+15. [Compatibility](#-compatibility)
+16. [Roadmap](#-roadmap)
 
 ---
 
@@ -86,6 +87,43 @@ India has over **4,000 urban local bodies**, 28 state governments, and hundreds 
 | 🔒 **ENUM State Machine in DB** | `complaint_status`, `severity_level`, `worker_availability` are PostgreSQL ENUMs. Invalid transitions are impossible even if someone bypasses the app |
 | 🤖 **reCAPTCHA Protection** | Bot-spam prevention on complaint submission and login to prevent fake complaint flooding |
 | 📋 **Immutable Audit Trail** | Every status change is logged to `ticket_history`. Citizens see public trail; authorities see internal notes. Tamper-proof |
+
+---
+
+## 🆕 April 2026 Feature Update
+
+### 1. Smart Notification Deep Links (Email + WhatsApp)
+- Notification links now open the **exact ticket detail page** directly:
+    - `https://jansamadhan.perkkk.dev/citizen/tickets/details?id=<complaint_uuid>`
+- Backend now supports deployed-domain link control through `FRONTEND_BASE_URL`.
+- Implemented for both complaint emails and closure-confirmation WhatsApp flows.
+
+### 2. Citizen Closure Confirmation Loop (Pending Closure)
+- Added full citizen confirmation loop for `pending_closure` tickets.
+- Citizens can explicitly mark outcome as **resolved** or **reopened** from the details page.
+- Worker completion can trigger outbound WhatsApp confirmation reminders.
+
+### 3. Admin Dashcam Live Command Center
+- Added `/admin/dashcam-live` with persistent telemetry cards for approved dashcam feeds.
+- Supports precomputed artifact overlays through:
+    - `GET /dashcam/precomputed/index`
+    - `POST /dashcam/precomputed/resolve`
+    - `GET /dashcam/precomputed/{video_id}`
+
+### 4. CCTV Reliability Engine + Verification
+- AI service now applies multi-trigger reliability checks before auto-ticket creation.
+- Verification flow supports `repaired` and `not_repaired` outcomes via `/cctv/verify`.
+
+### 5. Supervised Learning Dataset Pipeline
+- Added worker event capture for retraining datasets (`present`, `absent`, `repair_complete`).
+- Added export and metrics endpoints for supervised sample operations.
+
+### 6. Gamification And Wallet Enhancements
+- Added wallet, reward redemption, leaderboard, and spam-penalty integration.
+- Added admin wallet sync utility endpoint for retroactive wallet provisioning.
+
+### 7. Voice Input Pipeline
+- Added server-side STT proxy (`/api/stt`) for speech-to-text complaint workflows.
 
 ---
 
@@ -154,11 +192,24 @@ cp .env.example .env.local
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anon key for client-side calls |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-side only — **never expose to client** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key for server-side admin operations |
+| `SUPABASE_SERVICE_KEY` | Optional fallback service key used by some backend modules |
 | `GEMINI_API_KEY` | Google Gemini API key (free tier) |
+| `GEMINI_PRIMARY_MODEL` | Optional override for primary Gemini model |
+| `GEMINI_FALLBACK_MODEL` | Optional fallback Gemini model on quota/model errors |
 | `MAPPLS_API_KEY` | Mappls Maps API for India geocoding |
 | `NEXT_PUBLIC_API_URL` | FastAPI backend URL (Railway or local) |
 | `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | Google reCAPTCHA v2 site key |
+| `RECAPTCHA_SECRET_KEY` | Server-side secret for captcha verification API |
+| `SARVAM_API_KEY` | Server-side API key for speech-to-text proxy (`/api/stt`) |
+| `RESEND_API_KEY` | Resend key for transactional notifications |
+| `RESEND_FROM_EMAIL` | Sender identity for complaint emails |
+| `FRONTEND_BASE_URL` | Canonical deployed frontend base URL for deep links |
+| `AI_SERVICE_URL` | URL of the standalone AI service used by CCTV proxy endpoints |
+| `REDIS_URL` | Redis cache/session backend for API optimization |
+| `WHATSAPP_TOKEN` | Meta WhatsApp Cloud API token |
+| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp sender phone number ID |
+| `WHATSAPP_VERIFY_TOKEN` | Verification token for webhook handshake |
 
 ### Step 3 — Database Setup
 
@@ -632,25 +683,66 @@ graph TD
 
 ## 📡 API Reference
 
-### FastAPI Endpoints
+### FastAPI Endpoints (apps/api/main.py)
 
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/complaints/analyze` | `POST` | Seva: classify complaint category + severity from free text using Gemini |
-| `/complaints/chat` | `POST` | Multi-turn Seva conversation — maintains session context |
-| `/digipin/:lat/:lng` | `GET` | Encode GPS coordinates to DIGIPIN 10-char code |
-| `/digipin/decode/:code` | `GET` | Decode DIGIPIN back to lat/lng bounding box |
-| `/analytics/report` | `POST` | Generate AI summary of complaint trends for admin dashboard |
+| `/analyze` | `POST` | AI-assisted complaint preview generation |
+| `/confirm` | `POST` | Complaint creation with category routing + background notifications |
+| `/citizen/tickets` | `GET` | Citizen tickets feed (with caching support) |
+| `/citizen/nearby` | `GET` | Nearby map feed for citizen discovery/upvotes |
+| `/api/authority/assign` | `PATCH` | Worker assignment and reassignment workflow |
+| `/api/worker/supervised-samples` | `POST` | Collect supervised-learning events from workers |
+| `/api/supervised-samples/export` | `GET` | Export supervised sample datasets |
+| `/api/notifications/complaint-email` | `POST` | Event-driven complaint email notifications |
+| `/api/notify/closure-confirmation` | `POST` | WhatsApp closure confirmation notification trigger |
+| `/dashcam/precomputed/index` | `GET` | Dashcam artifact index for admin review UI |
+| `/dashcam/precomputed/resolve` | `POST` | Resolve artifact for uploaded/known dashcam videos |
+| `/cctv/analyze_live` | `POST` | CCTV AI analysis via backend proxy |
+| `/cctv/verify` | `POST` | CCTV verification outcome update (`repaired`/`not_repaired`) |
+
+### Next.js App APIs (apps/web/app/api)
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/complaints` | `POST/PATCH/PUT` | Complaint create/upvote/status actions from web app |
+| `/api/chat` | `POST` | Server-side Gemini proxy with model fallback + CORS control |
+| `/api/stt` | `POST` | Speech-to-text proxy for voice complaint flow |
+| `/api/verify-recaptcha` | `POST` | Server-side captcha validation |
+| `/api/citizen/wallet` | `GET/POST` | Wallet, rewards, and redemption operations |
+| `/api/citizen/leaderboard` | `GET` | Citizen leaderboard feed |
+| `/api/admin/authorities` | `GET/PATCH/POST` | Admin authority CRUD operations |
+| `/api/admin/workers` | `GET/PATCH/POST` | Admin worker CRUD operations |
+| `/api/admin/complaints` | `GET` | Admin complaint query API |
+| `/api/admin/complaints/spam` | `POST` | Spam moderation + penalty workflow |
+
+### AI Service APIs (ai-service/service/main.py)
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/health` | `GET` | AI service health and model readiness |
+| `/infer/image` | `POST` | Image inference endpoint for model testing |
+| `/cctv/analyze_live` | `POST` | Reliability-engine CCTV burst analysis |
+| `/cctv/verify` | `POST` | Camera/ticket verification state updates |
+| `/dashcam/precomputed/index` | `GET` | Available dashcam precomputed artifact list |
+| `/dashcam/precomputed/resolve` | `POST` | Resolve artifact by filename for overlay playback |
+| `/dashcam/precomputed/{video_id}` | `GET` | Fetch artifact by logical video identifier |
 
 ### Supabase RPC Functions
 
 | RPC | Purpose |
 |---|---|
 | `check_for_duplicate_report(lat, lng, category_id)` | PostGIS `ST_DWithin` 20m radius duplicate detection |
+| `find_duplicate_complaints_v2(...)` | Extended duplicate search with active-status and radius controls |
 | `get_nearby_complaints(lat, lng, radius_m)` | Distance-ranked complaints within configurable radius |
 | `increment_upvote_count(complaint_id)` | Atomic upvote + severity recalculation in single transaction |
+| `decrement_upvote_count(complaint_id)` | Atomic downvote counter update |
 | `assign_worker_to_complaint(complaint_id, worker_id)` | Race-safe worker assignment with `FOR UPDATE` row locks |
 | `check_sla_breaches()` | Cron-callable: auto-escalates complaints past their SLA deadline |
+| `award_points(user_id, points)` | Wallet points update used by gamification workflows |
+| `redeem_reward(user_id, reward_id)` | Reward redemption transaction flow |
+| `update_complaint_status_citizen(...)` | Citizen closure decision status update helper |
+| `nearest_urgent_complaint(...)` | Worker dispatch helper using proximity + urgency |
 
 ### Gemini AI — Free Tier Configuration
 
@@ -711,7 +803,7 @@ JanSamadhan is designed from day one for national scale. The Delhi pilot covers 
 | **Phase 1** | Delhi pilot — 9 zones, 42+ categories | ✅ Complete |
 | **Phase 2** | Multi-city: Mumbai (BMC), Bengaluru (BBMP), Chennai (GCC) | 🔄 Planned |
 | **Phase 3** | Offline PWA — service worker caching for low-connectivity | 🔄 Planned |
-| **Phase 4** | WhatsApp integration — report via WhatsApp message → Seva processes automatically | 🔄 Planned |
+| **Phase 4** | WhatsApp integration — webhook + closure confirmation + guided submission flows | ✅ Live (v1) |
 | **Phase 5** | CPGRAMS bridge — API integration for cross-jurisdiction escalation | 🔄 Planned |
 | **Phase 6** | Official DIGIPIN REST API (India Post v2, expected 2027) | 🔄 Planned | 
 
