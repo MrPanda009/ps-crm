@@ -14,7 +14,7 @@ const MapComponent = dynamic(() => import("@/components/MapComponent"), {
 
 export default function DashboardHotspotsMap() {
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+    <section className="flex h-[500px] flex-col rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
       <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-[#2a2a2a]">
         <div>
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Geographic Hotspots</p>
@@ -25,7 +25,7 @@ export default function DashboardHotspotsMap() {
         </div>
       </div>
 
-      <div className="h-[420px] w-full overflow-hidden rounded-b-2xl">
+      <div className="flex-1 w-full overflow-hidden rounded-b-2xl">
         <MapComponent highQuality={false} />
       </div>
     </section>

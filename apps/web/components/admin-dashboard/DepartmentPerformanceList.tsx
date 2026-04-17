@@ -48,7 +48,7 @@ export default function DepartmentPerformanceList() {
   }, [fetchPerformance])
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+    <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
       <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-[#2a2a2a]">
         <div>
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Department Performance</p>
@@ -59,7 +59,7 @@ export default function DepartmentPerformanceList() {
         </div>
       </div>
 
-      <div className="divide-y divide-gray-200 dark:divide-[#2a2a2a]">
+      <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-gray-200 dark:divide-[#2a2a2a] pr-1">
         {loading ? (
           <div className="space-y-3 p-5">
             <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200 dark:bg-[#2a2a2a]" />

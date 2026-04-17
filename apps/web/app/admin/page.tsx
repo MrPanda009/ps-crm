@@ -11,7 +11,7 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
         <DashboardHotspotsMap />
 
-        <div className="space-y-4">
+        <div className="flex h-[500px] min-h-0 flex-col gap-4">
           <DepartmentPerformanceList />
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
