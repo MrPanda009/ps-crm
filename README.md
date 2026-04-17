@@ -36,21 +36,23 @@
 3. [April 2026 Feature Update](#-april-2026-feature-update)
 4. [The 4 Major Portals](#-the-4-major-portals)
 5. [Setup Guide](#-setup-guide)
-6. [Citizen Flow — Filing a Complaint](#-citizen-flow--filing-a-complaint)
+6. [How To Start (Local Runtime)](#-how-to-start-local-runtime)
+7. [Citizen Flow — Filing a Complaint](#-citizen-flow--filing-a-complaint)
    - [Seva Chatbot (Gemini AI — Primary Path)](#-seva-chatbot--gemini-ai--primary-path)
    - [Manual Submission (Secondary Path)](#-manual-submission-secondary-path)
    - [Location Pin & DIGIPIN](#-location-pin--digipin)
    - [How a Ticket is Generated](#-how-a-ticket-is-generated)
-7. [Complaint Categories (42+ across 9 Delhi Zones)](#-complaint-categories-42-across-9-delhi-zones)
-8. [Authority Flow](#-authority-flow--department-scoped-no-overlap)
-9. [Worker Flow](#-worker-flow)
-10. [Admin Flow](#️-admin-flow)
-11. [SLA & Escalation Engine](#-sla--escalation-engine)
-12. [Application Architecture](#️-application-architecture)
-13. [API Reference](#-api-reference)
-14. [Security Design](#-security-design)
-15. [Compatibility](#-compatibility)
-16. [Roadmap](#-roadmap)
+8. [Complaint Categories (42+ across 9 Delhi Zones)](#-complaint-categories-42-across-9-delhi-zones)
+9. [Department Mapping (Category to Authority)](#-department-mapping-category-to-authority)
+10. [Authority Flow](#-authority-flow--department-scoped-no-overlap)
+11. [Worker Flow](#-worker-flow)
+12. [Admin Flow](#️-admin-flow)
+13. [SLA & Escalation Engine](#-sla--escalation-engine)
+14. [Application Architecture](#️-application-architecture)
+15. [API Reference](#-api-reference)
+16. [Security Design](#-security-design)
+17. [Compatibility](#-compatibility)
+18. [Roadmap](#-roadmap)
 
 ---
 
@@ -96,7 +98,8 @@ India has over **4,000 urban local bodies**, 28 state governments, and hundreds 
 - Notification links now open the **exact ticket detail page** directly:
     - `https://jansamadhan.perkkk.dev/citizen/tickets/details?id=<complaint_uuid>`
 - Backend now supports deployed-domain link control through `FRONTEND_BASE_URL`.
-- Implemented for both complaint emails and closure-confirmation WhatsApp flows.
+- Implemented for complaint emails, WhatsApp closure-confirmation pings, and guided citizen follow-up.
+- WhatsApp bot flow supports menu-driven reporting, image-first intake, location capture, status lookup, and account linking.
 
 ### 2. Citizen Closure Confirmation Loop (Pending Closure)
 - Added full citizen confirmation loop for `pending_closure` tickets.
@@ -105,25 +108,28 @@ India has over **4,000 urban local bodies**, 28 state governments, and hundreds 
 
 ### 3. Admin Dashcam Live Command Center
 - Added `/admin/dashcam-live` with persistent telemetry cards for approved dashcam feeds.
-- Supports precomputed artifact overlays through:
-    - `GET /dashcam/precomputed/index`
-    - `POST /dashcam/precomputed/resolve`
-    - `GET /dashcam/precomputed/{video_id}`
+- Dashboard behavior is focused on **real-time monitoring and verification workflows**.
 
 ### 4. CCTV Reliability Engine + Verification
 - AI service now applies multi-trigger reliability checks before auto-ticket creation.
 - Verification flow supports `repaired` and `not_repaired` outcomes via `/cctv/verify`.
+- DIGIPIN remains a first-class location identity for camera-to-ticket continuity and duplicate suppression.
 
 ### 5. Supervised Learning Dataset Pipeline
-- Added worker event capture for retraining datasets (`present`, `absent`, `repair_complete`).
-- Added export and metrics endpoints for supervised sample operations.
+- Added real-time worker event capture for retraining datasets (`present`, `absent`, `repair_complete`).
+- Added deduped sample capture, metrics, and export-batch workflow for model retraining inputs.
 
 ### 6. Gamification And Wallet Enhancements
 - Added wallet, reward redemption, leaderboard, and spam-penalty integration.
 - Added admin wallet sync utility endpoint for retroactive wallet provisioning.
 
 ### 7. Voice Input Pipeline
-- Added server-side STT proxy (`/api/stt`) for speech-to-text complaint workflows.
+- Added server-side Sarvam STT proxy (`/api/stt`) for multilingual speech-to-text complaint workflows.
+
+### 8. Public Accountability + Spatial Ops
+- Ticket details support Twitter/X escalation sharing with tiered authority/public handles.
+- Citizen heatmap and nearby complaint discovery remain real-time and severity-aware.
+- SLA urgency and breach visibility remain central to worker and authority prioritization.
 
 ---
 
@@ -233,23 +239,66 @@ This project uses `pnpm` workspaces. Install all dependencies from the root dire
 pnpm install
 ```
 
-### Step 5 — Start the Frontend
+### Step 5 — Start All Services (Recommended)
+
+Run the whole stack using Docker Compose from the repository root:
+
+```bash
+docker compose up --build
+```
+
+Available endpoints in this mode:
+- Web app: `http://localhost:8080`
+- FastAPI backend: `http://localhost:8000`
+- AI service health: `http://localhost:8001/health`
+
+### Step 6 — Start Manually (3 Terminals)
+
+Use this if you want hot reload and service-level debugging.
+
+Terminal 1 — Frontend:
 
 ```bash
 cd apps/web
 pnpm run dev
 ```
 
-### Step 6 — Start the FastAPI Backend
+Terminal 2 — FastAPI backend:
 
 ```bash
 cd apps/api
-# Create a virtual environment first, or install globally
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8000
 ```
 
-The app will be available at `http://localhost:3000`.
+Terminal 3 — AI service:
+
+```bash
+cd ai-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn service.main:app --reload --port 8001
+```
+
+Manual runtime endpoints:
+- Web app: `http://localhost:3000`
+- FastAPI backend: `http://localhost:8000`
+- AI service health: `http://localhost:8001/health`
+
+---
+
+## 🚀 How To Start (Local Runtime)
+
+If you want the fastest local bring-up, run:
+
+```bash
+docker compose up --build
+```
+
+If you want per-service debugging, run frontend/backend/AI service in separate terminals using Step 6 above.
 
 ---
 
@@ -429,6 +478,28 @@ JanSamadhan covers **42+ complaint types** spanning **9 Delhi jurisdiction bodie
 | 💡 **Lighting** | Street Light (MCD Zone), NDMC Street Light |
 | 🏛️ **Government Property** | Government Building Issue |
 | 🏙️ **NDMC Zone** | Central Govt Residential Zone, Connaught Place / Lutyens Issue, NDMC Road / Infrastructure |
+
+---
+
+## 🧭 Department Mapping (Category to Authority)
+
+Department mapping is enforced through seeded category metadata and authority-scoped workflows.
+
+| Category Family | Authority Owner |
+|---|---|
+| Metro | DMRC |
+| National highways and toll corridors | NHAI |
+| City roads and public works | PWD / MCD / NDMC (by route zone) |
+| Water and sewage | DJB |
+| Electricity infra | DISCOM |
+| Sanitation and waste | MCD / NDMC (by route zone) |
+| Law and traffic safety | Delhi Police |
+| Environment and tree protection | DPCC / Forest Department |
+
+Routing behavior:
+1. Complaint category selection determines authority ownership from the categories seed data.
+2. Authority dashboards only fetch tickets for their mapped department domain.
+3. Worker assignment is performed in the same authority domain to prevent cross-department leakage.
 
 ---
 
@@ -694,10 +765,10 @@ graph TD
 | `/api/authority/assign` | `PATCH` | Worker assignment and reassignment workflow |
 | `/api/worker/supervised-samples` | `POST` | Collect supervised-learning events from workers |
 | `/api/supervised-samples/export` | `GET` | Export supervised sample datasets |
+| `/api/supervised-samples/metrics` | `GET` | Supervised-learning collection counters and export readiness |
 | `/api/notifications/complaint-email` | `POST` | Event-driven complaint email notifications |
 | `/api/notify/closure-confirmation` | `POST` | WhatsApp closure confirmation notification trigger |
-| `/dashcam/precomputed/index` | `GET` | Dashcam artifact index for admin review UI |
-| `/dashcam/precomputed/resolve` | `POST` | Resolve artifact for uploaded/known dashcam videos |
+| `/whatsapp/webhook` | `GET/POST` | WhatsApp webhook verification and bot message intake |
 | `/cctv/analyze_live` | `POST` | CCTV AI analysis via backend proxy |
 | `/cctv/verify` | `POST` | CCTV verification outcome update (`repaired`/`not_repaired`) |
 
@@ -724,9 +795,6 @@ graph TD
 | `/infer/image` | `POST` | Image inference endpoint for model testing |
 | `/cctv/analyze_live` | `POST` | Reliability-engine CCTV burst analysis |
 | `/cctv/verify` | `POST` | Camera/ticket verification state updates |
-| `/dashcam/precomputed/index` | `GET` | Available dashcam precomputed artifact list |
-| `/dashcam/precomputed/resolve` | `POST` | Resolve artifact by filename for overlay playback |
-| `/dashcam/precomputed/{video_id}` | `GET` | Fetch artifact by logical video identifier |
 
 ### Supabase RPC Functions
 
@@ -790,7 +858,7 @@ DIGIPIN encoding is a pure algorithm — no external API call required. Even in 
 | **Offline capability** | DIGIPIN encoding works offline; complaint form data cached locally |
 | **Photo upload** | HEIC (iPhone), JPEG, PNG — auto-converted, 5MB limit |
 | **Map** | Leaflet.js with Mappls India tiles — works on 2G+ connections |
-| **Language** | English and Hindi supported in Seva chatbot; UI in English |
+| **Language** | Multilingual complaint intake (text + voice): Hindi, English, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi |
 
 ---
 
