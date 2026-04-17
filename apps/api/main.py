@@ -1876,7 +1876,7 @@ async def get_admin_complaints_list(
 COMPLAINT_DASHBOARD_SELECT = (
     "id, ticket_id, title, status, is_spam, effective_severity, sla_deadline, "
     "escalation_level, created_at, resolved_at, address_text, assigned_worker_id, "
-    "upvote_count, categories(name)"
+    "upvote_count, photo_urls, categories(name)"
 )
 
 TREND_SELECT = "status, is_spam, created_at, resolved_at"

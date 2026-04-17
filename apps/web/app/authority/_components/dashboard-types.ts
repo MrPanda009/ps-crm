@@ -29,6 +29,7 @@ export type AuthorityComplaintRow = {
   assigned_worker_id: string | null
   upvote_count: number
   is_spam: boolean
+  photo_urls?: string[] | null
   categories: { name: string } | null
 }
 

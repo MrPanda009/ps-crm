@@ -514,7 +514,18 @@ export function ComplaintDetailPanel({
   const body = (
     <div className={`${inline ? "" : "flex-1 overflow-y-auto"} px-4 py-3 space-y-3`}>
       <WorkflowStepper status={complaint.status} escalationLevel={complaint.escalation_level} />
-
+      {(complaint.photo_urls ?? []).length > 0 && (
+        <div className="mb-2 flex max-w-full min-w-0 gap-2 overflow-x-auto pb-1">
+          {(complaint.photo_urls ?? []).map((url, index) => (
+            <img
+              key={index}
+              src={url}
+              alt={`complaint photo ${index + 1}`}
+              className="h-44 w-[72vw] max-w-64 shrink-0 rounded-xl object-cover shadow-sm sm:w-56 md:w-64"
+            />
+          ))}
+        </div>
+      )}
       <div className="h-px bg-gray-100 dark:bg-gray-800" />
 
       <Field label="Category">
