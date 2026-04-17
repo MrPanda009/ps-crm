@@ -92,6 +92,33 @@ export type Database = {
           },
         ]
       }
+      cctv_analysis_logs: {
+        Row: {
+          ai_metadata: Json | null
+          camera_id: string | null
+          complaint_id: string | null
+          created_at: string | null
+          id: string
+          status_result: string | null
+        }
+        Insert: {
+          ai_metadata?: Json | null
+          camera_id?: string | null
+          complaint_id?: string | null
+          created_at?: string | null
+          id?: string
+          status_result?: string | null
+        }
+        Update: {
+          ai_metadata?: Json | null
+          camera_id?: string | null
+          complaint_id?: string | null
+          created_at?: string | null
+          id?: string
+          status_result?: string | null
+        }
+        Relationships: []
+      }
       cctv_cameras: {
         Row: {
           created_at: string | null
@@ -359,6 +386,89 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_collector_samples: {
+        Row: {
+          actor_id: string | null
+          camera_id: string | null
+          category_id: number | null
+          complaint_id: string
+          created_at: string
+          dedup_key: string
+          digipin: string | null
+          event_type: string
+          export_batch_id: string | null
+          exported_at: string | null
+          id: number
+          invalidated_at: string | null
+          invalidation_reason: string | null
+          is_active: boolean
+          is_exported: boolean
+          label_source: string
+          metadata: Json
+          proof_photo_url: string | null
+          severity: string | null
+          source_image_ref: string | null
+          target_bucket: string
+          ticket_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          camera_id?: string | null
+          category_id?: number | null
+          complaint_id: string
+          created_at?: string
+          dedup_key: string
+          digipin?: string | null
+          event_type: string
+          export_batch_id?: string | null
+          exported_at?: string | null
+          id?: number
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          is_active?: boolean
+          is_exported?: boolean
+          label_source?: string
+          metadata?: Json
+          proof_photo_url?: string | null
+          severity?: string | null
+          source_image_ref?: string | null
+          target_bucket: string
+          ticket_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          camera_id?: string | null
+          category_id?: number | null
+          complaint_id?: string
+          created_at?: string
+          dedup_key?: string
+          digipin?: string | null
+          event_type?: string
+          export_batch_id?: string | null
+          exported_at?: string | null
+          id?: number
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          is_active?: boolean
+          is_exported?: boolean
+          label_source?: string
+          metadata?: Json
+          proof_photo_url?: string | null
+          severity?: string | null
+          source_image_ref?: string | null
+          target_bucket?: string
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_collector_samples_complaint_id_fkey"
+            columns: ["complaint_id"]
+            isOneToOne: false
+            referencedRelation: "complaints"
             referencedColumns: ["id"]
           },
         ]
@@ -928,6 +1038,10 @@ export type Database = {
             }[]
           }
       check_sla_breaches: { Args: never; Returns: number }
+      decrement_upvote_count: {
+        Args: { p_complaint_id: string }
+        Returns: undefined
+      }
       find_duplicate_complaints_v2: {
         Args: {
           p_active_statuses: string[]
@@ -1029,10 +1143,6 @@ export type Database = {
             }[]
           }
       increment_upvote_count: {
-        Args: { p_complaint_id: string }
-        Returns: undefined
-      }
-      decrement_upvote_count: {
         Args: { p_complaint_id: string }
         Returns: undefined
       }

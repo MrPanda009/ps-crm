@@ -44,6 +44,7 @@ from shared import (
     build_complaint_record,
     redis_client,
     send_resend_email,
+    build_ticket_details_url,
     AI_SERVICE_URL,
 )
 
@@ -244,103 +245,41 @@ SUPERVISED_BUCKET_BY_EVENT = {
 }
 
 
-def _read_json_file(path: Path) -> Optional[Dict[str, Any]]:
-    if not path.exists():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to parse JSON file: {path}. Error: {exc}")
-
-
-def _dashcam_index_data() -> Dict[str, Any]:
-    return _read_json_file(DASHCAM_PRECOMPUTED_DIR / "index.json") or {"items": []}
-
-
-def _dashcam_lock_data() -> Dict[str, Any]:
-    return _read_json_file(DASHCAM_LOCK_MANIFEST_PATH) or {}
-
-
-def _dashcam_allowed_files() -> set[str]:
-    lock_data = _dashcam_lock_data()
-    approved = lock_data.get("approved_videos") or []
-    if approved:
-        return {str(name).strip().lower() for name in approved}
-    return {name.lower() for name in DEFAULT_APPROVED_DASHCAM_FILES}
-
-
-def _dashcam_excluded_files() -> set[str]:
-    lock_data = _dashcam_lock_data()
-    excluded = lock_data.get("excluded_videos") or []
-    if excluded:
-        return {str(name).strip().lower() for name in excluded}
-    return {name.lower() for name in DEFAULT_EXCLUDED_DASHCAM_FILES}
-
-
-def _resolve_artifact_file(filename: str, size_bytes: Optional[int]) -> tuple[str, Dict[str, Any]]:
-    lock_data = _dashcam_lock_data()
-    index_data = _dashcam_index_data()
-    index_items = index_data.get("items") or []
-
-    normalized_filename = filename.strip().lower()
-    candidates = [item for item in index_items if str(item.get("filename", "")).strip().lower() == normalized_filename]
-
-    selected: Optional[Dict[str, Any]] = None
-    if size_bytes is not None and candidates:
-        selected = next((item for item in candidates if int(item.get("size_bytes") or -1) == int(size_bytes)), None)
-    if selected is None and candidates:
-        selected = candidates[0]
-
-    if selected:
-        artifact_file = str(selected.get("artifact_file") or "").strip()
-        if artifact_file:
-            return artifact_file, selected
-
-    stem = Path(filename).stem
-    fallback_file = f"{stem}.json"
-    return fallback_file, {"filename": filename, "size_bytes": size_bytes, "artifact_file": fallback_file}
-
-
-def _locked_lookup() -> Dict[str, Dict[str, Any]]:
-    lock_data = _dashcam_lock_data()
-    summary = lock_data.get("artifacts_summary") or []
-    out: Dict[str, Dict[str, Any]] = {}
-    for item in summary:
-        if not isinstance(item, dict):
-            continue
-        if item.get("artifact_file"):
-            out[str(item["artifact_file"])] = item
-        if item.get("video_id"):
-            out[str(item["video_id"]) + ".json"] = item
-    return out
+async def _fetch_remote_artifact(filename: str) -> Optional[Dict[str, Any]]:
+    import httpx
+    from pathlib import Path
+    
+    if filename.endswith(".json"):
+        json_filename = filename
+    else:
+        json_filename = f"{Path(filename).stem}.json"
+        
+    url = f"https://bsdxzdydrhraaawkzglw.supabase.co/storage/v1/object/public/dashcam-demo/artifacts/precomputed/{json_filename}"
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(url, timeout=10.0)
+            if resp.status_code == 200:
+                return resp.json()
+            else:
+                return None
+        except Exception:
+            return None
 
 
 @app.get("/dashcam/precomputed/index")
 async def dashcam_precomputed_index() -> dict:
-    index_data = _dashcam_index_data()
-    lock_data = _dashcam_lock_data()
-    locked_map = _locked_lookup()
-
-    items = []
-    for item in index_data.get("items") or []:
-        artifact_file = str(item.get("artifact_file") or "")
-        lock_info = locked_map.get(artifact_file)
-        items.append(
-            {
-                "video_id": item.get("video_id"),
-                "filename": item.get("filename"),
-                "size_bytes": item.get("size_bytes"),
-                "artifact_file": artifact_file,
-                "locked": lock_info is not None,
-            }
-        )
-
     return {
-        "generated_at": index_data.get("generated_at"),
-        "items": items,
-        "approved_videos": list(_dashcam_allowed_files()),
-        "excluded_videos": list(_dashcam_excluded_files()),
-        "lock_manifest_path": str(DASHCAM_LOCK_MANIFEST_PATH) if lock_data else None,
+        "generated_at": datetime.utcnow().isoformat(),
+        "items": [
+            {"filename": "smooth_vid1.mp4", "artifact_file": "smooth_vid1.json", "locked": True},
+            {"filename": "smooth_vid2.mp4", "artifact_file": "smooth_vid2.json", "locked": True},
+            {"filename": "video_1.mp4", "artifact_file": "video_1.json", "locked": True},
+            {"filename": "video_2.mp4", "artifact_file": "video_2.json", "locked": True},
+        ],
+        "approved_videos": list(DEFAULT_APPROVED_DASHCAM_FILES),
+        "excluded_videos": list(DEFAULT_EXCLUDED_DASHCAM_FILES),
+        "lock_manifest_path": None,
     }
 
 
@@ -348,56 +287,45 @@ async def dashcam_precomputed_index() -> dict:
 async def dashcam_precomputed_resolve(request: DashcamResolveRequest) -> dict:
     filename = request.filename.strip()
     normalized = filename.lower()
-
-    if normalized in _dashcam_excluded_files():
+    
+    if normalized in {n.lower() for n in DEFAULT_EXCLUDED_DASHCAM_FILES}:
         raise HTTPException(status_code=403, detail=f"{filename} is excluded for dashcam demo overlays.")
 
-    if normalized not in _dashcam_allowed_files():
+    if normalized not in {n.lower() for n in DEFAULT_APPROVED_DASHCAM_FILES}:
         raise HTTPException(status_code=403, detail=f"{filename} is not in approved dashcam allowlist.")
 
-    artifact_file, resolved_item = _resolve_artifact_file(filename=filename, size_bytes=request.size_bytes)
-    artifact_path = DASHCAM_PRECOMPUTED_DIR / artifact_file
-    if not artifact_path.exists():
-        raise HTTPException(status_code=404, detail=f"No precomputed mapping found for {filename}.")
-
-    artifact = _read_json_file(artifact_path)
+    artifact = await _fetch_remote_artifact(filename)
     if not artifact:
-        raise HTTPException(status_code=500, detail=f"Artifact file empty or unreadable: {artifact_file}")
+        raise HTTPException(status_code=404, detail=f"No remote precomputed mapping found for {filename} in Supabase bucket.")
 
-    lock_info = _locked_lookup().get(artifact_file)
+    stem = Path(filename).stem
     return {
         "artifact": artifact,
         "resolved": {
-            "video_id": artifact.get("video_id"),
+            "video_id": artifact.get("video_id", stem),
             "filename": filename,
             "size_bytes": request.size_bytes,
-            "artifact_file": artifact_file,
-            "locked": lock_info is not None,
-            "lock_manifest_path": str(DASHCAM_LOCK_MANIFEST_PATH) if DASHCAM_LOCK_MANIFEST_PATH.exists() else None,
-            "source": resolved_item,
+            "artifact_file": f"{stem}.json",
+            "locked": True,
+            "lock_manifest_path": None,
+            "source": {"filename": filename, "source": "supabase_remote"},
         },
     }
 
 
 @app.get("/dashcam/precomputed/{video_id}")
 async def dashcam_precomputed_by_video_id(video_id: str) -> dict:
-    artifact_file = f"{video_id}.json"
-    artifact_path = DASHCAM_PRECOMPUTED_DIR / artifact_file
-    if not artifact_path.exists():
-        raise HTTPException(status_code=404, detail=f"Artifact not found for video_id={video_id}")
-
-    artifact = _read_json_file(artifact_path)
+    artifact = await _fetch_remote_artifact(video_id)
     if not artifact:
-        raise HTTPException(status_code=500, detail=f"Artifact file unreadable for video_id={video_id}")
+        raise HTTPException(status_code=404, detail=f"Artifact not found remotely for {video_id}")
 
-    lock_info = _locked_lookup().get(artifact_file)
     return {
         "artifact": artifact,
         "resolved": {
             "video_id": video_id,
-            "artifact_file": artifact_file,
-            "locked": lock_info is not None,
-            "lock_manifest_path": str(DASHCAM_LOCK_MANIFEST_PATH) if DASHCAM_LOCK_MANIFEST_PATH.exists() else None,
+            "artifact_file": f"{video_id}.json",
+            "locked": True,
+            "lock_manifest_path": None,
         },
     }
 
@@ -1000,8 +928,10 @@ async def confirm(
     )
 
     # --- Background Email Notification ---
+    print(f"DEBUG: Triggering email for ticket_id={inserted.get('ticket_id')} citizen_id={citizen_id}")
     asyncio.create_task(send_resend_email(
         ticket_id=inserted.get("ticket_id") or inserted["id"],
+        complaint_id=inserted["id"],
         title=title,
         authority=routed_authority,
         severity=severity_db,
@@ -1693,6 +1623,7 @@ async def assign_complaint(
             if latest:
                 asyncio.create_task(send_resend_email(
                     ticket_id=latest.get("ticket_id") or payload.complaint_id,
+                    complaint_id=payload.complaint_id,
                     title=latest.get("title") or "Complaint Update",
                     authority=latest.get("assigned_department") or "UNASSIGNED",
                     severity=latest.get("severity") or "L1",
@@ -2892,6 +2823,7 @@ async def notify_complaint_email(
 
     email_result = await send_resend_email(
         ticket_id=complaint.get("ticket_id") or request.complaint_id,
+        complaint_id=request.complaint_id,
         title=complaint.get("title") or "Complaint Update",
         authority=complaint.get("assigned_department") or "UNASSIGNED",
         severity=complaint.get("severity") or "L1",
@@ -2951,12 +2883,13 @@ async def notify_closure_confirmation(
         clean_phone = "".join(filter(str.isdigit, str(phone)))
         if len(clean_phone) == 10:
             clean_phone = f"91{clean_phone}"
+        ticket_details_url = build_ticket_details_url(request.complaint_id)
 
         msg = (
             f"🔔 *Ticket Verification Required*\n\n"
             f"Your ticket *{ticket_id}* has been marked as completed by our team.\n\n"
             f"Please verify the resolution and confirm if the issue is fixed.\n"
-            f"👉 Confirm or Reject: https://jansamadhan.perkkk.dev/citizen/tickets\n\n"
+            f"👉 Confirm or Reject: {ticket_details_url}\n\n"
             f"_(Reply with 'status {ticket_id}' here to check details)_"
         )
 

@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { CameraCard, CameraData } from '@/components/admin-surveillance/CameraCard';
 import type {
   DashcamBox,
@@ -9,8 +8,12 @@ import type {
   DashcamPrecomputedArtifact,
 } from '@/components/admin-surveillance/dashcam-review-types';
 
-const APPROVED_VIDEOS = ['smooth_vid1.mp4', 'smooth_vid2.mp4', 'video_1.mp4', 'video_2.mp4'];
-const EXCLUDED_VIDEO = 'video_3.mp4';
+const PERMANENT_VIDEOS = [
+  { name: 'smooth_vid1.mp4', url: 'https://bsdxzdydrhraaawkzglw.supabase.co/storage/v1/object/public/dashcam-demo/video/permanent/smooth_vid1.mp4' },
+  { name: 'smooth_vid2.mp4', url: 'https://bsdxzdydrhraaawkzglw.supabase.co/storage/v1/object/public/dashcam-demo/video/permanent/smooth_vid2.mp4' },
+  { name: 'video_1.mp4', url: 'https://bsdxzdydrhraaawkzglw.supabase.co/storage/v1/object/public/dashcam-demo/video/permanent/video_1.mp4' },
+  { name: 'video_2.mp4', url: 'https://bsdxzdydrhraaawkzglw.supabase.co/storage/v1/object/public/dashcam-demo/video/permanent/video_2.mp4' },
+];
 
 const normalizeName = (name: string): string => name.trim().toLowerCase();
 
@@ -102,154 +105,122 @@ const buildQualityMetrics = (artifact: DashcamPrecomputedArtifact): QualityMetri
 export default function DashcamLivePage() {
   const [dashcamStreams, setDashcamStreams] = useState<CameraData[]>([]);
   const [runtimeByStreamId, setRuntimeByStreamId] = useState<Record<string, RuntimeStreamState>>({});
-  const [artifactCache, setArtifactCache] = useState<Record<string, DashcamPrecomputedArtifact>>({});
-  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string>('Choose an approved clip and add it to the stream.');
-  const [isResolving, setIsResolving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function initializePermanentStreams() {
+      const streams: CameraData[] = [];
+      const runtimes: Record<string, RuntimeStreamState> = {};
+
+      for (let i = 0; i < PERMANENT_VIDEOS.length; i++) {
+        const vid = PERMANENT_VIDEOS[i];
+        const streamId = `dashcam_fixed_${i}`;
+
+        streams.push({
+          camera_id: streamId,
+          camera_name: `DASHCAM_${vid.name.replace(/\.[^.]+$/, '').toUpperCase()}`,
+          road_type: 'City Road',
+          latitude: 0,
+          longitude: 0,
+          digipin: '',
+          video_url: vid.url,
+          status: 'Idle',
+        });
+
+        runtimes[streamId] = {
+          videoFileName: vid.name,
+          videoSizeBytes: 0,
+          artifact: null,
+          mappingStatus: 'missing',
+          mappingMessage: 'Loading mapping data...',
+          locked: false,
+          overlayState: null,
+          metrics: null,
+        };
+      }
+
+      setDashcamStreams(streams);
+      setRuntimeByStreamId(runtimes);
+
+      // Async fetch precomputed artifacts individually
+      for (let i = 0; i < PERMANENT_VIDEOS.length; i++) {
+        const vid = PERMANENT_VIDEOS[i];
+        const streamId = `dashcam_fixed_${i}`;
+
+        try {
+          const response = await fetch(`${apiUrl}/dashcam/precomputed/resolve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: vid.name,
+            }),
+          });
+
+          if (response.ok) {
+            const payload = await response.json();
+            const artifact = payload?.artifact;
+            if (artifact && Array.isArray(artifact.frames) && mounted) {
+              setRuntimeByStreamId((prev) => ({
+                ...prev,
+                [streamId]: {
+                  ...prev[streamId],
+                  artifact,
+                  mappingStatus: 'resolved',
+                  mappingMessage: 'Ready to play.',
+                  locked: Boolean(payload?.resolved?.locked),
+                  metrics: buildQualityMetrics(artifact),
+                },
+              }));
+            } else if (mounted) {
+              setRuntimeByStreamId((prev) => ({
+                ...prev,
+                [streamId]: {
+                  ...prev[streamId],
+                  mappingStatus: 'error',
+                  mappingMessage: 'Artifact format invalid.',
+                },
+              }));
+            }
+          } else if (mounted) {
+             setRuntimeByStreamId((prev) => ({
+                ...prev,
+                [streamId]: {
+                  ...prev[streamId],
+                  mappingStatus: 'error',
+                  mappingMessage: 'Failed to resolve map.',
+                },
+              }));
+          }
+        } catch (err) {
+          console.error(`Error resolving artifact for ${vid.name}`, err);
+          if (mounted) {
+            setRuntimeByStreamId((prev) => ({
+              ...prev,
+              [streamId]: {
+                ...prev[streamId],
+                mappingStatus: 'error',
+                mappingMessage: 'Network error resolving map.',
+              },
+            }));
+          }
+        }
+      }
+    }
+
+    initializePermanentStreams();
+
+    return () => {
+      mounted = false;
+    };
+  }, [apiUrl]);
 
   const handleUpdateStream = (id: string, updates: Partial<CameraData>) => {
     setDashcamStreams((prev) =>
       prev.map((stream) => (stream.camera_id === id ? { ...stream, ...updates } : stream)),
     );
-  };
-
-  const handleDeleteStream = (id: string) => {
-    setDashcamStreams((prev) => {
-      const target = prev.find((stream) => stream.camera_id === id);
-      if (target?.video_url?.startsWith('blob:')) {
-        URL.revokeObjectURL(target.video_url);
-      }
-      return prev.filter((stream) => stream.camera_id !== id);
-    });
-
-    setRuntimeByStreamId((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  };
-
-  const handleVideoPick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-
-    const normalized = normalizeName(file.name);
-    if (normalized === normalizeName(EXCLUDED_VIDEO)) {
-      setStatusMessage('This clip is excluded from the approved demo set.');
-      setSelectedVideo(null);
-      return;
-    }
-
-    if (!APPROVED_VIDEOS.map(normalizeName).includes(normalized)) {
-      setStatusMessage('Please choose one of the approved demo clips.');
-      setSelectedVideo(null);
-      return;
-    }
-
-    const exists = Object.values(runtimeByStreamId).some(
-      (runtime) => normalizeName(runtime.videoFileName) === normalized,
-    );
-
-    if (exists) {
-      setStatusMessage('This clip is already loaded on the page.');
-      setSelectedVideo(null);
-      return;
-    }
-
-    setSelectedVideo(file);
-    setStatusMessage(`Selected: ${file.name}. Click Add Stream.`);
-  };
-
-  const resolveArtifact = async (videoFile: File): Promise<{ artifact: DashcamPrecomputedArtifact | null; locked: boolean; message: string }> => {
-    const cacheKey = `${normalizeName(videoFile.name)}:${videoFile.size}`;
-    const cached = artifactCache[cacheKey];
-    if (cached) {
-      return { artifact: cached, locked: true, message: 'Ready to play.' };
-    }
-
-    const response = await fetch(`${apiUrl}/dashcam/precomputed/resolve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename: videoFile.name,
-        size_bytes: videoFile.size,
-      }),
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      return { artifact: null, locked: false, message: 'This clip is not mapped for playback yet.' };
-    }
-
-    const artifact = payload?.artifact as DashcamPrecomputedArtifact | undefined;
-    if (!artifact || !Array.isArray(artifact.frames)) {
-      return { artifact: null, locked: false, message: 'Clip data could not be prepared for playback.' };
-    }
-
-    setArtifactCache((prev) => ({
-      ...prev,
-      [cacheKey]: artifact,
-    }));
-
-    return {
-      artifact,
-      locked: Boolean(payload?.resolved?.locked),
-      message: 'Ready to play.',
-    };
-  };
-
-  const handleAddStream = async () => {
-    if (!selectedVideo) {
-      setStatusMessage('Select an approved clip first.');
-      return;
-    }
-
-    setIsResolving(true);
-    const resolved = await resolveArtifact(selectedVideo);
-
-    const streamId = `dashcam_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const videoUrl = URL.createObjectURL(selectedVideo);
-
-    const newStream: CameraData = {
-      camera_id: streamId,
-      camera_name: `DASHCAM_${selectedVideo.name.replace(/\.[^.]+$/, '')}`,
-      road_type: 'City Road',
-      latitude: 0,
-      longitude: 0,
-      digipin: '',
-      video_url: videoUrl,
-      status: 'Idle',
-    };
-
-    setDashcamStreams((prev) => [...prev, newStream]);
-
-    setRuntimeByStreamId((prev) => ({
-      ...prev,
-      [streamId]: {
-        videoFileName: selectedVideo.name,
-        videoSizeBytes: selectedVideo.size,
-        artifact: resolved.artifact,
-        mappingStatus: resolved.artifact ? 'resolved' : 'missing',
-        mappingMessage: resolved.message,
-        locked: resolved.locked,
-        overlayState: null,
-        metrics: resolved.artifact ? buildQualityMetrics(resolved.artifact) : null,
-      },
-    }));
-
-    if (resolved.artifact) {
-      setStatusMessage(`${selectedVideo.name} added and ready.`);
-    } else {
-      setStatusMessage(`${selectedVideo.name} added. Playback overlay unavailable for this clip.`);
-    }
-    setSelectedVideo(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    setIsResolving(false);
   };
 
   const setOverlayState = (streamId: string, state: DashcamOverlayState | null) => {
@@ -267,53 +238,16 @@ export default function DashcamLivePage() {
     });
   };
 
-  const resolvedCount = useMemo(
-    () => Object.values(runtimeByStreamId).filter((runtime) => runtime.mappingStatus === 'resolved').length,
-    [runtimeByStreamId],
-  );
-
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 p-4 dark:bg-[#161616] md:p-6">
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <div className="flex-1 space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Approved Dashcam Video</div>
-              <div className="flex items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoPick}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#0f766e]/35 bg-[#0f766e]/10 px-4 py-2 text-xs font-bold uppercase tracking-wide text-[#0f766e] transition hover:bg-[#0f766e]/15"
-                >
-                  <Upload size={14} />
-                  Choose Clip
-                </button>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                  {selectedVideo ? selectedVideo.name : 'No clip selected'}
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              disabled={isResolving}
-              onClick={handleAddStream}
-              className="inline-flex items-center justify-center rounded-xl bg-[#0f766e] px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-[#0d5f59] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isResolving ? 'Resolving...' : 'Add Stream'}
-            </button>
+          <div className="flex flex-col gap-1">
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white">Dashcam Telemetry Feed</h1>
+            <p className="text-sm font-medium text-gray-500">
+              Live streams connecting directly to the central remote surveillance bucket.
+            </p>
           </div>
-
-          <div className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
-            {statusMessage}
-          </div>
-
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-4 sm:grid-cols-2">
@@ -332,11 +266,11 @@ export default function DashcamLivePage() {
                   reviewArtifact={runtime.artifact}
                   onOverlayStateChange={(state) => setOverlayState(streamId, state)}
                   onUpdate={handleUpdateStream}
-                  onDelete={handleDeleteStream}
+                  onDelete={() => {}} // Disabling delete action for permanent streams
                 />
-
+                
                 {runtime.mappingStatus !== 'resolved' && (
-                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-[12px] font-medium text-orange-800 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-300">
+                  <div className={`rounded-xl border p-3 text-[12px] font-medium ${runtime.mappingStatus === 'error' ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300' : 'border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-300'}`}>
                     {runtime.mappingMessage}
                   </div>
                 )}
