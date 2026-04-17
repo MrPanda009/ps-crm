@@ -15,6 +15,7 @@ interface CurrentTicketCardProps {
   onNavigate: (latitude: number, longitude: number) => void;
   onUpdate: (ticketId: string, note: string) => void;
   onStatusChange: (ticketId: string, newStatus: string) => void;
+  onMarkAbsent: (ticketId: string) => void;
   onMarkCompleted: (ticketId: string) => void;
 }
 
@@ -23,6 +24,7 @@ export default function CurrentTicketCard({
   onNavigate,
   onUpdate,
   onStatusChange,
+  onMarkAbsent,
   onMarkCompleted,
 }: CurrentTicketCardProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -133,19 +135,34 @@ export default function CurrentTicketCard({
               {!noteMode ? (
                 <ul className="py-1">
                   {(ticket.status === "assigned" || ticket.status === "reopened") && (
-                    <li>
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-[#2a2a2a]"
-                        onClick={() => {
-                          onStatusChange(ticket.id, "in_progress");
-                          setDropdownOpen(false);
-                        }}
-                      >
-                        <span className="h-2 w-2 rounded-full bg-blue-500" />
-                        Start Work
-                      </button>
-                    </li>
+                    <>
+                      <li>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                          onClick={() => {
+                            onStatusChange(ticket.id, "in_progress");
+                            setDropdownOpen(false);
+                          }}
+                        >
+                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          Present
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                          onClick={() => {
+                            onMarkAbsent(ticket.id);
+                            setDropdownOpen(false);
+                          }}
+                        >
+                          <span className="h-2 w-2 rounded-full bg-orange-500" />
+                          Absent
+                        </button>
+                      </li>
+                    </>
                   )}
                   {ticket.status === "in_progress" && (
                     <li>

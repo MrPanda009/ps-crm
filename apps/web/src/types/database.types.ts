@@ -1036,6 +1036,10 @@ export type Database = {
         Args: { p_complaint_id: string }
         Returns: undefined
       }
+      decrement_upvote_count: {
+        Args: { p_complaint_id: string }
+        Returns: undefined
+      }
       nearest_urgent_complaint:
         | {
             Args: { worker_lat: number; worker_lng: number }

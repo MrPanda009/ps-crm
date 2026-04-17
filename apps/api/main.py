@@ -50,6 +50,22 @@ from shared import (
 # Global constants for direct Supabase REST API calls (bypassing supabase-py bugs)
 SERVICE_BASE_URL = SUPABASE_URL
 SERVICE_API_KEY = SUPABASE_SERVICE_KEY
+DASHCAM_PRECOMPUTED_DIR = Path(
+    os.getenv("DASHCAM_PRECOMPUTED_DIR", r"C:\Users\medha\OneDrive\Desktop\yolo\dashcam_external\artifacts")
+)
+DASHCAM_LOCK_MANIFEST_PATH = Path(
+    os.getenv(
+        "DASHCAM_LOCK_MANIFEST_PATH",
+        r"C:\Users\medha\OneDrive\Desktop\yolo\dashcam_external\artifacts\phase_c_lock_manifest.json",
+    )
+)
+DEFAULT_APPROVED_DASHCAM_FILES = {
+    "smooth_vid1.mp4",
+    "smooth_vid2.mp4",
+    "video_1.mp4",
+    "video_2.mp4",
+}
+DEFAULT_EXCLUDED_DASHCAM_FILES = {"video_3.mp4"}
 
 
 # =========================================================
@@ -195,6 +211,174 @@ class CameraAnalyzeRequest(BaseModel):
     camera_id: str
 
 
+class CameraVerifyRequest(BaseModel):
+    camera_id: str
+    verification_result: str
+
+
+class DashcamResolveRequest(BaseModel):
+    filename: str
+    size_bytes: Optional[int] = None
+
+
+def _read_json_file(path: Path) -> Optional[Dict[str, Any]]:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to parse JSON file: {path}. Error: {exc}")
+
+
+def _dashcam_index_data() -> Dict[str, Any]:
+    return _read_json_file(DASHCAM_PRECOMPUTED_DIR / "index.json") or {"items": []}
+
+
+def _dashcam_lock_data() -> Dict[str, Any]:
+    return _read_json_file(DASHCAM_LOCK_MANIFEST_PATH) or {}
+
+
+def _dashcam_allowed_files() -> set[str]:
+    lock_data = _dashcam_lock_data()
+    approved = lock_data.get("approved_videos") or []
+    if approved:
+        return {str(name).strip().lower() for name in approved}
+    return {name.lower() for name in DEFAULT_APPROVED_DASHCAM_FILES}
+
+
+def _dashcam_excluded_files() -> set[str]:
+    lock_data = _dashcam_lock_data()
+    excluded = lock_data.get("excluded_videos") or []
+    if excluded:
+        return {str(name).strip().lower() for name in excluded}
+    return {name.lower() for name in DEFAULT_EXCLUDED_DASHCAM_FILES}
+
+
+def _resolve_artifact_file(filename: str, size_bytes: Optional[int]) -> tuple[str, Dict[str, Any]]:
+    lock_data = _dashcam_lock_data()
+    index_data = _dashcam_index_data()
+    index_items = index_data.get("items") or []
+
+    normalized_filename = filename.strip().lower()
+    candidates = [item for item in index_items if str(item.get("filename", "")).strip().lower() == normalized_filename]
+
+    selected: Optional[Dict[str, Any]] = None
+    if size_bytes is not None and candidates:
+        selected = next((item for item in candidates if int(item.get("size_bytes") or -1) == int(size_bytes)), None)
+    if selected is None and candidates:
+        selected = candidates[0]
+
+    if selected:
+        artifact_file = str(selected.get("artifact_file") or "").strip()
+        if artifact_file:
+            return artifact_file, selected
+
+    stem = Path(filename).stem
+    fallback_file = f"{stem}.json"
+    return fallback_file, {"filename": filename, "size_bytes": size_bytes, "artifact_file": fallback_file}
+
+
+def _locked_lookup() -> Dict[str, Dict[str, Any]]:
+    lock_data = _dashcam_lock_data()
+    summary = lock_data.get("artifacts_summary") or []
+    out: Dict[str, Dict[str, Any]] = {}
+    for item in summary:
+        if not isinstance(item, dict):
+            continue
+        if item.get("artifact_file"):
+            out[str(item["artifact_file"])] = item
+        if item.get("video_id"):
+            out[str(item["video_id"]) + ".json"] = item
+    return out
+
+
+@app.get("/dashcam/precomputed/index")
+async def dashcam_precomputed_index() -> dict:
+    index_data = _dashcam_index_data()
+    lock_data = _dashcam_lock_data()
+    locked_map = _locked_lookup()
+
+    items = []
+    for item in index_data.get("items") or []:
+        artifact_file = str(item.get("artifact_file") or "")
+        lock_info = locked_map.get(artifact_file)
+        items.append(
+            {
+                "video_id": item.get("video_id"),
+                "filename": item.get("filename"),
+                "size_bytes": item.get("size_bytes"),
+                "artifact_file": artifact_file,
+                "locked": lock_info is not None,
+            }
+        )
+
+    return {
+        "generated_at": index_data.get("generated_at"),
+        "items": items,
+        "approved_videos": list(_dashcam_allowed_files()),
+        "excluded_videos": list(_dashcam_excluded_files()),
+        "lock_manifest_path": str(DASHCAM_LOCK_MANIFEST_PATH) if lock_data else None,
+    }
+
+
+@app.post("/dashcam/precomputed/resolve")
+async def dashcam_precomputed_resolve(request: DashcamResolveRequest) -> dict:
+    filename = request.filename.strip()
+    normalized = filename.lower()
+
+    if normalized in _dashcam_excluded_files():
+        raise HTTPException(status_code=403, detail=f"{filename} is excluded for dashcam demo overlays.")
+
+    if normalized not in _dashcam_allowed_files():
+        raise HTTPException(status_code=403, detail=f"{filename} is not in approved dashcam allowlist.")
+
+    artifact_file, resolved_item = _resolve_artifact_file(filename=filename, size_bytes=request.size_bytes)
+    artifact_path = DASHCAM_PRECOMPUTED_DIR / artifact_file
+    if not artifact_path.exists():
+        raise HTTPException(status_code=404, detail=f"No precomputed mapping found for {filename}.")
+
+    artifact = _read_json_file(artifact_path)
+    if not artifact:
+        raise HTTPException(status_code=500, detail=f"Artifact file empty or unreadable: {artifact_file}")
+
+    lock_info = _locked_lookup().get(artifact_file)
+    return {
+        "artifact": artifact,
+        "resolved": {
+            "video_id": artifact.get("video_id"),
+            "filename": filename,
+            "size_bytes": request.size_bytes,
+            "artifact_file": artifact_file,
+            "locked": lock_info is not None,
+            "lock_manifest_path": str(DASHCAM_LOCK_MANIFEST_PATH) if DASHCAM_LOCK_MANIFEST_PATH.exists() else None,
+            "source": resolved_item,
+        },
+    }
+
+
+@app.get("/dashcam/precomputed/{video_id}")
+async def dashcam_precomputed_by_video_id(video_id: str) -> dict:
+    artifact_file = f"{video_id}.json"
+    artifact_path = DASHCAM_PRECOMPUTED_DIR / artifact_file
+    if not artifact_path.exists():
+        raise HTTPException(status_code=404, detail=f"Artifact not found for video_id={video_id}")
+
+    artifact = _read_json_file(artifact_path)
+    if not artifact:
+        raise HTTPException(status_code=500, detail=f"Artifact file unreadable for video_id={video_id}")
+
+    lock_info = _locked_lookup().get(artifact_file)
+    return {
+        "artifact": artifact,
+        "resolved": {
+            "video_id": video_id,
+            "artifact_file": artifact_file,
+            "locked": lock_info is not None,
+            "lock_manifest_path": str(DASHCAM_LOCK_MANIFEST_PATH) if DASHCAM_LOCK_MANIFEST_PATH.exists() else None,
+        },
+    }
+
+
 
 @app.post("/cctv/analyze_live")
 async def cctv_analyze_live(
@@ -224,6 +408,40 @@ async def cctv_analyze_live(
             return JSONResponse(status_code=resp.status_code, content=data)
         except Exception as e:
             print(f"[AI Proxy Error] {e}")
+            raise HTTPException(status_code=502, detail=f"Failed to reach AI service: {str(e)}")
+
+
+@app.post("/cctv/verify")
+async def cctv_verify(
+    request: CameraVerifyRequest,
+    authorization: Optional[str] = Header(None),
+    x_request_id: Optional[str] = Header(None, alias="x-request-id"),
+):
+    """Proxy verification requests to the AI Service."""
+    if not AI_SERVICE_URL:
+        raise HTTPException(status_code=503, detail="AI Service not configured on backend.")
+
+    base_url = AI_SERVICE_URL.strip()
+    if not base_url.startswith(("http://", "https://")):
+        base_url = f"https://{base_url}"
+    target_url = f"{base_url.rstrip('/')}/cctv/verify"
+
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = {}
+            if authorization:
+                headers["Authorization"] = authorization
+            if x_request_id:
+                headers["x-request-id"] = x_request_id
+
+            resp = await client.post(target_url, json=request.dict(), headers=headers, timeout=30.0)
+            try:
+                payload = resp.json()
+            except Exception:
+                payload = {"detail": resp.text or "AI service returned a non-JSON response."}
+            return JSONResponse(status_code=resp.status_code, content=payload)
+        except Exception as e:
+            print(f"[AI Verify Proxy Error] {e}")
             raise HTTPException(status_code=502, detail=f"Failed to reach AI service: {str(e)}")
 class ClosureConfirmationRequest(BaseModel):
     complaint_id: str
@@ -1743,12 +1961,12 @@ async def get_authority_workers(
 
 WORKER_COMPLAINT_SELECT = (
     "id, ticket_id, title, assigned_worker_id, description, address_text, "
-    "severity, status, is_spam, created_at, resolved_at, location, categories(name)"
+    "severity, status, is_spam, created_at, resolved_at, location, camera_id, sla_breached, sla_deadline, categories(name)"
 )
 
 WORKER_COMPLAINT_SELECT_FALLBACK = (
     "id, ticket_id, title, assigned_worker_id, description, address_text, "
-    "severity, status, is_spam, created_at, resolved_at, location"
+    "severity, status, is_spam, created_at, resolved_at, location, camera_id, sla_breached, sla_deadline"
 )
 
 
