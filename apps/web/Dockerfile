@@ -34,6 +34,9 @@ RUN pnpm run build
 FROM node:20-slim AS runner
 WORKDIR /app
 
+# Install pnpm for the start command
+RUN npm install -g pnpm
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
