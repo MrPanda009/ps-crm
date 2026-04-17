@@ -391,52 +391,36 @@ export function useNearbyTickets() {
     if (!target) return;
 
     try {
-      if (isUpvoted) {
-        // Toggle OFF
-        setHasUpvoted((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        setAllComplaints((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, (c.upvote_count ?? 1) - 1) } : c))
-        );
-        setVisibleComplaints((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, upvote_count: Math.max(0, (c.upvote_count ?? 1) - 1) } : c))
-        );
+      // Optimistic UI updates
+      setHasUpvoted((prev) => {
+        const next = new Set(prev);
+        if (isUpvoted) next.delete(id); else next.add(id);
+        return next;
+      });
 
-        // Sync with DB
-        const { error: delError } = await supabase
-          .from("upvotes")
-          .delete()
-          .eq("citizen_id", userId)
-          .eq("complaint_id", id);
-        
-        if (delError && delError.code !== 'PGRST116') throw delError;
+      const updateCount = (c: MappedComplaint) => {
+        if (c.id !== id) return c;
+        const nextCount = isUpvoted ? Math.max(0, (c.upvote_count ?? 1) - 1) : (c.upvote_count ?? 0) + 1;
+        return { ...c, upvote_count: nextCount };
+      };
 
-        const { error: updError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: id });
-        if (updError) throw updError;
+      setAllComplaints((prev) => prev.map(updateCount));
+      setVisibleComplaints((prev) => prev.map(updateCount));
 
-      } else {
-        // Toggle ON
-        setHasUpvoted((prev) => new Set([...prev, id]));
-        setAllComplaints((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, upvote_count: (c.upvote_count ?? 0) + 1 } : c))
-        );
-        setVisibleComplaints((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, upvote_count: (c.upvote_count ?? 0) + 1 } : c))
-        );
-
-        // Sync with DB
-        const { error: insError } = await supabase
-          .from("upvotes")
-          .insert({ citizen_id: userId, complaint_id: id });
-        
-        if (insError && insError.code !== '23505') throw insError;
-
-        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: id });
-        if (rpcError) throw rpcError;
-      }
+      // Sync with DB via centralized API
+      const response = await fetch('/api/complaints', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          complaint_id: id, 
+          action: isUpvoted ? 'downvote' : 'upvote' 
+        })
+      });
+      
+      if (!response.ok) throw new Error("Failed to sync upvote with API");
       setError(null);
     } catch (err: any) {
       console.error("Upvote persistence failed:", err);

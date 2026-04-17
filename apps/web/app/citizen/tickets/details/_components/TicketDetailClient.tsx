@@ -22,6 +22,57 @@ import { getTieredTwitterHandles } from "@/src/lib/twitter-handles";
 
 type Complaint = Database["public"]["Tables"]["complaints"]["Row"];
 
+// ─── Location Parser (EWKB/Hex) ──────────────────────────────────────────────────────────
+
+function parseEwkbHexPoint(hex: string): { lat: number; lng: number } | null {
+  const normalized = hex.trim();
+  if (!/^[0-9a-fA-F]+$/.test(normalized) || normalized.length < 42) return null;
+  try {
+    const bytes = new Uint8Array(normalized.length / 2);
+    for (let i = 0; i < normalized.length; i += 2)
+      bytes[i / 2] = parseInt(normalized.slice(i, i + 2), 16);
+    const view = new DataView(bytes.buffer);
+    const littleEndian = view.getUint8(0) === 1;
+    const typeWithFlags = view.getUint32(1, littleEndian);
+    const hasSrid = (typeWithFlags & 0x20000000) !== 0;
+    const geomType = typeWithFlags & 0x000000ff;
+    if (geomType !== 1) return null;
+    const coordOffset = hasSrid ? 9 : 5;
+    if (bytes.byteLength < coordOffset + 16) return null;
+    const lng = view.getFloat64(coordOffset, littleEndian);
+    const lat = view.getFloat64(coordOffset + 8, littleEndian);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+function parseLocation(location: unknown): { lat: number; lng: number } | null {
+  if (!location) return null;
+  if (typeof location === "object") {
+    const o = location as Record<string, unknown>;
+    if (Array.isArray(o.coordinates) && o.coordinates.length >= 2) {
+      const lng = Number(o.coordinates[0]);
+      const lat = Number(o.coordinates[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+    const latVal = o.lat ?? o.latitude;
+    const lngVal = o.lng ?? o.lon ?? o.longitude;
+    if (latVal !== undefined && lngVal !== undefined) {
+      const lat = Number(latVal); const lng = Number(lngVal);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+  }
+  if (typeof location === "string") {
+    const ewkb = parseEwkbHexPoint(location);
+    if (ewkb) return ewkb;
+    const m = location.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+    if (m) return { lng: Number(m[1]), lat: Number(m[2]) };
+  }
+  return null;
+}
+
 // ── Workflow steps (adapted from authority panel) ─────────────────────────────
 const WORKFLOW_STEPS = [
   { key: "submitted",    label: "Filed",        actor: "Citizen"   },
@@ -194,6 +245,7 @@ export default function TicketDetailClient({
   }, { scope: containerRef, dependencies: [loading, ticket, isModal, viewMode] });
 
   const handleToggleLifecycle = async () => {
+    if (!ticketId) return;
     if (viewMode === "details") {
       setViewMode("lifecycle");
       if (history.length === 0) {
@@ -242,26 +294,21 @@ export default function TicketDetailClient({
     setUpvoteCount(prev => wasUpvoted ? Math.max(0, prev - 1) : prev + 1);
 
     try {
-      if (wasUpvoted) {
-        const { error: delError } = await supabase.from("upvotes").delete().eq("citizen_id", user.id).eq("complaint_id", ticketId);
-        // If it's already deleted, we don't treat it as a fatal error
-        if (delError && delError.code !== 'PGRST116') throw delError;
-        
-        const { error: rpcError } = await supabase.rpc('decrement_upvote_count', { p_complaint_id: ticketId });
-        if (rpcError) throw rpcError;
-      } else {
-        const { error: insError } = await supabase.from("upvotes").insert({ citizen_id: user.id, complaint_id: ticketId });
-        
-        // Error code 23505 is 'unique_violation' (duplicate key).
-        // If it already exists, we ignore and proceed to the RPC to ensure the count is synced.
-        if (insError && insError.code !== '23505') throw insError;
-        
-        const { error: rpcError } = await supabase.rpc('increment_upvote_count', { p_complaint_id: ticketId });
-        if (rpcError) throw rpcError;
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/complaints', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ 
+          complaint_id: ticketId, 
+          action: wasUpvoted ? 'downvote' : 'upvote' 
+        })
+      });
       
-      // Verification: re-fetch from DB to ensure local state is synced after non-optimistic action
-      // (The realtime subscription will also handle this, but explicit fetch is safer)
+      if (!response.ok) throw new Error("Failed to sync upvote");
+      
     } catch (err: any) {
       console.error("Upvote persistence failed:", err);
       // Rollback optimistic UI
@@ -308,7 +355,7 @@ export default function TicketDetailClient({
   };
 
   const handleShareToX = async () => {
-    if (!ticket) return;
+    if (!ticket || !ticketId) return;
     
     const { primary, escalated, tier } = getTieredTwitterHandles(
       ticket.category_id, 
@@ -317,7 +364,7 @@ export default function TicketDetailClient({
     );
     
     const handles = `${primary} ${escalated}`.trim();
-    const shareUrl = window.location.href;
+    const shareUrl = `${window.location.protocol}//${window.location.host}/citizen/tickets/details?id=${ticketId}`;
     
     // Time-based urgency
     const daysSince = Math.floor((new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60 * 24));
@@ -400,6 +447,11 @@ export default function TicketDetailClient({
       );
     }
 
+    const coords = parseLocation(ticket.location);
+    const mapsUrl = coords 
+      ? `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.address_text || "")}`;
+
     return (
       <div className="modal-box relative z-10 flex h-[85vh] min-h-[600px] max-h-[800px] w-[95%] max-w-[1024px] overflow-hidden rounded-[2.5rem] border border-gray-200 bg-white shadow-xl dark:border-[#2a2a2a] dark:bg-[#161616] will-change-[transform,opacity]">
         <div className="flex h-full w-full flex-col lg:flex-row">
@@ -449,7 +501,7 @@ export default function TicketDetailClient({
             {viewMode === "details" ? (
               <>
                 {/* Quick Metadata */}
-                <div className="mt-8 grid grid-cols-2 gap-4 animate-fade-in">
+                <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-4 animate-fade-in">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
                       <ShieldCheck size={14} className="text-[#b48470] dark:text-gray-500" />
@@ -470,13 +522,34 @@ export default function TicketDetailClient({
                       })}
                     </div>
                   </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
+                      < ShieldCheck size={14} className="text-[#b48470] dark:text-gray-500" />
+                      SPAM STATUS
+                    </div>
+                    <div className={`text-base font-bold ${ticket.is_spam ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-500"}`}>
+                      {ticket.is_spam ? "SPAM" : "LEGIT"}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Full Address */}
                 <div className="mt-8 space-y-1.5 animate-fade-in">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
-                    <MapPin size={14} className="text-[#b48470] dark:text-gray-500" />
-                    FULL ADDRESS
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#b48470] dark:text-gray-500">
+                      <MapPin size={14} className="text-[#b48470] dark:text-gray-500" />
+                      FULL ADDRESS
+                    </div>
+                    {ticket.address_text && (
+                      <a 
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg bg-[#b48470]/10 px-2 py-1 text-[10px] font-bold text-[#b48470] transition-all hover:bg-[#b48470] hover:text-white"
+                      >
+                        GET DIRECTIONS →
+                      </a>
+                    )}
                   </div>
                   <p className="text-sm font-bold leading-relaxed text-gray-700 dark:text-gray-200">
                     {ticket.address_text?.split('|')[0] || "Address unavailable"}

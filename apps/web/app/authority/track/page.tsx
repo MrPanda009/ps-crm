@@ -13,7 +13,7 @@ type Status = "submitted" | "under_review" | "assigned" | "in_progress" | "resol
 type Sev    = string
 
 type Complaint = {
-  id: string; ticket_id: string; title: string; status: Status
+  id: string; ticket_id: string; title: string; status: Status; is_spam: boolean
   effective_severity: Sev; sla_deadline: string | null
   escalation_level: number; created_at: string; resolved_at: string | null
   address_text: string | null; assigned_worker_id: string | null; upvote_count: number
@@ -36,7 +36,7 @@ const SEV_FILTER_OPTIONS = [
 ]
 
 const COMPLAINT_SELECT =
-  "id,ticket_id,title,status,effective_severity,sla_deadline," +
+  "id,ticket_id,title,status,is_spam,effective_severity,sla_deadline," +
   "escalation_level,created_at,resolved_at,address_text,assigned_worker_id,upvote_count,categories(name)"
 
 function slaStatus(deadline: string | null, status: Status): { breached: boolean; text: string; pill: string } {
@@ -532,8 +532,8 @@ export default function TrackPage() {
 
                       {/* Status */}
                       <td className="px-2.5 py-2 whitespace-nowrap">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.badge}`}>
-                          {st.label}
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.is_spam ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" : st.badge}`}>
+                          {c.is_spam ? "SPAM" : st.label}
                         </span>
                       </td>
 
