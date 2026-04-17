@@ -80,11 +80,18 @@ const WORKFLOW_STEPS = [
   { key: "assigned",     label: "Assigned",     actor: "Authority" },
   { key: "in_progress",  label: "In Progress",  actor: "Worker"    },
   { key: "resolved",     label: "Resolved",     actor: "Worker"    },
+  { key: "spam",         label: "Spam",         actor: "System"    },
 ] as const;
 
 function WorkflowStepper({ status }: { status: string }) {
+  // Handle 'reopened' by showing progress until 'resolved' or 'spam'
+  const isTerminal = status === "resolved" || status === "rejected" || status === "spam" || status === "closed";
   const currentIdx = WORKFLOW_STEPS.findIndex(s => s.key === status);
-  const activeIdx  = currentIdx === -1 ? 0 : currentIdx;
+  
+  // If reopened, show everything up to "in_progress" as active
+  const activeIdx = currentIdx !== -1 
+    ? currentIdx 
+    : (status === "reopened" ? 3 : 0);
 
   return (
     <div>
