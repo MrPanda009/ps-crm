@@ -181,6 +181,7 @@ export default function MapComponent({
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [rawCount, setRawCount] = useState(0);
+  const { theme } = useTheme();
 
   // Fetch complaints from Supabase
   async function fetchComplaints() {
@@ -290,8 +291,6 @@ export default function MapComponent({
       className: "",
     });
   };
-
-  const { theme } = useTheme();
 
   return (
     <div style={{ position: "relative", height: "100%", width: "100%" }}>
