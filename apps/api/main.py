@@ -1227,6 +1227,87 @@ async def get_admin_dashboard_stats(
         raise HTTPException(status_code=500, detail=f"Admin stats fetch failed: {str(e)}")
 
 
+@app.get("/api/admin/dashboard/department-performance")
+async def get_admin_dashboard_department_performance(
+    authorization: Optional[str] = Header(None)
+):
+    cache_key = "admin:stats:department-performance"
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return { "source": "cache", **json.loads(cached) }
+        except Exception as e:
+            print(f"Redis read error: {e}")
+
+    try:
+        complaints_res = await asyncio.to_thread(
+            lambda: supabase.table("complaints")
+            .select("assigned_department, status, created_at, resolved_at, is_spam")
+            .execute()
+        )
+
+        rows = complaints_res.data or []
+        department_map: Dict[str, Dict[str, Any]] = {}
+
+        for row in rows:
+            department = row.get("assigned_department") or "Unassigned"
+            if not isinstance(department, str):
+                department = str(department)
+
+            stats = department_map.setdefault(department, {
+                "resolvedCount": 0,
+                "activeCount": 0,
+                "durations": [],
+            })
+
+            status = (row.get("status") or "").lower()
+            is_spam = bool(row.get("is_spam"))
+
+            if status == "resolved" and not is_spam and row.get("resolved_at"):
+                try:
+                    start = datetime.fromisoformat(str(row.get("created_at")).replace("Z", "+00:00"))
+                    end = datetime.fromisoformat(str(row.get("resolved_at")).replace("Z", "+00:00"))
+                    delta_days = (end - start).total_seconds() / (3600 * 24)
+                    if delta_days >= 0:
+                        stats["durations"].append(delta_days)
+                        stats["resolvedCount"] += 1
+                    else:
+                        stats["activeCount"] += 1
+                except Exception:
+                    stats["activeCount"] += 1
+            else:
+                stats["activeCount"] += 1
+
+        performance = []
+        for department, stats in department_map.items():
+            resolved_count = stats["resolvedCount"]
+            avg_resolution_days = (
+                sum(stats["durations"]) / len(stats["durations"])
+                if stats["durations"] else 0
+            )
+            performance.append({
+                "department": department,
+                "avgResolutionDays": round(avg_resolution_days, 1),
+                "resolvedCount": resolved_count,
+                "activeCount": stats["activeCount"],
+            })
+
+        performance.sort(key=lambda item: item["avgResolutionDays"] if item["resolvedCount"] > 0 else 999)
+        top_performance = performance[:10]
+
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 300, json.dumps({ "items": top_performance }))
+            except Exception as e:
+                print(f"Redis write error: {e}")
+
+        return { "source": "database", "items": top_performance }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Department performance fetch failed: {str(e)}")
+
+
 # =========================================================
 # 8d. ADMIN AUTHORITIES LIST (Consolidated + Redis)
 # =========================================================
