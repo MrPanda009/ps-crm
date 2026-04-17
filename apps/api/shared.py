@@ -51,6 +51,7 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "Jansamadhan@mail.perkkk.dev").strip() or "Jansamadhan@mail.perkkk.dev"
 AI_SERVICE_URL = os.getenv("AI_SERVICE_URL")
 REDIS_URL = os.getenv("REDIS_URL")
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://jansamadhan.perkkk.dev").strip().rstrip("/")
 
 # Startup Validation
 print(f"DEBUG: SUPABASE_URL={SUPABASE_URL}")
@@ -177,6 +178,16 @@ def _status_label(status: Optional[str]) -> str:
     return str(status).replace("_", " ").title()
 
 
+def build_ticket_details_url(complaint_id: Optional[str]) -> str:
+    """Build an absolute URL to the citizen ticket details page."""
+    base_url = FRONTEND_BASE_URL or "https://jansamadhan.perkkk.dev"
+    normalized_id = str(complaint_id or "").strip()
+    if not normalized_id:
+        return f"{base_url}/citizen/tickets"
+    encoded_id = urllib.parse.quote(normalized_id, safe="")
+    return f"{base_url}/citizen/tickets/details?id={encoded_id}"
+
+
 async def send_resend_email(
     ticket_id: str,
     title: str,
@@ -186,6 +197,7 @@ async def send_resend_email(
     city: str,
     address: str,
     *,
+    complaint_id: Optional[str] = None,
     citizen_id: Optional[str] = None,
     worker_id: Optional[str] = None,
     event_type: str = "complaint_created",
@@ -216,6 +228,7 @@ async def send_resend_email(
     summary = _NOTIFICATION_EVENT_SUMMARIES[event]
     status_text = _status_label(status)
     current_year = datetime.now().year
+    ticket_url = build_ticket_details_url(complaint_id)
 
     email_html = f"""
     <!DOCTYPE html>
@@ -260,7 +273,7 @@ async def send_resend_email(
           </table>
 
           <div class="btn-container">
-            <a href="https://jansamadhan.perkkk.dev/citizen/tickets" class="btn">View Ticket</a>
+                        <a href="{ticket_url}" class="btn">View Ticket</a>
           </div>
         </div>
         <div class="footer">

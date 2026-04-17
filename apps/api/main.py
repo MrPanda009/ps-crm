@@ -44,6 +44,7 @@ from shared import (
     build_complaint_record,
     redis_client,
     send_resend_email,
+    build_ticket_details_url,
     AI_SERVICE_URL,
 )
 
@@ -930,6 +931,7 @@ async def confirm(
     print(f"DEBUG: Triggering email for ticket_id={inserted.get('ticket_id')} citizen_id={citizen_id}")
     asyncio.create_task(send_resend_email(
         ticket_id=inserted.get("ticket_id") or inserted["id"],
+        complaint_id=inserted["id"],
         title=title,
         authority=routed_authority,
         severity=severity_db,
@@ -1621,6 +1623,7 @@ async def assign_complaint(
             if latest:
                 asyncio.create_task(send_resend_email(
                     ticket_id=latest.get("ticket_id") or payload.complaint_id,
+                    complaint_id=payload.complaint_id,
                     title=latest.get("title") or "Complaint Update",
                     authority=latest.get("assigned_department") or "UNASSIGNED",
                     severity=latest.get("severity") or "L1",
@@ -2820,6 +2823,7 @@ async def notify_complaint_email(
 
     email_result = await send_resend_email(
         ticket_id=complaint.get("ticket_id") or request.complaint_id,
+        complaint_id=request.complaint_id,
         title=complaint.get("title") or "Complaint Update",
         authority=complaint.get("assigned_department") or "UNASSIGNED",
         severity=complaint.get("severity") or "L1",
@@ -2879,12 +2883,13 @@ async def notify_closure_confirmation(
         clean_phone = "".join(filter(str.isdigit, str(phone)))
         if len(clean_phone) == 10:
             clean_phone = f"91{clean_phone}"
+        ticket_details_url = build_ticket_details_url(request.complaint_id)
 
         msg = (
             f"🔔 *Ticket Verification Required*\n\n"
             f"Your ticket *{ticket_id}* has been marked as completed by our team.\n\n"
             f"Please verify the resolution and confirm if the issue is fixed.\n"
-            f"👉 Confirm or Reject: https://jansamadhan.perkkk.dev/citizen/tickets\n\n"
+            f"👉 Confirm or Reject: {ticket_details_url}\n\n"
             f"_(Reply with 'status {ticket_id}' here to check details)_"
         )
 
