@@ -224,7 +224,12 @@ export function getUrgentTickets(
         // also catch string-format high/critical from DB
         ["high","critical","l3","l4"].includes((c.effective_severity ?? "").toLowerCase()))
     )
+    .filter(c => isBreached(c.sla_deadline, c.status))
     .sort((a, b) => {
+      const aDeadline = a.sla_deadline ? new Date(a.sla_deadline).getTime() : Number.POSITIVE_INFINITY
+      const bDeadline = b.sla_deadline ? new Date(b.sla_deadline).getTime() : Number.POSITIVE_INFINITY
+      if (aDeadline !== bDeadline) return aDeadline - bDeadline
+
       const ra = SEVERITY_RANK[a.effective_severity] ?? SEVERITY_RANK[(a.effective_severity ?? "").toLowerCase()] ?? 0
       const rb = SEVERITY_RANK[b.effective_severity] ?? SEVERITY_RANK[(b.effective_severity ?? "").toLowerCase()] ?? 0
       const diff = rb - ra
