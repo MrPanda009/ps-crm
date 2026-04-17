@@ -53,6 +53,8 @@ AI_SERVICE_URL = os.getenv("AI_SERVICE_URL")
 REDIS_URL = os.getenv("REDIS_URL")
 
 # Startup Validation
+print(f"DEBUG: SUPABASE_URL={SUPABASE_URL}")
+print(f"DEBUG: RESEND_API_KEY={'set' if RESEND_API_KEY else 'MISSING'}")
 if not GEMINI_API_KEY:
     print("❌ FATAL: GEMINI_API_KEY is not set.")
 if not SUPABASE_URL:
@@ -202,6 +204,7 @@ async def send_resend_email(
         worker_id=worker_id,
         worker_id_override=worker_id_override,
     )
+    print(f"DEBUG: Email recipients for {ticket_id}: {recipients}")
     if not recipients:
         print(
             f"[Email] No eligible recipients for event={event} ticket={ticket_id} "

@@ -927,6 +927,7 @@ async def confirm(
     )
 
     # --- Background Email Notification ---
+    print(f"DEBUG: Triggering email for ticket_id={inserted.get('ticket_id')} citizen_id={citizen_id}")
     asyncio.create_task(send_resend_email(
         ticket_id=inserted.get("ticket_id") or inserted["id"],
         title=title,
