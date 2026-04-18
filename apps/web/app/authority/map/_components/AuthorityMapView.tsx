@@ -2,7 +2,7 @@
 
 "use client"
 
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   MapContainer,
   TileLayer,
@@ -21,6 +21,8 @@ import {
   UserCheck,
 } from "lucide-react"
 import { supabase } from "@/src/lib/supabase"
+import { useTheme } from "@/components/ThemeProvider"
+import { getMapTileLayerConfig } from "@/lib/map-tiles"
 
 // Dynamically import MarkerClusterGroup with no SSR
 const MarkerClusterGroup = dynamic(
@@ -534,7 +536,8 @@ const SEV_OPTIONS: { value: SeverityLevel | "all"; label: string }[] = [
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AuthorityMapView() {
+export default function AuthorityMapView({ highQuality = true }: { highQuality?: boolean }) {
+  const { theme } = useTheme()
   const [leafletLib,     setLeafletLib]     = useState<any>(null)
   const [tickets,        setTickets]        = useState<MapTicket[]>([])
   const [workers,        setWorkers]        = useState<WorkerOption[]>([])
@@ -545,6 +548,10 @@ export default function AuthorityMapView() {
   const [statusFilter,   setStatusFilter]   = useState<ComplaintStatus | "all">("all")
   const [sevFilter,      setSevFilter]      = useState<SeverityLevel | "all">("all")
   const [department,     setDepartment]     = useState("")
+  const tileConfig = useMemo(
+    () => getMapTileLayerConfig({ theme, highQuality }),
+    [highQuality, theme]
+  )
 
   // ── Init Leaflet ─────────────────────────────────────────────────────────
 
@@ -811,8 +818,11 @@ export default function AuthorityMapView() {
               style={{ height: "100%", width: "100%" }}
             >
               <TileLayer
-                attribution="© OpenStreetMap contributors"
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution={tileConfig.attribution}
+                url={tileConfig.url}
+                detectRetina={tileConfig.detectRetina}
+                maxNativeZoom={tileConfig.maxNativeZoom}
+                subdomains={tileConfig.subdomains}
               />
 
               {showHeatmap && <HeatmapLayer tickets={visible} />}

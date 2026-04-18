@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
 import type { Tables } from "@/src/types/database.types";
 import { useTheme } from "@/components/ThemeProvider";
+import { getMapTileLayerConfig } from "@/lib/map-tiles";
 
 type ComplaintRow = Tables<"complaints">;
 
@@ -182,6 +183,7 @@ export default function MapComponent({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [rawCount, setRawCount] = useState(0);
   const { theme } = useTheme();
+  const tileConfig = getMapTileLayerConfig({ theme, highQuality });
 
   // Fetch complaints from Supabase
   async function fetchComplaints() {
@@ -313,23 +315,11 @@ export default function MapComponent({
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
-          attribution={
-            theme === "dark"
-              ? '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://stadiamaps.com/">Stadia Maps</a>'
-              : highQuality
-              ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              : "© OpenStreetMap contributors"
-          }
-          url={
-            theme === "dark"
-              ? "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
-              : highQuality
-              ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          }
-          detectRetina={theme === "dark" || Boolean(highQuality)}
-          maxNativeZoom={theme === "dark" || highQuality ? 20 : 19}
-          subdomains={theme === "dark" || highQuality ? "abcd" : "abc"}
+          attribution={tileConfig.attribution}
+          url={tileConfig.url}
+          detectRetina={tileConfig.detectRetina}
+          maxNativeZoom={tileConfig.maxNativeZoom}
+          subdomains={tileConfig.subdomains}
         />
         <ZoomToComplaint
           complaints={complaints}
