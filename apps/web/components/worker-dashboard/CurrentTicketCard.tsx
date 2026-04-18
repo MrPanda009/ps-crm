@@ -131,7 +131,7 @@ export default function CurrentTicketCard({
           </button>
 
           {dropdownOpen && (
-            <div className="absolute left-0 top-full z-50 mt-1 w-[min(18rem,calc(100vw-3rem))] rounded-lg border border-gray-200 bg-white shadow-lg sm:w-64 dark:border-[#3a3a3a] dark:bg-[#1e1e1e]">
+            <div className="absolute left-0 top-full z-[1000] mt-1 w-[min(18rem,calc(100vw-3rem))] rounded-lg border border-gray-200 bg-white shadow-lg sm:w-64 dark:border-[#3a3a3a] dark:bg-[#1e1e1e]">
               {!noteMode ? (
                 <ul className="py-1">
                   {(ticket.status === "assigned" || ticket.status === "reopened") && (

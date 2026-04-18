@@ -90,7 +90,7 @@ export default function PendingTicketCard({
           </button>
 
           {dropdownOpen && (
-            <div className="absolute bottom-[calc(100%+4px)] right-0 z-50 w-[min(18rem,calc(100vw-3rem))] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-[#3a3a3a] dark:bg-[#1e1e1e]">
+            <div className="absolute bottom-[calc(100%+4px)] right-0 z-[1000] w-[min(18rem,calc(100vw-3rem))] rounded-lg border border-gray-200 bg-white shadow-lg dark:border-[#3a3a3a] dark:bg-[#1e1e1e]">
               {!noteMode ? (
                 <ul className="py-1">
                   {(ticket.status === "assigned" || ticket.status === "reopened") && (
